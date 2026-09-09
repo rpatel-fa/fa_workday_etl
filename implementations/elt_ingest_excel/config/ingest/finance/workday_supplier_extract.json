@@ -1,0 +1,14 @@
+[
+  {
+    "workbookPathName": "~/Downloads",
+    "workbookFileName": "Extract Suppliers 2026-07-28 20_40 BST.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "13",
+        "dataRow": "14",
+        "targetTableName": "fin_workday_extract_supplier"
+      }
+    ]
+  }
+]

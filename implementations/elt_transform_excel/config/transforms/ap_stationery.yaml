@@ -1,0 +1,221 @@
+version: 1
+
+transform:
+  key: ap_stationery
+  label: AP Stationery
+  source_type: AP Stationery Proactis Upload
+  eib_population_type: Supplier Invoice
+  description: >
+    GENERIC stationery / courier company supplier-invoice workbooks transformed into the
+    Workday Supplier Invoice EIB. ONE config covers ALL qualifying *Template.xlsx /
+    *TEMPLATE.xlsx files under /Stationery Companies/ for ALL suppliers: currently
+    ADDISON LEE (FA subfolder only — see exclusion below), AMBASSADOR TAXI, DHL, E-COURIER,
+    plus any future suppliers who drop a TEMPLATE-suffixed workbook with the same "Proactis
+    Upload" tab. No per-supplier or per-company config is needed — the single ap_stationery
+    profile is intentionally generic. Sources the Finance-prepared "Proactis Upload" tab
+    directly — confirmed via openpyxl full-column uniformity scan (4 TEMPLATE files
+    inspected Aug 14 2026) that 14 of 16 columns A–P are byte-for-byte identical across all
+    variants; only 2 column-name alias groups exist (see source_layout header notes below).
+    Each supplier workbook can contain ONE OR MORE multi-line invoices (InvoiceNumber repeats
+    across 2+ rows for split-coding allocations; the same file may also contain single-line
+    invoices). VBA Phase 1 prepass groups rows by InvoiceNumber, assigns a per-group shared
+    Spreadsheet Key (col B). CHANGED 2026-09-09 per Will's hand-edited Aug Ambassador Taxi EIB
+    (AP confirmed correct shape) + user instruction 2026-09-09 "we want to ensure the invoice
+    number is unique":
+      (1) K (InvoiceNumber) = COMPOSITE = CreditorID + "-" + YYMM + "-" + RawInvNum (e.g.
+          AMB001-2607-496). BG (SuppliersInvoiceNumber) = RAW PASHROUGH = col C DIRECT (e.g. 496).
+          INTENTIONALLY DIFFERENT: K preserves Workday uniqueness across suppliers/months;
+          Will's hand-edited Aug file set K=BG=495 (single-invoice shortcut). User explicitly
+          restored composite K. BG remains external-facing raw for AP PDF reconciliation.
+      (2) AG (ReceiptDate) is left BLANK (do NOT read from ReceivedDate col, do NOT fallback to AF);
+      (3) EM (Line Order) = per-group 1..N sequential counter reset on new InvoiceNumber group;
+          CORRECT for mixed single/multi-line batches (Sept). Workday B+EM tuple = authoritative
+          line position; single-line groups trivially produce 1 (matches legacy default).
+      (4) EK (Row ID) = EXACT MIRROR of EM (per-group 1..N counter). Written from the same
+          `lineOrderNext` VBA local to guarantee EK == EM per row; required for mixed single +
+          multi-line Sept batches; matches CALC_TAX_DUE Workday grouping semantics.
+      (5) AS (Control Amount Total) is left BLANK -- AP confirmed no value required;
+      (6) GE = GF = Net amount only on both Unit Cost and Extended Amount (no VAT pre-add);
+      (7) FE/FF/FK P20 triple = GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard /
+          Fully_Recoverable (Purchasing domain ref-IDs, NOT the generic Standard_Rated constants).
+    Header consistency guard enforces Company/Supplier/
+    Currency/InvoiceDate identity within each group; diverging header fields
+    raise a build error before EIB write. Source column B "SupplierID" is formatted as
+    `{CompanyPrefix}-{CreditorID}` (e.g. "FA-ADD001" for Addison Lee FA, "FA-AMB001" for
+    Ambassador, "FA-DHL001" for DHL, "FA-ECO003" for E-Courier). VBA splits on the first
+    hyphen per-row to extract the per-row company prefix and bare CreditorID for standard
+    2-part supplier resolution (`{CreditorID}-{Company}` then bare `{CreditorID}`). The 9
+    worktags are ALL resolved via Mapping MASTER lookup on the accounting-string code from
+    column K (Seg1=Cost Centre, Seg2=Spend Category, Seg3=Project/Commercial Partner/Grant,
+    Seg4=Program). Tax is driven per-row from source TaxCode column P — current files are all
+    P20 but the per_row_tax table also handles P0/PZ zero-rated for future-proofing.
+    CHANGED 2026-09-09: P20 triple = GBR_Domestic_Purchase_Of_Goods_And_Services /
+    GBR_Standard / Fully_Recoverable (AP confirmed vs Will's hand-edited Aug
+    Ambassador Taxi EIB). Previously GBR_Standard_Rated/GBR_Standard_Rated/Recoverable_Allocate.
+    Per-row dates: InvoiceDate from col D (InvoiceDate); AG is blank per (2) above.
+    Line description from col O Description. Net/Gross amounts from cols L+N.
+
+    DELIBERATE EXCLUSION — handled as a separate future transform (separate session):
+    * ANY workbook under /ADDISON LEE/WNSL/ subfolder (i.e. WNSL-prefixed SupplierID
+      such as "WNSL-ADD001" / WNSL-invoice-3426595* files). These are intentionally NOT
+      routed through this generic ap_stationery pipeline. The WNSL folder today contains
+      no Proactis-Upload TEMPLATE-suffixed file, so the generic TEMPLATE-file discovery
+      rule already excludes them by name-pattern — but the exclusion is documented here
+      AND in the VBA gate guard as a belt-and-braces re-check.
+
+    See config/transform_specs/ap_stationery.yaml for the full decision record and
+    per-column mapping classes.
+
+runtime:
+  step_list_macro: RunApStationerySupplierInvoice
+
+source_layout:
+  worksheet_name: Proactis Upload
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - Template
+    - SupplierID
+    - InvoiceNumber
+    - InvoiceDate
+    - ReceivedDate
+    - Currency
+    - Tray
+    - CreatedBy
+    - PONumber
+    - ItemCode
+    # NOTE: col K cost-code header varies by file — 3 of 4 files use "New Cost Code"
+    # (Ambassador, DHL, E-Courier) and 1 of 4 files use "Final Cost Code" (Addison Lee).
+    # Pipe-delimited alias list: VBA uses SplitHeaderAliases + a looped FindColumnIndexInRow
+    # over each alternative (order = priority). NormalizeToken handles whitespace/case.
+    - New Cost Code|Final Cost Code
+    # NOTE: col L net-amount header varies by file — 3 of 4 files use "Net" (Addison Lee,
+    # Ambassador, DHL) and 1 of 4 files use "Net Amount" (E-Courier). Pipe-delimited
+    # alias list; VBA uses SplitHeaderAliases + looped FindColumnIndexInRow.
+    - Net|Net Amount
+    - Tax
+    - Gross
+    - Description
+    - TaxCode
+
+transform_constants:
+  # Supplier resolution contract — explicit so cold-start agents don't guess.
+  # Two-part supplier precedence: exact per-company match (precedence 1) then bare fallback (precedence 2).
+  # Company code is NEVER hardcoded here — it is derived PER ROW from the SupplierID
+  # column B "{CompanyPrefix}-{CreditorID}" split (left segment = company,
+  # right = bare creditor ID. companyCodePerRow" then mapped via runner company-mapping
+  # rows (runner "FA", "WNSL", etc.), falling back to the company_fallback entity
+  # name when no runner mapping entry exists for that row's company prefix.
+  supplier_resolution:
+    mode: per_row_split
+    source_column: SupplierID
+    split_delimiter: "-"
+    split_count: 2
+    segments:
+      - index: 1
+        name: Company
+        note: Resolves Workday company ref-id via mapping sheet entity=company
+      - index: 2
+        name: CreditorID
+        note: Bare creditor prefix — combined with Company for 2-part supplier match
+    key_precedence:
+      1: "{CreditorID}-{Company}"
+      2: "{CreditorID}"
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    reference_id_delimiter: pipe
+  # Per-row tax classification driven by source column P "TaxCode" (STRING values,
+  # NOT percentage numbers). Canonical convention matches amex_trains validator:
+  #   driver_column = TaxCode   (the column read per-row)
+  #   rate_0 branch = when TaxCode cell value is "P0" OR "PZ" → 0% Outside of Scope
+  #   rate_20 branch = when TaxCode cell value is "P20" → 20% Standard Rated
+  # Current 4 stationery template files are 100% P20 rows; zero-rated branches
+  # exist for future suppliers who may export or have tax-exempt purchases.
+  per_row_tax:
+    driver_column: TaxCode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  # All 9 worktags resolved from the col K accounting string under aliases
+  # "New Cost Code|Final Cost Code" (see source_layout.required_headers for the canonical
+  # alias list). 4-segment accounting string via Mapping MASTER lowest-hierarchy match.
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  # No fixed literal worktags — spend_category (DP) is resolved per-row from Seg2 of
+  # the accounting string, not hardcoded like AMEX transforms.
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  # source_layout defaults — shared by all stationery supplier variants below
+  source_worksheet_name: Proactis Upload
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.
+  #
+  # Per-supplier folder convention (matches taxi/first_class/source + target pattern):
+  #   Stationery Companies/{Supplier}/{Company?}/source/  <- user places TEMPLATE .xlsx here
+  #   Stationery Companies/{Supplier}/{Company?}/target/  <- Runner writes EIB output here
+  #
+  # shell_defaults.variants produces ONE DROPDOWN ROW PER VARIANT on the Runner. All variants
+  # below share the SAME VBA step-list macro (RunApStationerySupplierInvoice), the SAME
+  # source_layout schema (Proactis Upload tab, headers row 1 / data row 2), the SAME
+  # transform_constants (9-worktag Mapping MASTER pipeline, per-row SupplierID split,
+  # per-row TaxCode driver). The only per-variant differences are: (1) the profile_key /
+  # profile_label shown in the Runner dropdown, (2) the machine-local source_data path,
+  # (3) the machine-local output_file_path target.
+  #
+  # DELIBERATE EXCLUSION (kept as a belt-and-braces note even though the TEMPLATE pattern
+  # already excludes it): /ADDISON LEE/WNSL/ files are intentionally NOT covered here.
+  variants:
+    - profile_key: ap_stationery_addison_lee_fa
+      profile_label: AP Stationery Addison Lee FA
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/FA/source/342290_JUL 26__ADDISON LEE TEMPLATE.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/FA/target/Submit_Supplier_Invoice_ap_stationery_addison_lee_fa_output.xlsx
+    - profile_key: ap_stationery_ambassador_taxi
+      profile_label: AP Stationery Ambassador Taxi
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/AMBASSADOR TAXI/source/Invoice 496 AUG 26_Template.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/AMBASSADOR TAXI/target/Submit_Supplier_Invoice_ap_stationery_ambassador_taxi_output.xlsx
+    - profile_key: ap_stationery_dhl
+      profile_label: AP Stationery DHL
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/DHL/source/LONR011182321_JUL 26_Template_V3.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/DHL/target/Submit_Supplier_Invoice_ap_stationery_dhl_output.xlsx
+    - profile_key: ap_stationery_e_courier
+      profile_label: AP Stationery E-Courier
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/source/589576_Invoice JUL 26 Template.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/target/Submit_Supplier_Invoice_ap_stationery_e_courier_output.xlsx

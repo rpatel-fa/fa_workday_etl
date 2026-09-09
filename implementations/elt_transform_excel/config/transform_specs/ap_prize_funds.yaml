@@ -1,0 +1,368 @@
+# Transform spec - ap_prize_funds
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# Lives in config/transform_specs/ (not config/transforms/, which the build globs as runnable profiles).
+# Operational facts live in config/transforms/ap_prize_funds.yaml. Not restated here.
+#
+# Source workbook: "Copy of Copy of FA Cup 1ST RND PROPER (1) (3).xlsx"
+# Data sheet: INTEGRATION (header row 1, data rows 2..81, 11 cols A-K)
+#   Col A = BatchID        ("NVFAC1STRNDP2526" on all 80 rows = FA Cup 1st Round Proper, Nov 25-26 season)
+#   B = CreditorID         (80 distinct club creditor codes, WINNERS: ACC008..WYC004; LOSERS: AFC044..YOR004)
+#   C = DocumentType       ("INVOICE" on all rows)
+#   D = Decscription       (note header misspelling with extra 'c'; all rows = "FAC1STRNDP2526")
+#   E = InvoiceDate        (constant 2025-11-04 = round date)
+#   F = ReceiptDate        (constant 2025-11-20 = payment-due date per sheet)
+#   G = DocNo              (ALL rows = "FAC1STRNDP2526" -- NOT unique per row)
+#   H = DistributionReferenceCode (one value across all 80 rows: "1050-605100-PPGC0001-0000 - PGB" with a non-breaking space before hyphen)
+#   I = PurchasesAmount    (40 rows of 47750 = Winners; 40 rows of 15800 = Losers; Grand Total 2,542,000)
+#   J = TaxAmount          (0 on all rows)
+#   K = TaxDetailID        ("POS" on all rows)
+#
+# This is Finance AP's canonical GP Integration tab. Unlike CFA Distributions (FM->Integration
+# reverse engineering), here the Integration tab IS the input, directly from the AP team who
+# already prepare it for loading into Workday. Simpler than the referee case.
+#
+# KEY DESIGN DECISIONS (distinct from ap_referees):
+#
+#   * NO Company column in Integration tab (not present; not blank -- column doesn't exist).
+#     So we don't look up a Company header; we just hardcode SOURCE_COMPANY_CODE="FA" constant.
+#
+#   * DocNo = "FAC1STRNDP2526" on ALL 80 rows. This is fundamentally different from referees
+#     where DocNo was the per-row voucher unique key. Here DocNo = the whole batch reference.
+#     Therefore:
+#
+#     Rule 8 - Invoice Number (EIB G): NVFAC1STRNDP2526-{CreditorID}
+#       Because CreditorID is 80-way unique (one club per row) and DocNo is the same for
+#       everyone. This is the CFA pattern (batch-creditor) because each supplier has exactly
+#       one invoice in this batch.
+#
+#     Rule 7 - Suppliers Invoice Number (EIB AU): FAC1STRNDP2526-{CreditorID}
+#       GP voucher number at a per-club level. DocNo prefix + CreditorID suffix.
+#
+# Derived-field rules (Integration Tab -> EIB mapping):
+#
+#   Rule 1 - Company: Constant "FA" (no Company column in Integration; the entire prize fund
+#            batch is FA Group / FA. No NFC/WNSL club prize funds in this file).
+#   Rule 2 - BatchID token: "NVFAC1STRNDP2526" (Integration col A, all rows identical; note
+#            spaces are already removed). Used as prefix for InvoiceNumber (Rule 8).
+#   Rule 3 - DocumentType (Int C): already UPPER ("INVOICE"); gate checks exact match.
+#   Rule 4 - ItemDescription (EIB EP): UPPER(TRIM(Int D "Decscription")) -- same typo 'c'
+#            preserved; matches source literal header. All rows = "FAC1STRNDP2526" so EP will
+#            be that value everywhere on output.
+#   Rule 5 - InvoiceDate (EIB AF): Int E AS IS (constant 2025-11-04 across all 80 rows;
+#            read from source for robustness in case next round file changes).
+#   Rule 6 - ReceiptDate (EIB AG): Int F AS IS (constant 2025-11-20; read from source).
+#   Rule 7 - Suppliers Invoice Number (EIB BG / voucher): {DocNo}-{CreditorID}.
+#            DocNo alone is same for all 80 rows, so would fail Workday's per-supplier inv-no
+#            uniqueness check. Appending CreditorID gives per-supplier uniqueness.
+#            Example: FAC1STRNDP2526-ACC008 for Accrington Stanley (Winner, row 2).
+#   Rule 8 - Invoice Number (EIB K): NVFAC1STRNDP2526-{CreditorID}.
+#            = batch token + CreditorID (80 distinct clubs = 80 unique invoice numbers).
+#            DocNo NOT used as suffix because it's constant across the batch.
+#            Example: NVFAC1STRNDP2526-ACC008.
+#   Rule 9 - DistributionReferenceCode / Final Code / accounting string (EIB worktags):
+#            Int H AS IS. Single value across all 80 rows in this exemplar:
+#            "1050-605100-PPGC0001-0000 - PGB". Lowest-hierarchy Cost Centre, Spend Category,
+#            7 optional worktags resolved exactly as CFA Rule 9.
+#   Rule 10 - PurchasesAmount (net line amount): Int I AS IS. 40 rows of 47750 (Winners) +
+#             40 rows of 15800 (Losers) = £2,542,000. Tax=0 so CALC_TAX_DUE no-op.
+#   Rule 11 - TaxAmount: Int J AS IS (= 0 everywhere).
+#   Rule 12 - TaxDetailID: Int K AS IS (= POS everywhere).
+#   Rule 13 - Memo (EIB GQ): DocNo + " " + CreditorID + " " + DistributionReferenceCode.
+#             Batch ref + club code + accounting string -- traceability pattern.
+#   Rule 14 - Reporting Type (EIB GR): second accounting-string segment first character via
+#             reporting_type_from_final_code helper.
+#
+# Reuses the standard Supplier Invoice EIB field block; house defaults inherited unchanged:
+# I=Y, EK=1, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+
+meta:
+  key: ap_prize_funds
+  label: AP Prize Funds
+  requester: Finance (AP)
+  date_confirmed: 2026-08-11
+  exemplar_to_fork: ap_referees
+  note: >
+    Integration tab IS the input (confirmed by Finance AP team -- they already prepare this for
+    Workday GP import). Simpler than referees in some ways (80 single-club rows = clean
+    1:1 CreditorIDs); trickier in one way: DocNo is the same for all 80 rows, so we cannot
+    use DocNo as a per-row unique key (need CreditorID suffix for both Invoice Number G AND
+    SuppliersInvNo AU). Also note: NO Company column exists in Integration -- we just use
+    constant "FA".
+
+shared_helpers:
+  supplier_resolution: direct_gp_creditor_id_via_extract
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_distribution_reference_code
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: per_row
+    source_column: CreditorID            # Integration col B (NOT col C like referees!)
+    source_company_constant: FA          # Rule 1 -- constant (no Company column in Integration)
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    key_precedence:
+      1: "{CreditorID}-FA"               # exact per-company match (SQL s_exact) -- HIGHER
+      2: "{CreditorID}"                  # bare fallback (SQL s_bare)
+    reference_id_delimiter: pipe
+    note: >
+      Integration col B (CreditorID) carries club codes (ACC008, AFC044, WYC004, YOR004, ...).
+      Prize fund = pure FA company (no NFC / WNSL clubs). Two-part resolution, identical mechanism
+      to referees and CFA: try "{CreditorID}-FA" first (to disambiguate same bare creditor code
+      across companies), then fall back to bare "{CreditorID}".
+  company:
+    source_code: constant
+    value: FA
+    resolved_via: mapping tab entity=company with constant SOURCE_COMPANY_CODE=FA fallback
+    note: >
+      Unlike referees (Integration col A = Company), prize funds Integration tab has NO company
+      column. Hardcoded constant SOURCE_COMPANY_CODE = "FA". The entire prize fund batch is FA.
+
+fields:
+  invoice_number:
+    rule: "NVFAC1STRNDP2526-{CreditorID}"    # Rule 8; e.g. NVFAC1STRNDP2526-ACC008
+    note: >
+      DocNo is "FAC1STRNDP2526" on ALL 80 rows (constant across the batch, not per-row).
+      Therefore we CANNOT use the referee pattern "{batch}-{DocNo}" (that would give 80 duplicate
+      Workday invoice numbers). Instead we use the CFA pattern: "{BatchID}-{CreditorID}".
+      CreditorIDs are 80/80 distinct, so this form is guaranteed unique per invoice.
+      Batch token taken from Integration col A literal = "NVFAC1STRNDP2526" (no spaces to strip).
+  invoice_date:
+    source_column: InvoiceDate                # Rule 5 = Integration col E (2025-11-04 constant)
+    format: Excel serial date coerced to YYYY-MM-DD text at write time
+    note: >
+      All 80 rows share 2025-11-04 (Emirates FA Cup 1st Round Proper date). Read from source
+      for robustness in case next round files use different round dates.
+  receipt_date:
+    source_column: ReceiptDate                # Rule 6 = Integration col F (2025-11-20 constant)
+    note: >
+      All 80 rows share 2025-11-20 (the date-of-payment target per the PIVOT sheet's instructions).
+      Read from source for robustness.
+  suppliers_invoice_number:                    # EIB BG (= voucher / source-system invoice ref)
+    rule: "FAC1STRNDP2526-{CreditorID}"       # Rule 7; e.g. FAC1STRNDP2526-ACC008
+    note: >
+      Source DocNo (Integration col G) = "FAC1STRNDP2526" on all 80 rows. Used AS THE PREFIX
+      (not the full value, because bare DocNo is not unique per club/supplier -- Workday enforces
+      per-supplier uniqueness on SuppliersInvoiceNumber AU). Appending CreditorID gives the
+      per-club GP voucher reference: FAC1STRNDP2526-{ClubCode}.
+  item_description:
+    rule: "UPPER(TRIM(Decscription))"         # Rule 4
+    note: >
+      Header D literal is "Decscription" with extra 'c' (Finance-created GP header).
+      All 80 rows carry the same batch label "FAC1STRNDP2526" -- DI output will be that constant.
+  memo:
+    rule: "DocNo + ' ' + CreditorID + ' ' + DistributionReferenceCode"   # Rule 13
+    note: >
+      EIB EO = batch ref + club creditor code + accounting string. Traceability: the AP team
+      can see both the club (CreditorID) and the accounting string from the EIB, without
+      needing to re-open the source Excel.
+  line_amount:
+    source_column: PurchasesAmount             # Integration col I (Rule 10). Note header: trailing space "PurchasesAmount " -- NormalizeToken trims.
+    basis: net
+    note: >
+      40 Winner rows @ £47,750 + 40 Loser rows @ £15,800 = £1,910,000 + £632,000 = £2,542,000.
+      TaxAmount = 0 POS everywhere so Workday CALC_TAX_DUE adds nothing.
+  spend_category:
+    derivation: per_row_lookup
+    key_source_column: DistributionReferenceCode   # Integration col H
+    key_rule: lowest-hierarchy matching accounting-string segment
+    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Spend Category
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  reporting_type:
+    source_column: DistributionReferenceCode
+    rule: second accounting-string segment first character via reporting_type_from_final_code helper
+  cost_centre:
+    derivation: per_row_lookup
+    key_source_column: DistributionReferenceCode
+    key_rule: lowest-hierarchy matching accounting-string segment
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  related_worktags:
+    event:
+      target: er
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Events - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    camp:
+      target: es
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Camps - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    fa_learning_course:
+      target: et
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: FA Learning - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    commercial_partner:
+      target: eu
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Commercial Partners - Custom Worktag
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    grant:
+      target: ev
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Grant
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    programme:
+      target: ew
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Program - Delivered Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    project:
+      target: ex
+      source_column: DistributionReferenceCode
+      worktag_business_object_key: Projects (Opex)
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+
+tax:
+  mode: uniform
+  applicability: GBR_Outside_of_Scope
+  code: GBR_Zero_Rated
+  recoverability: Nonrecoverable_Allocate
+  note: >
+    Tax amount (Integration J) = 0 and Tax detail (Integration K) = POS on all 80 rows;
+    source carries no VAT breakdown. Same treatment as CFA Distributions and Referee Invoices.
+    Prize-money payments to football clubs are outside the scope of VAT (reverse-charge or
+    non-business supplies depending on the club, but zero-rated from FA's perspective).
+
+eib_house_defaults:
+  fixed_company_code: FA
+  batch_id_token: NVFAC1STRNDP2526
+  submit_flag: "Y"
+  default_currency: GBP
+  tax_applicability: GBR_Outside_of_Scope
+  tax_code: GBR_Zero_Rated
+  tax_recoverability: Nonrecoverable_Allocate
+  tax_point_date_type: INVOICE/ADJUSTMENT_DATE
+  tax_option: CALC_TAX_DUE
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet_name: MAPPING MASTER
+
+worktag_business_objects:
+  cost_centre: "Cost Center"
+  spend_category: "Spend Category"
+  event: "Events - Custom Org"
+  camp: "Camps - Custom Org"
+  fa_learning: "FA Learning - Custom Org"
+  commercial_partner: "Commercial Partners - Custom Worktag"
+  grant: "Grant"
+  program: "Program - Delivered Org"
+  project: "Projects (Opex)"
+
+skip_rule:
+  drop_when:
+    - CreditorID blank
+    - DocumentType UPPER != INVOICE
+    - Decscription blank
+    - DocNo blank
+    - DistributionReferenceCode blank
+    - PurchasesAmount == 0
+    - cost_centre unresolved
+    - spend_category unresolved
+    - supplier unresolved (CreditorID with -FA precedence, then bare, not on Supplier Spreadsheet)
+  note: >
+    Prize funds Integration has NO "Company" column (unlike referees which had it in col A),
+    so we don't check Company blankness in skip_rule. If Finance ever add a Company column to
+    the Integration tab, the first edit to both files (spec + build profile) should be to
+    include it in required_headers and re-add Company-blank to drop_when.
+
+trailer_row_handling:
+  pattern: >
+    Exemplar data rows = 80 (rows 2..81). Integration max_row reports 445 but rows 82..445
+    are all blank (confirmed by inspection -- no Grand Total row visible at the bottom of
+    INTEGRATION tab). The consecutive-empty-rows gate (>=3 consecutive empty rows, or any
+    truly-empty row past the end) will stop iteration cleanly once it hits 3 blanks after
+    row 81. No Grand-Total trailer row pattern in this exemplar.
+  note: >
+    If future prize-fund files add a Grand Total row, the summation-keyword absorption in
+    RowIsEmptyOrTrailer (TOTAL/SUBTOTAL/GRAND/SUM whole-word matching) should handle it
+    silently; otherwise RowIsSkippable will reject it on CreditorID/DocNo blank.
+
+open_questions:
+  # RESOLVED (2026-08-11): Source worksheet = INTEGRATION tab (confirmed in user message
+  #   "use again the integration tab - which is what finance ap team create for loading into
+  #   workday"). Other sheets (FINANCE, CLUBS, PIVOT DATA, PIVOT, GP DATA, TV BROADCAST) are
+  #   Finance review / lookups only -- not consumed by the transform.
+  # RESOLVED (2026-08-11): InvoiceNumber rule = {BatchID}-{CreditorID} (not DocNo). DocNo is
+  #   "FAC1STRNDP2526" for all 80 rows. CreditorID = 80 distinct club codes, so batch+cred
+  #   gives unique per-invoice keys.
+  # RESOLVED (2026-08-11): SuppliersInvoiceNumber AU = {DocNo}-{CreditorID}. Workday enforces
+  #   per-supplier uniqueness on AU; bare DocNo is same for all 80 rows so would clash every
+  #   club with every other club. Appending CreditorID gives per-club voucher refs.
+  - >-
+    DistributionReferenceCode contains a non-breaking space (U+00A0) between "0000" and "- PGB"
+    in Integration col H. Verify the Mapping MASTER OLD CODE entries use the same character,
+    or the normalisation step (Trim/Replace) handles it correctly. If unresolved-worktag rows
+    fire, this is the #1 suspect.
+  - >-
+    Tax treatment: confirm uniform Outside of Scope / Zero Rated / Nonrecoverable for all 80
+    prize-fund rows (40 winners @ 47,750 + 40 losers @ 15,800). Integration TaxAmount=0
+    everywhere so the line amount is untouched.
+  - >-
+    Currency: confirm GBP default (no currency column in Integration; FA Cup prize funds are
+    GBP domestic to English/Welsh clubs). If UEFA competitions ever go through this pipeline
+    we'll need a currency column.
+  - >-
+    Month-on-month / next-round maintenance (e.g. FA Cup 2nd Round Proper):
+    (1) shell_defaults.source_data = new file path;
+    (2) BATCH_ID_TOKEN in .bas = Integration col A new literal (e.g. NVFAC2RNDP2526);
+    (3) all other layout + headers unchanged.
+
+mapping:
+  # Standard Supplier Invoice EIB v46.2 columns (sheet = Submit Supplier Invoice):
+  #   EIB data starts row 6; clear-range ends col HH.
+  #   House defaults: I=Y, EK=1, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+  "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1" }
+  "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
+  "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}" }
+  "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company" }
+  "T":  { source: "OUTPUT_DEFAULT_CURRENCY constant", value: "GBP" }
+  "U":  { source: supplier_resolved_supplier_id, rule: "parties.supplier ResolveSupplierWithCompanyPrecedence (CreditorID-FA then bare CreditorID)" }
+  "AF": { source: InvoiceDate, rule: "Rule 5 = Integration col E coerced @ text format via NormalizeSourceDate" }
+  "AG": { source: ReceiptDate, rule: "Rule 6 = Integration col F coerced @ text; Invoice Received Date (NOT v46.1 AR=Hold Reason)" }
+  "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; bare DocNo constant across batch; creditor suffix disambiguates per Workday per-supplier uniqueness" }
+  "EK": { source: "HOUSE DEFAULT line_item_count_constant", value: "1", rule: "line Row ID (NOT v46.1 DD=Manual Override Percent)" }
+  "EP": { source: item_description, rule: "Rule 4 = UCase(Trim(Int D Decscription)); note header typo with extra c preserved" }
+  "EW": { source: spend_category, rule: "fields.spend_category — lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if no-hit)" }
+  "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }
+  "FF": { source: "tax uniform code", value: "GBR_Zero_Rated" }
+  "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
+  "FK": { source: "tax uniform recoverability", value: "Nonrecoverable_Allocate" }
+  "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
+  "GE": { source: PurchasesAmount, rule: "Rule 10 = Integration col I (Unit Cost; Winners 47750, Losers 15800; tax=0 CALC no-op)" }
+  "GF": { source: PurchasesAmount, rule: "Rule 10 line Extended Amount (same as GE, tax=0; v46.2 line NOT split IK)" }
+  "GQ": { source: memo, rule: "Rule 13 concat: DocNo + ' ' + CreditorID + ' ' + DistributionReferenceCode — v46.2 line NOT split IL" }
+  "GR": { source: reporting_type, rule: "Rule 14 = LEFT(second segment of DistributionReferenceCode, 1) via ResolveReportingTypeFromFinalCode" }
+  "GT": { source: cost_centre, rule: "fields.cost_centre — lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Cost Center hierarchy (reject if no-hit)" }
+  "GV": { source: event, rule: "fields.related_worktags.event — optional blank if no-hit via Mapping MASTER Events Custom Org" }
+  "GX": { source: camp, rule: "fields.related_worktags.camp — optional via Camps Custom Org" }
+  "GZ": { source: fa_learning_course, rule: "fields.related_worktags.fa_learning — optional via FA Learning Custom Org" }
+  "HB": { source: commercial_partner, rule: "fields.related_worktags.commercial_partner — optional via Commercial Partners Custom Worktag" }
+  "HD": { source: grant, rule: "fields.related_worktags.grant — optional via Grant" }
+  "HF": { source: programme, rule: "fields.related_worktags.programme — optional via Program Delivered Org" }
+  "HH": { source: project, rule: "fields.related_worktags.project — optional via Projects (Opex)" }

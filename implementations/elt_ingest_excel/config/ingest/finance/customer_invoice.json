@@ -1,0 +1,38 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer_invoice",
+    "workbookFileName": "AR DTL TB AUG 5 2026.xlsx",
+    "sheets": [
+      {
+        "sheetName": "FA AR DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_customer_invoice_fa"
+      },
+      {
+        "sheetName": "NFC AR DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_customer_invoice_nfc"
+      },
+      {
+        "sheetName": "WNSL AR DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_customer_invoice_wnsl"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract_Customers_20260810_1615.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "11",
+        "dataRow": "12",
+        "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  }
+]

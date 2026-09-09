@@ -1,0 +1,40 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/workday_eib_result",
+    "workbookFileName": "Submit E2E Customers With Errors Tab.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Submit Customer",
+        "headerRow": "5",
+        "dataRow": "6",
+        "targetTableName": "fin_wd_submit_customer"
+      },
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "0",
+        "dataRow": "11",
+        "columnHeaders": [
+          "spreadsheet_key",
+          "error_description"
+        ],
+        "targetTableName": "fin_wd_submit_customer_summary"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/workday_eib_result",
+    "workbookFileName": "workday_fin_supplier_purchase_order_v1.xlsx",
+    "sheets": [
+      {
+        "sheetName": "eRRORS",
+        "headerRow": "0",
+        "dataRow": "9",
+        "columnHeaders": [
+          "spreadsheet_key",
+          "error_description"
+        ],
+        "targetTableName": "fin_wd_supplier_purchase_order_error"
+      }
+    ]
+  }
+]

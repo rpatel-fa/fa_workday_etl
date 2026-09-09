@@ -1,0 +1,54 @@
+# Shared reference-data paths — single source of truth.
+#
+# Every transform profile in config/transforms/ inherits these fixed reference files.
+# When Workday ships a new extract or finance issues a new mapping master, change the
+# path HERE ONCE — not in each transform profile.
+#
+# Precedence: a transform profile's shell_defaults may still override any key by setting
+# it explicitly; when the profile omits the key, the build injects the value below.
+#
+# Consumed by scripts/build_runner.py and scripts/create_runner_shell.py, which write
+# these into the Runner's `config` registry at build time. See docs/CONFIGURATION.md.
+#
+# Consequence if this drifts from reality: every transform resolves suppliers/customers/
+# cost-centres against a stale file, silently rejecting valid rows.
+#
+# --- File contract (the shape the macros expect; header row is found by content, not fixed) ---
+#   Supplier extract : tab "Sheet1"      | "Reference ID" -> "Supplier ID"
+#   Customer extract : tab "Sheet1"      | "Reference ID" -> "Customer ID"
+#   Mapping MASTER   : tab "MAPPING MASTER" (v37 schema, header row 1)
+#                      Core columns read by macros:
+#                        Col 2:  "OLD SEGMENT"                  (segment specificity rank)
+#                        Col 3:  "OLD CODE"                     (account-string element)
+#                        Col 6:  "Core vs Prism"                (use rows = "Core" only)
+#                        Col 10: "WORKDAY BUSINESS OBJECT"      (WBO filter key)
+#                        Col 11: "WORKDAY REF ID"               (resolved target ref id)
+#                      Additional v37 columns (not consumed by macros, present for Finance):
+#                        Col 1:  "OLD DIMENSION Name"
+#                        Col 4:  "Capex Entity"
+#                        Col 5:  "Code_Entity"
+#                        Col 7:  "Splits/Combos"
+#                        Col 8:  "WORKDAY LEDGER CODE"
+#                        Col 9:  "WORKDAY LEDGER NAME"
+#                        Col 12: "WORKDAY NAME"
+#                        Cols 13-37: cross-instance check columns, parent hierarchies,
+#                                    Reporting Type category matrices, comments
+#                      Resolution: account-string segment -> hierarchy ref id, lowest
+#                      (most specific) OLD SEGMENT wins.
+#   Note: Ledger Code (WORKDAY LEDGER CODE) is a GL-journal concern only — NOT populated on
+#   Supplier (AP) or Customer (AR) invoices, so the invoice macros never read it.
+version: 1
+
+reference_paths:
+  # Workday Customer extract (Customer entity: Reference ID -> Customer ID). AR transforms.
+  customer_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/workday/extract/Extract_Customers_20260810_1615.xlsx
+
+  # Workday Supplier extract (Supplier entity: Reference ID -> Supplier ID). AP transforms.
+  supplier_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/workday/extract/Extract Suppliers 07.08.2026 2026-08-07 15_46 BST.xlsx
+
+  # Finance Mapping MASTER: account-string segments -> Workday hierarchies (Cost Centre,
+  # Spend Category, worktags). The tab within the workbook is `mapping_sheet`.
+  # Updated 2026-09-08: v41 -> v42 (Production release 08.09.26). v41 Production 07.09.26
+  # superseded; all transforms now read v42 Production as the Single Source of Truth.
+  mapping_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/mapping/Mapping MASTER - v42 08.09.26 - Production.xlsx
+  mapping_sheet: MAPPING MASTER

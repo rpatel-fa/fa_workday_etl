@@ -1,0 +1,32 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier_purchase_order",
+    "workbookFileName": "The FA - PO Export for Rakesh Patel .xlsx",
+    "sheets": [
+      {
+        "sheetName": "With Accounting Elements",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_purchase_order"
+      },
+      {
+        "sheetName": "With 22 Digit String",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_purchase_order_v1"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier_purchase_order",
+    "workbookFileName": "Mapping MASTER - v42 08.09.26 - Production.xlsx",
+    "sheets": [
+      {
+        "sheetName": "MAPPING MASTER",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_ref_wd_fdm_mapping"
+      }
+    ]
+  }
+]

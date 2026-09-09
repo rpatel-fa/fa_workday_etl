@@ -1,0 +1,20 @@
+[
+  {
+    "workbookFileName": "/path/to/workbook1.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "targetTableName": "table1"
+      }
+    ]
+  },
+  {
+    "workbookFileName": "/path/to/workbook2.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet2",
+        "targetTableName": "table2"
+      }
+    ]
+  }
+]

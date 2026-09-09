@@ -1,0 +1,149 @@
+# Ingest spec - ar_customer_invoice
+#
+# Defines the AR-facing template workbook that Finance (AR) populate by hand to create customer
+# invoices. This is the INPUT side: it declares the columns the template must expose and nothing
+# else. The target-column mapping into the Customer Invoice EIB is a separate, later artifact
+# (config/transform_specs/<key>.yaml) — not restated here. See docs/CONFIGURATION.md
+# ("Ingest Specs").
+#
+# Provenance: the column set is the subset of the MS Dynamics GP HATB extract that survives into
+# workday_customer_invoice, derived from elt_ingest_excel's
+# config/transform/sql/finance/customer_invoice/. The GP extract puts invoices and credit notes
+# in one sheet split by document_type; AR get separate templates instead (confirmed 2026-07-15),
+# so there is no Document Type column here — this template is invoices only.
+#
+# Sibling: ar_customer_credit_note.yaml (Workday: Customer Invoice Adjustment).
+
+meta:
+  key: ar_customer_invoice
+  label: AR Customer Invoice
+  requester: Finance (AR)
+  eib_population_type: Customer Invoice
+  purpose: >
+    Standard input workbook for AR to raise new customer invoices, replacing the practice of
+    cloning the full GP HATB extract. Carries only fields AR populate; house defaults and
+    derived values are excluded by design.
+  derived_from: elt_ingest_excel/config/transform/sql/finance/customer_invoice/
+  existing_transforms: >
+    ar_invoice and ar_discipline_invoice already target this EIB from their own bespoke source
+    extracts. This template is the standardised replacement input shape, not a third variant —
+    reconcile against those two specs before authoring the transform.
+
+template:
+  worksheet_name: Customer Invoice
+  header_row: 1
+  data_start_row: 2
+  grain: one row per invoice line
+
+columns:
+
+- name: Company
+  required: true
+  type: enum
+  description: >
+    Owning business unit. Resolved to the Workday company (THE FA GROUP - FA/NFC/WNSL) through
+    the Runner's mapping tab, as every existing transform does.
+  allowed_values: [FA, NFC, WNSL]
+  example: FA
+  feeds: EIB column k (Company)
+
+- name: Customer ID
+  required: true
+  type: text
+  description: >
+    The Workday Customer ID being invoiced. For a customer created through the AR Customer
+    template this is that workbook's Customer ID; the two templates line up without a lookup.
+  example: C-001234
+  feeds: EIB column cq (Customer)
+  cross_reference: ar_customer.yaml -> Customer ID
+
+- name: Document Number
+  required: true
+  type: text
+  description: >
+    AR's invoice reference (legacy GP Invoice Number). Must be unique per customer or Workday
+    rejects the duplicate. Populates the EIB Customer Invoice Number column, with Memo carrying the
+    narrative description.
+  example: INV-2026-0042
+  feeds: EIB column h (Customer Invoice Number)
+
+- name: Document Date
+  required: true
+  type: date
+  description: Invoice date. Reformatted to YYYY-MM-DD for the EIB.
+  format: DD/MM/YYYY
+  feeds: EIB column gf (Invoice Date)
+
+- name: Currency
+  required: true
+  type: text
+  description: >
+    ISO 4217 code, uppercase (^[A-Z]{3}$). Must be a Workday-valid currency — not every ISO code
+    is. Not enumerated here: the list is long and tenant-defined, so a copy would drift; validate
+    the template's drop-down against the reference below.
+  allowed_values_ref: >
+    ref_workday_validate_customer_currency, sourced from the 'Currency' sheet of
+    'FIN Master Customer Workbook Instructions.xlsx' (see elt_ingest_excel/docs/finance-customer.md)
+  default: GBP
+  example: GBP
+  feeds: EIB column cp (Currency)
+
+- name: Amount
+  required: true
+  type: number
+  description: >
+    Invoice amount in the invoice Currency. The GP extract splits this across a GBP column and
+    an originating-currency column; the template carries one column because AR state the
+    currency explicitly alongside it. Zero-amount rows are dropped downstream. JPY is rounded
+    to whole units.
+  feeds: EIB columns ha (Amount Due) and mj (Extended Amount) - same value to both
+
+- name: Customer Invoice Type
+  required: true
+  type: text
+  description: >
+    Workday invoice type. The migration fixes this to Standard; ar_discipline_invoice uses DSC.
+    AR-raised invoices may need others, so it is a column rather than a constant.
+  default: Standard
+  feeds: EIB column hc (Customer Invoice Type)
+
+- name: Revenue Category
+  required: true
+  type: text
+  description: >
+    Workday revenue category for the invoice line. The migration hard-codes 'AR Conversion'
+    because migrated open AR has no meaningful category; genuine AR-raised invoices do. See
+    open_questions - the allowed list is not yet supplied.
+  feeds: EIB column ke (Revenue Category)
+
+- name: Line Item Description
+  required: true
+  type: text
+  description: Description shown on the invoice line. The migration hard-codes 'Open AR Conversion'.
+  feeds: EIB column kf (Invoice Line Item Description)
+
+# Columns deliberately NOT in the template, with the reason.
+excluded:
+- {column: Document Type, reason: credit notes have their own template (ar_customer_credit_note.yaml) - the GP split on document_type is not reproduced}
+- {column: Spreadsheet Key, reason: generated as a row sequence by the transform}
+- {column: Auto Complete / Submit, reason: house default Y}
+- {column: Payment Status, reason: house default Unpaid}
+- {column: Document Status, reason: house default Approved}
+- {column: Invoice Line Row ID, reason: house default 1 - one line per row at this grain}
+- {column: Exchange Rate, reason: present in the GP FA sheet only and never read by the transform SQL}
+
+open_questions:
+- id: revenue_category_values
+  question: >
+    What is the allowed Revenue Category list for AR-raised invoices? The migration's
+    'AR Conversion' is a conversion-only value and must not be the default for new invoices.
+    Needed before the template can offer a validated drop-down.
+  blocking: true
+  owner: Finance (AR)
+- id: invoice_line_grain
+  question: >
+    Do AR need multi-line invoices? This template is one row per invoice line but has no
+    grouping key, so every row becomes a single-line invoice (Row ID fixed at 1). Multi-line
+    support needs an invoice-grouping column and a per-invoice line sequence.
+  blocking: false
+  owner: Finance (AR)

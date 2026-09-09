@@ -1,0 +1,80 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/prod/delta/delta_3",
+    "workbookFileName": "New Customers for Workday Aug 10  2026.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Query1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_customer_debtor_delta_1"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract Customers 07.08.2026 2026-08-07 15_54 BST.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "11",
+        "dataRow": "12",
+        "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/threeplus/Supplier and Customer Master Record workbooks & Instructions Guide",
+    "workbookFileName": "FIN Master Customer Workbook Instructions.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Address Requirements",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_address"
+      },
+      {
+        "sheetName": "Currency",
+        "headerRow": "2",
+        "dataRow": "3",
+        "targetTableName": "ref_workday_validate_customer_currency"
+      },
+      {
+        "sheetName": "Bank Account Formatting",
+        "headerRow": "4",
+        "dataRow": "5",
+        "targetTableName": "ref_workday_validate_customer_bank_format"
+      },
+      {
+        "sheetName": "Country States-Regions",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_region"
+      },
+      {
+        "sheetName": "Postal Code Formatting",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_postal_code"
+      },
+      {
+        "sheetName": "Phone Number",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_phone_format"
+      },
+      {
+        "sheetName": "Address Formats",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_address_format"
+      },
+      {
+        "sheetName": "Tax ID Types",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_customer_tax_id_type"
+      }
+    ]
+  }  
+]

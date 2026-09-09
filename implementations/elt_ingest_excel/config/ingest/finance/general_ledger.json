@@ -1,0 +1,62 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/balances/prod/20260907",
+    "workbookFileName": "CONS_GL_TRIAL_BALANCE.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_cons"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/balances/prod/20260907",
+    "workbookFileName": "FA_GL_TRIAL_BALANCE.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_fa"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/balances/prod/20260907",
+    "workbookFileName": "NFC_GL_TRIAL_BALANCE.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_nfc"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/balances/prod/20260907",
+    "workbookFileName": "WNSL_GL_TRIAL_BALANCE.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_wnsl"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/mapping",
+    "workbookFileName": "Mapping MASTER - v42 08.09.26 - Production.xlsx",
+    "sheets": [
+      {
+        "sheetName": "MAPPING MASTER",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_ref_wd_fdm_gl_mapping"
+      }
+    ]
+  }
+]

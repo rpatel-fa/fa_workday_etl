@@ -1,0 +1,71 @@
+
+[
+  {
+    "srcWorkbookPathName": ".",
+    "srcWorkbookFileName": "dummy_template.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_reference_data_mapping",
+    "sheets": [
+      {
+        "sheetName": "ref_bank_sort_code_prefix",
+        "srcTableName": "ref_bank_sort_code_prefix_mapping"
+      },
+      {
+        "sheetName": "ref_country",
+        "srcTableName": "ref_country"
+      },
+      {
+        "sheetName": "ref_country_county_state_town",
+        "srcTableName": "ref_country_county_state_town_mapping"
+      },
+      {
+        "sheetName": "ref_country_tax_id_type",
+        "srcTableName": "ref_country_tax_id_type_mapping"
+      },
+      {
+        "sheetName": "ref_customer_class",
+        "srcTableName": "ref_customer_category"
+      },
+      {
+        "sheetName": "ref_location",
+        "srcTableName": "ref_location_mapping"
+      },
+      {
+        "sheetName": "ref_post_code_district",
+        "srcTableName": "ref_post_code_district"
+      },
+      {
+        "sheetName": "ref_post_code_workday_region",
+        "srcTableName": "ref_post_code_workday_region"
+      },
+      {
+        "sheetName": "ref_source_business_unit",
+        "srcTableName": "ref_source_business_unit_mapping"
+      },
+      {
+        "sheetName": "ref_source_country_code",
+        "srcTableName": "ref_source_country_code_mapping"
+      },
+      {
+        "sheetName": "ref_source_country_name",
+        "srcTableName": "ref_source_country_name_mapping"
+      },
+      {
+        "sheetName": "ref_source_payment_terms",
+        "srcTableName": "ref_source_payment_terms"
+      },
+      {
+        "sheetName": "ref_supplier_category",
+        "srcTableName": "ref_supplier_category"
+      },
+      {
+        "sheetName": "ref_workday_country_state_reg",
+        "srcTableName": "ref_workday_country_state_region"
+      },
+      {
+        "sheetName": "ref_worker_type",
+        "srcTableName": "ref_worker_type_mapping"
+      }
+    ]
+  }
+]

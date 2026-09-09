@@ -1,0 +1,618 @@
+[
+	{
+		"sort_code_prefix" : "00",
+		"bank_name_primary" : "Non-standard (IBAN use only)",
+		"banking_group" : null,
+		"prefix_type" : "non-standard",
+		"notes" : "Used only within IBANs for incoming Euro transfers. Not valid for domestic UK payments."
+	},
+	{
+		"sort_code_prefix" : "01",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "Primary NatWest retail and branch range."
+	},
+	{
+		"sort_code_prefix" : "02",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "Secondary NatWest operational range."
+	},
+	{
+		"sort_code_prefix" : "03",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "Secondary NatWest operational range."
+	},
+	{
+		"sort_code_prefix" : "04",
+		"bank_name_primary" : "Various (Fintech \/ PSP — see notes)",
+		"banking_group" : null,
+		"prefix_type" : "psp-allocated",
+		"notes" : "Sub-allocated by Bacs to individual fintechs. Key sub-ranges: 04-00-04 Monzo Bank Ltd, 04-29-09 Revolut NewCo UK Ltd, 04-00-75 Modulr Finance (FCA e-money institution), 04-00-03 Prepay Technologies \/ PPS (FCA e-money institution), 04-06-05 ClearBank Limited. No single bank owns this prefix. Must use full sort code lookup."
+	},
+	{
+		"sort_code_prefix" : "05",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "Clydesdale Bank plc range, trading as Virgin Money \/ Yorkshire Bank. Clydesdale Bank plc acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "06",
+		"bank_name_primary" : "Nationwide Building Society",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "Nationwide Building Society primary range. Not PRA bank-authorised; regulated by PRA as a building society."
+	},
+	{
+		"sort_code_prefix" : "07",
+		"bank_name_primary" : "Nationwide Building Society",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "07-00 to 07-49 Nationwide Building Society. Upper sub-ranges may be allocated to other PSPs."
+	},
+	{
+		"sort_code_prefix" : "08",
+		"bank_name_primary" : "The Co-operative Bank p.l.c.",
+		"banking_group" : "The Co-operative Bank p.l.c.",
+		"prefix_type" : "clearing",
+		"notes" : "Primary Co-operative Bank range. Notable exceptions: 08-32-00 HMRC VAT (Citibank UK Limited), 08-32-10 HMRC NI (Citibank UK Limited). 08-60 to 08-61 and 08-90 to 08-99 are operational sub-ranges."
+	},
+	{
+		"sort_code_prefix" : "09",
+		"bank_name_primary" : "Santander UK plc",
+		"banking_group" : "Santander Group",
+		"prefix_type" : "clearing",
+		"notes" : "09-00 to 09-19 Santander UK plc. Inherited from Alliance & Leicester (merged 2010). Some 09-01-xx ranges remain associated with legacy A&L accounts."
+	},
+	{
+		"sort_code_prefix" : "10",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "10-00 to 10-79 Clydesdale Bank plc range, trading as Virgin Money. Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "11",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc retail range (includes Halifax brand). Part of Lloyds Banking Group since 2009."
+	},
+	{
+		"sort_code_prefix" : "12",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "12-00 to 12-69 Clydesdale Bank plc, trading as Virgin Money. Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "13",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc operational range, now Lloyds Banking Group."
+	},
+	{
+		"sort_code_prefix" : "14",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc operational range, now Lloyds Banking Group."
+	},
+	{
+		"sort_code_prefix" : "15",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "The Royal Bank of Scotland plc primary range. 15-80 is part of RBS since 1923. 15-98 to 15-99 are sub-allocated operational codes."
+	},
+	{
+		"sort_code_prefix" : "16",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "The Royal Bank of Scotland plc secondary range. Notable exceptions: 16-00-38 Drummonds Bank (NatWest Group subsidiary), 16-52-21 Cumberland Building Society (not PRA bank-authorised), 16-57-10 Cater Allen Limited (Santander Group)."
+	},
+	{
+		"sort_code_prefix" : "17",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "The Royal Bank of Scotland plc operational range."
+	},
+	{
+		"sort_code_prefix" : "18",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing",
+		"notes" : "Clydesdale Bank plc Scotland range. Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "19",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "The Royal Bank of Scotland plc \/ Ulster Bank operational range including some Northern Ireland sub-ranges."
+	},
+	{
+		"sort_code_prefix" : "20",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc primary retail range. Originally allocated as '2' pre-1957. Note: Barclays Bank plc is the separate wholesale\/international entity within the same group."
+	},
+	{
+		"sort_code_prefix" : "21",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "22",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "23",
+		"bank_name_primary" : "Barclays Bank UK plc (range owner; many sub-allocated)",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc sponsoring range with many PSP sub-allocations. Key exceptions: 23-05-80 Metro Bank plc, 23-14-70 Wise (FCA e-money institution, not PRA-authorised), 23-05-05 Stripe (not PRA-authorised), 23-69-72 Prepay Technologies (FCA e-money institution), 23-59-54 Newcastle Building Society (not PRA bank-authorised), 23-32-72 Pockit, 23-00-88 VFX Financial, 23-22-21 Fire Financial Services. Full sort code lookup required for accurate identification."
+	},
+	{
+		"sort_code_prefix" : "24",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "25",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "26",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "27",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "28",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "29",
+		"bank_name_primary" : "Barclays Bank UK plc",
+		"banking_group" : "Barclays Group",
+		"prefix_type" : "clearing",
+		"notes" : "Barclays Bank UK plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "30",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc primary retail range. Originally allocated as '3' pre-1957. Notable sub-allocations: 30-00-66 Arbuthnot Latham & Co., Limited, 30-00-83 Al Rayan Bank plc, 30-02-48 FinecoBank SPA (EEA branch)."
+	},
+	{
+		"sort_code_prefix" : "31",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "32",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "33",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "34",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "35",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "36",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "37",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "38",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "39",
+		"bank_name_primary" : "Lloyds Bank plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Lloyds Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "40",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc primary range. Originally Midland Bank ('4' pre-1957, then 40). Note: HSBC Bank plc is the separate wholesale\/international entity within the same group. Key sub-allocations: 40-47-xx First Direct (trading name of HSBC UK Bank plc), 40-12-xx Marks and Spencer Financial Services plc, 40-64-05 Barclays Bank UK plc (formerly Tesco Bank; acquired 2024), 40-64-25 Clydesdale Bank plc (Virgin Money brand), 40-64-37 Goldman Sachs International Bank (Marcus brand), 40-63-01 Coventry Building Society (not PRA bank-authorised), 40-63-77 Cynergy Bank plc, 40-60-80 CashFlows (FCA e-money institution), 40-51-78 Gibraltar International Bank Limited, 49-99-79 Deutsche Bank AG."
+	},
+	{
+		"sort_code_prefix" : "41",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "42",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "43",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "44",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "45",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "46",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "47",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "48",
+		"bank_name_primary" : "HSBC UK Bank plc",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "49",
+		"bank_name_primary" : "HSBC UK Bank plc (incl. Deutsche Bank AG sub-range)",
+		"banking_group" : "HSBC Group",
+		"prefix_type" : "clearing",
+		"notes" : "HSBC UK Bank plc range; 49-99-79 to 49-99-99 allocated to Deutsche Bank AG."
+	},
+	{
+		"sort_code_prefix" : "50",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "51",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "52",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "53",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "54",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "55",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "56",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "57",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "58",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "59",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing",
+		"notes" : "Bank of Scotland plc Scotland range."
+	},
+	{
+		"sort_code_prefix" : "60",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc primary range. Key sub-allocations: 60-83-71 Starling Bank Limited, 60-84-07 J.P. Morgan Europe Limited (Chase UK brand), 60-83-12 Atom Bank plc, 60-83-14 Gibraltar International Bank Limited, 60-83-66 FidBank UK Limited (formerly Fidor Bank UK), 60-84-00 Zopa Bank Limited, 60-01-73 Reliance Bank Limited."
+	},
+	{
+		"sort_code_prefix" : "61",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "62",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "63",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "64",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "65",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "66",
+		"bank_name_primary" : "National Westminster Bank plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing",
+		"notes" : "National Westminster Bank plc secondary range."
+	},
+	{
+		"sort_code_prefix" : "70",
+		"bank_name_primary" : "Various (historically foreign\/non-clearing banks)",
+		"banking_group" : null,
+		"prefix_type" : "legacy",
+		"notes" : "Originally reserved for London offices of non-clearing banks ('walks'). Most reallocated to clearing bank sponsorship by the 1990s. Full sort code lookup required."
+	},
+	{
+		"sort_code_prefix" : "71",
+		"bank_name_primary" : "Various (historically foreign\/non-clearing banks)",
+		"banking_group" : null,
+		"prefix_type" : "legacy",
+		"notes" : "See prefix 70 notes."
+	},
+	{
+		"sort_code_prefix" : "72",
+		"bank_name_primary" : "Various (historically foreign\/non-clearing banks)",
+		"banking_group" : null,
+		"prefix_type" : "legacy",
+		"notes" : "See prefix 70 notes."
+	},
+	{
+		"sort_code_prefix" : "77",
+		"bank_name_primary" : "Lloyds Bank plc \/ TSB Bank plc",
+		"banking_group" : "Lloyds Banking Group \/ TSB",
+		"prefix_type" : "clearing",
+		"notes" : "77-00 to 77-44 and 77-46 to 77-99. Former TSB branches. When TSB demerged from Lloyds in 2013, some 77-xx branches went to TSB Bank plc, some stayed with Lloyds Bank plc — both banks share this prefix range. Full sort code lookup required to distinguish Lloyds Bank plc from TSB Bank plc."
+	},
+	{
+		"sort_code_prefix" : "80",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Bank of Scotland plc Scotland clearing range."
+	},
+	{
+		"sort_code_prefix" : "81",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Bank of Scotland plc Scotland clearing range."
+	},
+	{
+		"sort_code_prefix" : "82",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Clydesdale Bank plc Scotland clearing range. Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "83",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Clydesdale Bank plc Scotland clearing range (formerly separate institution). Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "84",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Bank of Scotland plc Scotland clearing range (formerly separate institution)."
+	},
+	{
+		"sort_code_prefix" : "85",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Bank of Scotland plc Scotland clearing range."
+	},
+	{
+		"sort_code_prefix" : "86",
+		"bank_name_primary" : "Clydesdale Bank plc",
+		"banking_group" : "Nationwide Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Clydesdale Bank plc Scotland clearing range. Acquired by Nationwide Group in October 2024."
+	},
+	{
+		"sort_code_prefix" : "87",
+		"bank_name_primary" : "TSB Bank plc",
+		"banking_group" : "TSB Bank plc",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Former TSB Scotland range (merged with TSB\/Lloyds 1995). Now administered under TSB Bank plc."
+	},
+	{
+		"sort_code_prefix" : "88",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "Bank of Scotland plc Scotland clearing range."
+	},
+	{
+		"sort_code_prefix" : "89",
+		"bank_name_primary" : "Bank of Scotland plc",
+		"banking_group" : "Lloyds Banking Group",
+		"prefix_type" : "clearing-scotland",
+		"notes" : "89-00 to 89-29 Lloyds Banking Group operational range (formerly separate institution)."
+	},
+	{
+		"sort_code_prefix" : "90",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Northern Ireland clearing range. Registered with IPSO\/BPFI. Ulster Bank (NatWest Group brand in NI) sort codes begin 98-xx-xx. The Royal Bank of Scotland plc is the PRA-authorised legal entity for NatWest Group NI operations."
+	},
+	{
+		"sort_code_prefix" : "91",
+		"bank_name_primary" : "AIB Group (UK) plc",
+		"banking_group" : "AIB Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Formerly Belfast Banking Company (merged 1970). Now AIB Group (UK) plc, trading as First Trust Bank in NI."
+	},
+	{
+		"sort_code_prefix" : "92",
+		"bank_name_primary" : "Bank of Ireland (UK) plc",
+		"banking_group" : "Bank of Ireland Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Bank of Ireland (UK) plc Northern Ireland range."
+	},
+	{
+		"sort_code_prefix" : "93",
+		"bank_name_primary" : "AIB Group (UK) plc \/ various",
+		"banking_group" : "AIB Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "AIB Group (UK) plc NI range; some sub-ranges allocated to other institutions."
+	},
+	{
+		"sort_code_prefix" : "94",
+		"bank_name_primary" : "Northern Bank Limited",
+		"banking_group" : "Danske Bank Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Northern Bank Limited, the PRA-authorised UK entity for Danske Bank in Northern Ireland. Rebranded Danske Bank in 2012. Former Clydesdale Bank NI also in this range."
+	},
+	{
+		"sort_code_prefix" : "95",
+		"bank_name_primary" : "Santander UK plc",
+		"banking_group" : "Santander Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Santander UK plc NI operational range (formerly Alliance & Leicester NI)."
+	},
+	{
+		"sort_code_prefix" : "98",
+		"bank_name_primary" : "The Royal Bank of Scotland plc",
+		"banking_group" : "NatWest Group",
+		"prefix_type" : "clearing-northern-ireland",
+		"notes" : "Ulster Bank (NatWest Group brand) primary Northern Ireland retail range. The PRA-authorised legal entity is The Royal Bank of Scotland plc."
+	}
+]

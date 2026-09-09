@@ -1,0 +1,1002 @@
+[
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Aberdeen",
+		"county_state_name" : "Aberdeen City (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Abertillery",
+		"county_state_name" : "Blaenau Gwent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Aberystwyth",
+		"county_state_name" : "Ceredigion"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Accrington",
+		"county_state_name" : "Lancashire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Aldershot",
+		"county_state_name" : "Hampshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Alnwick",
+		"county_state_name" : "Northumberland"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Antrim",
+		"county_state_name" : "County Antrim"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Armagh",
+		"county_state_name" : "County Armagh"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ashford",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Aylesbury",
+		"county_state_name" : "Buckinghamshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ayr",
+		"county_state_name" : "South Ayrshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ballymena",
+		"county_state_name" : "Ballymena (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ballymoney",
+		"county_state_name" : "Ballymoney (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Banbridge",
+		"county_state_name" : "Banbridge (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Banbury",
+		"county_state_name" : "Oxfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bangor",
+		"county_state_name" : "Gwynedd"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Barnsley",
+		"county_state_name" : "South Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Barnstaple",
+		"county_state_name" : "Devon"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Barrow-in-Furness",
+		"county_state_name" : "Cumbria"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Barry",
+		"county_state_name" : "Vale of Glamorgan"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Basildon",
+		"county_state_name" : "Essex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Basingstoke",
+		"county_state_name" : "Hampshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bath",
+		"county_state_name" : "Bath and North East Somerset (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bedford",
+		"county_state_name" : "Bedfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Belfast",
+		"county_state_name" : "Belfast (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Beverley",
+		"county_state_name" : "East Riding of Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Birkenhead",
+		"county_state_name" : "Merseyside"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Birmingham",
+		"county_state_name" : "West Midlands"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Blackburn",
+		"county_state_name" : "Blackburn with Darwen (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Blackpool",
+		"county_state_name" : "Blackpool (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bolton",
+		"county_state_name" : "Manchester"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Boston",
+		"county_state_name" : "Lincolnshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bournemouth",
+		"county_state_name" : "Bournemouth (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bracknell",
+		"county_state_name" : "Bracknell Forest (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bradford",
+		"county_state_name" : "West Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Brentwood",
+		"county_state_name" : "Essex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bridgend",
+		"county_state_name" : "Bridgend"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bridgwater",
+		"county_state_name" : "Somerset"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bridlington",
+		"county_state_name" : "East Riding of Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Brighton",
+		"county_state_name" : "Brighton and Hove (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bristol",
+		"county_state_name" : "Bristol, City of (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bromley",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Burnley",
+		"county_state_name" : "Lancashire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Burton upon Trent",
+		"county_state_name" : "Staffordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bury",
+		"county_state_name" : "Manchester"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Bury St Edmunds",
+		"county_state_name" : "Suffolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Caerphilly",
+		"county_state_name" : "Caerphilly"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Cambridge",
+		"county_state_name" : "Cambridgeshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Canterbury",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Cardiff",
+		"county_state_name" : "Cardiff"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Carlisle",
+		"county_state_name" : "Cumbria"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Carmarthen",
+		"county_state_name" : "Carmarthenshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Carrickfergus",
+		"county_state_name" : "Carrickfergus (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Castlereagh",
+		"county_state_name" : "Castlereagh (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chatham",
+		"county_state_name" : "Medway (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chelmsford",
+		"county_state_name" : "Essex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Cheltenham",
+		"county_state_name" : "Gloucestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chester",
+		"county_state_name" : "Cheshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chesterfield",
+		"county_state_name" : "Derbyshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chichester",
+		"county_state_name" : "West Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Chippenham",
+		"county_state_name" : "Wiltshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Christchurch",
+		"county_state_name" : "Dorset"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Cleethorpes",
+		"county_state_name" : "North East Lincolnshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Coatbridge",
+		"county_state_name" : "North Lanarkshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Colchester",
+		"county_state_name" : "Essex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Coleraine",
+		"county_state_name" : "Coleraine (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Colwyn Bay",
+		"county_state_name" : "Conwy"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Congleton",
+		"county_state_name" : "Cheshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Cookstown",
+		"county_state_name" : "Cookstown (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Corby",
+		"county_state_name" : "Northamptonshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Coventry",
+		"county_state_name" : "West Midlands"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Crawley",
+		"county_state_name" : "West Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Crewe",
+		"county_state_name" : "Cheshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Croydon",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Darlington",
+		"county_state_name" : "Darlington (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Daventry",
+		"county_state_name" : "Northamptonshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Derby",
+		"county_state_name" : "Derbyshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Derry",
+		"county_state_name" : "Derry (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Doncaster",
+		"county_state_name" : "South Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dorchester",
+		"county_state_name" : "Dorset"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dover",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dudley",
+		"county_state_name" : "West Midlands"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dumfries",
+		"county_state_name" : "Dumfries and Galloway (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dundee",
+		"county_state_name" : "Dundee City (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dunfermline",
+		"county_state_name" : "Fife"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Dunstable",
+		"county_state_name" : "Bedfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Durham",
+		"county_state_name" : "Durham"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ealing",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "East Kilbride",
+		"county_state_name" : "South Lanarkshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Eastbourne",
+		"county_state_name" : "East Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ebbw Vale",
+		"county_state_name" : "Blaenau Gwent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Edinburgh",
+		"county_state_name" : "Edinburgh, City of (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Elgin",
+		"county_state_name" : "Moray"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ellesmere Port",
+		"county_state_name" : "Cheshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ely",
+		"county_state_name" : "Cambridgeshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Enfield",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Enniskillen",
+		"county_state_name" : "County Fermanagh"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Epsom",
+		"county_state_name" : "Surrey"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Exeter",
+		"county_state_name" : "Devon"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Falkirk",
+		"county_state_name" : "Falkirk (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Falmouth",
+		"county_state_name" : "Cornwall"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Fareham",
+		"county_state_name" : "Hampshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Flint",
+		"county_state_name" : "Flintshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Folkestone",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Fort William",
+		"county_state_name" : "Highland (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Gateshead",
+		"county_state_name" : "Tyne and Wear"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Gillingham",
+		"county_state_name" : "Medway (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Glasgow",
+		"county_state_name" : "Glasgow City (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Gloucester",
+		"county_state_name" : "Gloucestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Goole",
+		"county_state_name" : "East Riding of Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Gosport",
+		"county_state_name" : "Hampshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Grantham",
+		"county_state_name" : "Lincolnshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Grays",
+		"county_state_name" : "Thurrock (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Great Yarmouth",
+		"county_state_name" : "Norfolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Greenock",
+		"county_state_name" : "Inverclyde (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Grimsby",
+		"county_state_name" : "North East Lincolnshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Guildford",
+		"county_state_name" : "Surrey"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hackney",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Halifax",
+		"county_state_name" : "West Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hamilton",
+		"county_state_name" : "South Lanarkshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hanley",
+		"county_state_name" : "Stoke-on-Trent (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Harlow",
+		"county_state_name" : "Essex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Harrogate",
+		"county_state_name" : "North Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Harrow",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hartlepool",
+		"county_state_name" : "Hartlepool (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hastings",
+		"county_state_name" : "East Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hatfield",
+		"county_state_name" : "Hertfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Haverfordwest",
+		"county_state_name" : "Pembrokeshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hemel Hempstead",
+		"county_state_name" : "Hertfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hereford",
+		"county_state_name" : "Herefordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hexham",
+		"county_state_name" : "Northumberland"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "High Wycombe",
+		"county_state_name" : "Buckinghamshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hinckley",
+		"county_state_name" : "Leicestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Holyhead",
+		"county_state_name" : "Isle of Anglesey"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Horsham",
+		"county_state_name" : "West Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hounslow",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hove",
+		"county_state_name" : "Brighton and Hove (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Huddersfield",
+		"county_state_name" : "West Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Hull",
+		"county_state_name" : "Kingston upon Hull, City of (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ilford",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Inverness",
+		"county_state_name" : "Highland (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Ipswich",
+		"county_state_name" : "Suffolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Islington",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kendal",
+		"county_state_name" : "Cumbria"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kettering",
+		"county_state_name" : "Northamptonshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kidderminster",
+		"county_state_name" : "Worcestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kilmarnock",
+		"county_state_name" : "East Ayrshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kings Lynn",
+		"county_state_name" : "Norfolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kingston upon Hull",
+		"county_state_name" : "Kingston upon Hull, City of (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kingston upon Thames",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Kirkcaldy",
+		"county_state_name" : "Fife"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Knowsley",
+		"county_state_name" : "Merseyside"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lancaster",
+		"county_state_name" : "Lancashire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Leamington Spa",
+		"county_state_name" : "Warwickshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Leeds",
+		"county_state_name" : "West Yorkshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Leicester",
+		"county_state_name" : "Leicestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Leighton Buzzard",
+		"county_state_name" : "Bedfordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lewes",
+		"county_state_name" : "East Sussex"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lichfield",
+		"county_state_name" : "Staffordshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lincoln",
+		"county_state_name" : "Lincolnshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lisburn",
+		"county_state_name" : "Lisburn (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Liverpool",
+		"county_state_name" : "Merseyside"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Livingston",
+		"county_state_name" : "West Lothian"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Llandudno",
+		"county_state_name" : "Conwy"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Llanelli",
+		"county_state_name" : "Carmarthenshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "London",
+		"county_state_name" : "London"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Londonderry",
+		"county_state_name" : "Derry (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Loughborough",
+		"county_state_name" : "Leicestershire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Lowestoft",
+		"county_state_name" : "Suffolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Luton",
+		"county_state_name" : "Luton (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Macclesfield",
+		"county_state_name" : "Cheshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Magherafelt",
+		"county_state_name" : "Magherafelt (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Maidenhead",
+		"county_state_name" : "Windsor and Maidenhead (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Maidstone",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Manchester",
+		"county_state_name" : "Manchester"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Mansfield",
+		"county_state_name" : "Nottinghamshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Margate",
+		"county_state_name" : "Kent"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Matlock",
+		"county_state_name" : "Derbyshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Merthyr Tydfil",
+		"county_state_name" : "Merthyr Tydfil"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Middlesbrough",
+		"county_state_name" : "Middlesbrough (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Milton Keynes",
+		"county_state_name" : "Milton Keynes (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Monmouth",
+		"county_state_name" : "Monmouthshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Motherwell",
+		"county_state_name" : "North Lanarkshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Neath",
+		"county_state_name" : "Neath Port Talbot"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newark",
+		"county_state_name" : "Nottinghamshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newbury",
+		"county_state_name" : "West Berkshire (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newcastle upon Tyne",
+		"county_state_name" : "Tyne and Wear"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newport",
+		"county_state_name" : "Newport"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newquay",
+		"county_state_name" : "Cornwall"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newry",
+		"county_state_name" : "Newry and Mourne (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newtown",
+		"county_state_name" : "Powys"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newtownabbey",
+		"county_state_name" : "Newtownabbey (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Newtownards",
+		"county_state_name" : "Ards (obsolete)"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "North Shields",
+		"county_state_name" : "Tyne and Wear"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Northampton",
+		"county_state_name" : "Northamptonshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Northumberland",
+		"county_state_name" : "Northumberland"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Norwich",
+		"county_state_name" : "Norfolk"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Nottingham",
+		"county_state_name" : "Nottinghamshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Nuneaton",
+		"county_state_name" : "Warwickshire"
+	},
+	{
+		"country_code" : "GB",
+		"town_city_name" : "Oakham",
+		"county_state_name" : "Rutland"
+	}
+]

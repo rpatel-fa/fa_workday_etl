@@ -1,0 +1,44 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/balances/prod",
+    "workbookFileName": "MULTICO GL TRIAL BALANCE.xlsx",
+    "sheets": [
+      {
+        "sheetName": "CONS",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_cons"
+      },
+      {
+        "sheetName": "FA",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_fa"
+      },
+      {
+        "sheetName": "NFC",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_nfc"
+      },
+      {
+        "sheetName": "WNSL",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_general_ledger_wnsl"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/mapping",
+    "workbookFileName": "Mapping MASTER - v42 08.09.26 - Production.xlsx",
+    "sheets": [
+      {
+        "sheetName": "MAPPING MASTER",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_ref_wd_fdm_gl_mapping"
+      }
+    ]
+  }
+]

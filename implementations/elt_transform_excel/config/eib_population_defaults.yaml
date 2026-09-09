@@ -1,0 +1,119 @@
+version: 1
+
+# Single source of truth for per-EIB-population-type conventions.
+#
+# Cold-start agents and scaffold_transform.py MUST read these constants from
+# HERE, not infer them from .bas Private Consts. If a new EIB population type
+# is added (e.g. "Supplier Invoice Request", "Journal"), add it as a new
+# top-level key below; the build gates in build_runner.py will error with a
+# clear message if a profile's transform.eib_population_type is not listed
+# here.
+#
+# Each key = the exact string value used in transform.eib_population_type.
+
+eib_populations:
+
+  "Supplier Invoice":
+    target_sheet_name: "Submit Supplier Invoice"
+    target_data_start_row: 6
+    # v46.2 guard column: line worktags run to HH (Project). Every supplier module
+    # clears to "HH"; EX was the v46.1 end and left GF/GQ/worktags uncleared on re-runs.
+    clear_published_rows_end_col: "HH"
+    tax_point_date_type_default: "INVOICE/ADJUSTMENT_DATE"
+    tax_option_default: "CALC_TAX_DUE"
+    submit_flag_default: "Y"
+    default_currency_default: "GBP"
+    sequence_start_default: 1
+    # Archetype-safe SHARED columns: the ColumnIndex() writes that are generic plumbing (not
+    # driven by a profile's worktag pipeline), so they need not appear in a profile's
+    # supplier_eib_columns block. SINGLE SOURCE OF TRUTH for the build's ColumnIndex() coverage
+    # gate (was a hard-coded frozenset in build_runner.py; moved here for parity with
+    # customer_invoice_eib_columns). Letters are quoted so YAML never coerces "N"/"Y" to booleans.
+    # v46.2-active line/header targets: GF (Extended Amount), GQ (Memo), AG (Received Date),
+    # BH (External PO), EK (line Row ID). IK/IL are the split-line twins retained only for
+    # not-yet-migrated modules (amex/prize) and must not be used by migrated transforms.
+    # common plumbing + header-level; then down-payment/helper; then line desc/tax/amounts/memo;
+    # then the legacy allowlist (old v46.1 letters still referenced by defunct .bas).
+    safe_shared_columns: [
+      "B", "D", "E", "H", "I", "K",
+      "R", "T", "U", "AF", "AG", "AR", "AS", "BG", "BH",
+      "BB", "DD",
+      "EP", "FE", "FF", "FH", "FK", "FL", "GE", "GF", "IK", "IL",
+      "F", "G", "L", "N", "O", "AH", "AP", "AU", "DI",
+      "DS", "DT", "DV", "DY", "DZ", "ED", "EE", "EO",
+      "DK", "DL", "DM", "DN", "DP", "DQ", "EA", "EB", "EI", "EK", "EL",
+      "EM", "EN", "EQ", "ET", "EY", "FD", "FG", "FJ", "FQ",
+      "FR", "FS", "FT", "FW", "FX", "GC", "GI", "GK", "GL", "GM",
+      "GN", "GO", "GP", "GQ", "GS", "GU", "GW", "GY", "HA", "HC", "HE"
+    ]
+
+  "Customer Invoice":
+    target_sheet_name: "Submit Customer Invoice"
+    target_data_start_row: 6
+    clear_published_rows_end_col: "IC"
+    auto_complete_default: "Y"
+    submit_flag_default: "Y"
+    payment_status_default: "Unpaid"
+    document_status_default: "Approved"
+    default_currency_default: "GBP"
+    # Archetype-safe SHARED columns for Customer Invoice (generic plumbing; see the Supplier
+    # Invoice note above). SINGLE SOURCE OF TRUTH for the ColumnIndex() coverage gate.
+    safe_shared_columns: [
+      "B", "CP", "CQ", "E", "GB", "GF", "GY", "GZ", "H", "HA", "HC", "HL", "HQ",
+      "I", "IH", "K", "KB", "KE", "KF", "LW", "MC", "MG", "MJ", "MK", "MN", "MT"
+    ]
+    # Submit_Customer_Invoice_v46.1 column conventions (single source of truth).
+    # customer_invoice_eib_columns is the canonical column registry for AR
+    # transforms; it is consumed both by the hygiene gate (verify_gates.py) and
+    # by the YAML spec authoring tools. AR profiles inherit these defaults and
+    # may override per-transform only when a confirmed decision warrants it.
+    customer_invoice_eib_columns:
+      # --- Header-level fields ---
+      spreadsheet_key: B
+      header_comment: E
+      submit: H
+      locked_in_workday: I
+      company: J
+      row_id_header: K
+      currency: AI
+      customer: AJ
+      sold_to_customer: AK
+      billable_project_header: BN
+      invoice_number: BO
+      invoice_date: BR
+      payment_status: CK
+      document_status: CL
+      amount_due: CM
+      customer_invoice_type: CO
+      header_tax_code: CP
+      customer_po_number: CQ
+      include_customer_worktags: CY
+      header_worktags_plus: CZ
+      header_memo: DB
+      # --- Line-level fields ---
+      line_reference: DU
+      line_order: DV
+      sales_item: EJ
+      revenue_category: EM
+      line_item_description: EN
+      line_tax_applicability: FA
+      line_tax_code: FB
+      line_quantity: FH
+      line_unit_of_measure: FI
+      line_unit_cost: FL
+      line_extended_amount: FO
+      line_transaction_date: FP
+      line_from_date: FQ
+      line_to_date: FR
+      deferred_revenue: FS
+      line_memo: FV
+      # --- Accounting-string / Worktag hierarchy (FX..GF, 9 slots) ---
+      cost_centre: FX
+      reporting_type: FY
+      camp: FZ
+      event: GA
+      commercial_partner: GB
+      fa_learning_course: GC
+      grant: GD
+      programme: GE
+      project_line: GF

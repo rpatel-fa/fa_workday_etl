@@ -1,0 +1,81 @@
+version: 1
+
+transform:
+  key: ar_discipline_invoice
+  label: AR Discipline Invoice
+  source_type: AR Discipline Invoice
+  eib_population_type: Customer Invoice
+  description: >
+    Discipline (fines/payments) invoice extracts transformed into the same Workday
+    Customer Invoice EIB workbook used by AR Invoice. Company and Currency are fixed
+    (FA / GBP) since the source extract has neither column. The field mapping in
+    vba_src/transforms/modArDisciplineCustInvoice.bas mirrors the mapping: section in
+    config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
+
+runtime:
+  step_list_macro: RunArDisciplineInvoiceCustomerInvoice
+
+source_layout:
+  worksheet_resolution: first_sheet
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  required_headers:
+    - Customer Number
+    - Document Number
+    - Document Date
+    - Original Trx Amount
+
+transform_constants:
+  fixed_company_code: FA
+  fixed_currency: GBP
+  fixed_invoice_type: DSC
+  fixed_dsc_indicator: "Y"
+  company_fallback: THE FA GROUP - FA
+  # No COST CODE or accounting-string driver in the discipline extract;
+  # Revenue Category + worktags are left blank (Finance fill-in pre-upload
+  # for coding overrides). Kept keys here for gate parity with other AR
+  # transforms.
+  unmapped_handling: silent_blank
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    revenue_category: "Revenue Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+    sales_item: "Sales Item"
+  derived_worktags:
+    reporting_type:
+      derivation: no cost code driver in source layout; left blank unless Finance overrides
+  customer_invoice_eib_columns:
+    revenue_category: EM
+    billable_project_header: BN
+    billable_project_line: BN
+    sales_item: EJ
+    worktags_plus_order:
+      sales_item: EJ
+      cost_centre: FX
+      reporting_type: FY
+      camp: FZ
+      event: GA
+      commercial_partner: GB
+      fa_learning: GC
+      grant: GD
+      program: GE
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Discipline Invoices.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Submit_Customer_Invoice_v46.1_ar_discipline_invoice_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_resolution: first_sheet
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

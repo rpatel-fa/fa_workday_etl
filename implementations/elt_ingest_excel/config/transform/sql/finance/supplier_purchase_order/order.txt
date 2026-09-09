@@ -1,0 +1,5 @@
+src_fin_supplier_purchase_order_base.sql
+src_fin_supplier_purchase_order_nrm.sql
+src_fin_supplier_purchase_order.sql
+src_fin_supplier_purchase_order_ref.sql
+workday_supplier_purchase_order.sql

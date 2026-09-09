@@ -1,0 +1,68 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/okta_20260603",
+    "workbookFileName": "Export Users 2026-05-15 10-39-43.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Overall",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_okta_all"
+      },
+      {
+        "sheetName": "CW",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_okta_cw"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/cw_rescind",
+    "workbookFileName": "Extract_Supervisory_Organizations (7).xlsx",
+    "sheets": [
+      {
+        "sheetName": "Extract Supervisory Organizatio",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_workday_sup_org"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/cw_rescind",
+    "workbookFileName": "3+_All_Worker_Data_for_Okta20260601.xlsx",
+    "sheets": [
+      {
+        "sheetName": "3+ All Worker Data for Okta",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_workday_worker_all"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/cw_rescind",
+    "workbookFileName": "All_Contingent_Workers20260601.xlsx",
+    "sheets": [
+      {
+        "sheetName": "All Contingent Workers",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_workday_contingent_worker"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/okta_cw_missing_manager_20260521",
+    "workbookFileName": "Copy of CW line manager update.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_okta_cw_line_manager_update"
+      }
+    ]
+  }
+]

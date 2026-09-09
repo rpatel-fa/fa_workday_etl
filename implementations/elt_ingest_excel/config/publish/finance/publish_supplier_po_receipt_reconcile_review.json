@@ -1,0 +1,76 @@
+[
+  {
+    "tgtWorkbookPathName": "~/Documents/__data/excel/workday/reconcile",
+    "tgtWorkbookFileName": "supplier_po_receipt_reconcile_review_pack",
+    "sheets": [
+      {
+        "sheetName": "board_summary",
+        "srcTableName": "reconcile_supplier_po_receipt_board_summary"
+      },
+      {
+        "sheetName": "report",
+        "srcTableName": "reconcile_supplier_po_receipt_report"
+      },
+      {
+        "sheetName": "row_counts",
+        "srcTableName": "reconcile_po_receipt_row_counts"
+      },
+      {
+        "sheetName": "amount_by_currency",
+        "srcTableName": "reconcile_po_receipt_amount_by_currency"
+      },
+      {
+        "sheetName": "currency_coverage",
+        "srcTableName": "reconcile_po_receipt_currency_coverage"
+      },
+      {
+        "sheetName": "audit_po_coverage",
+        "srcTableName": "reconcile_po_audit_coverage"
+      },
+      {
+        "sheetName": "audit_po_non_overlap",
+        "srcTableName": "reconcile_po_audit_non_overlap"
+      },
+      {
+        "sheetName": "audit_po_reconcile",
+        "srcTableName": "reconcile_po_audit_reconcile"
+      },
+      {
+        "sheetName": "audit_po_only_triage",
+        "srcTableName": "reconcile_po_audit_only_triage"
+      },
+      {
+        "sheetName": "po_reconciliation",
+        "srcTableName": "reconcile_po_receipt_by_po"
+      },
+      {
+        "sheetName": "total_po_by_currency",
+        "srcTableName": "reconcile_total_po_amount_by_currency"
+      },
+      {
+        "sheetName": "total_receipt_by_currency",
+        "srcTableName": "reconcile_total_receipt_amount_by_currency"
+      },
+      {
+        "sheetName": "gl_po_accruals_by_currency",
+        "srcTableName": "reconcile_gl_po_accruals_by_currency"
+      },
+      {
+        "sheetName": "summary",
+        "srcTableName": "z_reconcile_supplier_po_receipt_summary"
+      },
+      {
+        "sheetName": "where_data_is_wrong",
+        "srcTableName": "reconcile_po_receipt_data_quality"
+      },
+      {
+        "sheetName": "workday_cleanup_actions",
+        "srcTableName": "reconcile_po_receipt_workday_cleanup"
+      },
+      {
+        "sheetName": "all_issues",
+        "srcTableName": "reconciliation_supplier_po_receipt_issues"
+      }
+    ]
+  }
+]

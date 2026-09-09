@@ -1,0 +1,32 @@
+init.sql
+validate_supplier_po_commitment_stack_required_keys.sql
+validate_workday_extract_supplier_reference_id_conflict.sql
+validate_supplier_po_commitment_stack_unmapped_suppliers.sql
+validate_supplier_po_commitment_stack_unmapped_supplier_names.sql
+validate_supplier_po_commitment_stack_tracked_spend_project.sql
+validate_supplier_po_commitment_stack_missing_refs.sql
+validate_supplier_po_commitment_stack_status_alignment.sql
+validate_supplier_po_commitment_stack_line_id_uniqueness.sql
+validate_workday_supplier_po_commitment_stack_mandatory_cols.sql
+validate_supplier_po_commitment_stack_ref_coverage.sql
+z_validate_supplier_purchase_order_receipt_issues.sql
+
+-- NOTE: Valid source tables for this module are the UNION of:
+--       (a) All tables materialised by the transform SQL folder
+--           (order.txt under transform/sql/finance/supplier_purchase_order_receipt/)
+--       (b) All 5 source extract tables declared in this module's ingest config:
+--           elt_ingest_excel/config/ingest/finance/supplier_purchase_order_receipt.json
+--           → fin_supplier_po_commitment_stack_report
+--           → fin_supplier_po_receipt               (ingested but UNUSED in output)
+--           → fin_workday_extract_supplier
+--           → fin_ref_wd_fdm_mapping
+--           → fin_ref_wd_spend_category
+--       (c) Any FUTURE Workday post-load extracts that become the 4th-layer
+--           reconciliation TARGETs (PO extract + supplier receipt extract).
+--           When added, they MUST first be declared in the module's ingest
+--           config (supplier_purchase_order_receipt.json) and projected via
+--           a transform-layer base SQL BEFORE validate SQL is allowed to
+--           reference them. See recon-todo.md OPEN-8.
+--
+--       No table outside (a)+(b)+(c) is allowed to be referenced from this
+--       folder's in-pipeline SQL.

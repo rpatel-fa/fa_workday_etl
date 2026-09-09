@@ -1,0 +1,855 @@
+{
+  "description": "ISO 3166-1 alpha-2 country code -> country name, dialling code, currency, language, tax ID type. Backs every *Country Code column; the transform resolves the country name and the international phone code (phone_code with '+' stripped) from it.",
+  "key_column": "country_code",
+  "provenance": "Snapshot copied 2026-07-15 from elt_ingest_excel/config/data/ref_country.json. A COPY, not a link — nothing syncs it. Re-check by hand against that file if countries change.",
+  "rows": [
+    {
+      "country_code": "AE",
+      "language_code": "AR",
+      "currency_code": "AED",
+      "phone_code": "+971",
+      "tax_id_type": "Other",
+      "country_name": "United Arab Emirates"
+    },
+    {
+      "country_code": "AL",
+      "language_code": "SQ",
+      "currency_code": "ALL",
+      "phone_code": "+355",
+      "tax_id_type": "Other",
+      "country_name": "Albania"
+    },
+    {
+      "country_code": "AR",
+      "language_code": "ES",
+      "currency_code": "ARS",
+      "phone_code": "+54",
+      "tax_id_type": "Other",
+      "country_name": "Argentina"
+    },
+    {
+      "country_code": "AT",
+      "language_code": "DE",
+      "currency_code": "EUR",
+      "phone_code": "+43",
+      "tax_id_type": "VAT",
+      "country_name": "Austria"
+    },
+    {
+      "country_code": "AU",
+      "language_code": "EN",
+      "currency_code": "AUD",
+      "phone_code": "+61",
+      "tax_id_type": "Other",
+      "country_name": "Australia"
+    },
+    {
+      "country_code": "AX",
+      "language_code": "SV",
+      "currency_code": "EUR",
+      "phone_code": "+358",
+      "tax_id_type": "Other",
+      "country_name": "Åland Islands"
+    },
+    {
+      "country_code": "BA",
+      "language_code": "BS",
+      "currency_code": "BAM",
+      "phone_code": "+387",
+      "tax_id_type": "Other",
+      "country_name": "Bosnia and Herzegovina"
+    },
+    {
+      "country_code": "BE",
+      "language_code": "NL",
+      "currency_code": "EUR",
+      "phone_code": "+32",
+      "tax_id_type": "VAT",
+      "country_name": "Belgium"
+    },
+    {
+      "country_code": "BG",
+      "language_code": "BG",
+      "currency_code": "BGN",
+      "phone_code": "+359",
+      "tax_id_type": "Other",
+      "country_name": "Bulgaria"
+    },
+    {
+      "country_code": "BL",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+590",
+      "tax_id_type": "Other",
+      "country_name": "Saint Barthelemy"
+    },
+    {
+      "country_code": "BM",
+      "language_code": "EN",
+      "currency_code": "BMD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Bermuda"
+    },
+    {
+      "country_code": "BR",
+      "language_code": "PT",
+      "currency_code": "BRL",
+      "phone_code": "+55",
+      "tax_id_type": "Other",
+      "country_name": "Brazil"
+    },
+    {
+      "country_code": "CA",
+      "language_code": "EN",
+      "currency_code": "CAD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Canada"
+    },
+    {
+      "country_code": "CD",
+      "language_code": "FR",
+      "currency_code": "CDF",
+      "phone_code": "+243",
+      "tax_id_type": "Other",
+      "country_name": "Congo, Democratic Republic of the"
+    },
+    {
+      "country_code": "CG",
+      "language_code": "FR",
+      "currency_code": "XAF",
+      "phone_code": "+242",
+      "tax_id_type": "Other",
+      "country_name": "Congo"
+    },
+    {
+      "country_code": "CH",
+      "language_code": "DE",
+      "currency_code": "CHF",
+      "phone_code": "+41",
+      "tax_id_type": "Other",
+      "country_name": "Switzerland"
+    },
+    {
+      "country_code": "CI",
+      "language_code": "FR",
+      "currency_code": "XOF",
+      "phone_code": "+225",
+      "tax_id_type": "Other",
+      "country_name": "Côte d'Ivoire"
+    },
+    {
+      "country_code": "CL",
+      "language_code": "ES",
+      "currency_code": "CLP",
+      "phone_code": "+56",
+      "tax_id_type": "Other",
+      "country_name": "Chile"
+    },
+    {
+      "country_code": "CM",
+      "language_code": "FR",
+      "currency_code": "XAF",
+      "phone_code": "+237",
+      "tax_id_type": "Other",
+      "country_name": "Cameroon"
+    },
+    {
+      "country_code": "CN",
+      "language_code": "ZH",
+      "currency_code": "CNY",
+      "phone_code": "+86",
+      "tax_id_type": "Other",
+      "country_name": "China"
+    },
+    {
+      "country_code": "CR",
+      "language_code": "ES",
+      "currency_code": "CRC",
+      "phone_code": "+506",
+      "tax_id_type": "Other",
+      "country_name": "Costa Rica"
+    },
+    {
+      "country_code": "CV",
+      "language_code": "PT",
+      "currency_code": "CVE",
+      "phone_code": "+238",
+      "tax_id_type": "Other",
+      "country_name": "Cabo Verde"
+    },
+    {
+      "country_code": "CW",
+      "language_code": "NL",
+      "currency_code": "ANG",
+      "phone_code": "+599",
+      "tax_id_type": "Other",
+      "country_name": "Curaçao"
+    },
+    {
+      "country_code": "CY",
+      "language_code": "EL",
+      "currency_code": "EUR",
+      "phone_code": "+357",
+      "tax_id_type": "Other",
+      "country_name": "Cyprus"
+    },
+    {
+      "country_code": "CZ",
+      "language_code": "CS",
+      "currency_code": "CZK",
+      "phone_code": "+420",
+      "tax_id_type": "Other",
+      "country_name": "Czechia"
+    },
+    {
+      "country_code": "DE",
+      "language_code": "DE",
+      "currency_code": "EUR",
+      "phone_code": "+49",
+      "tax_id_type": "VAT",
+      "country_name": "Germany"
+    },
+    {
+      "country_code": "DK",
+      "language_code": "DA",
+      "currency_code": "DKK",
+      "phone_code": "+45",
+      "tax_id_type": "VAT",
+      "country_name": "Denmark"
+    },
+    {
+      "country_code": "DO",
+      "language_code": "ES",
+      "currency_code": "DOP",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Dominican Republic"
+    },
+    {
+      "country_code": "DZ",
+      "language_code": "AR",
+      "currency_code": "DZD",
+      "phone_code": "+213",
+      "tax_id_type": "Other",
+      "country_name": "Algeria"
+    },
+    {
+      "country_code": "EC",
+      "language_code": "ES",
+      "currency_code": "USD",
+      "phone_code": "+593",
+      "tax_id_type": "Other",
+      "country_name": "Ecuador"
+    },
+    {
+      "country_code": "EE",
+      "language_code": "ET",
+      "currency_code": "EUR",
+      "phone_code": "+372",
+      "tax_id_type": "Other",
+      "country_name": "Estonia"
+    },
+    {
+      "country_code": "ES",
+      "language_code": "ES",
+      "currency_code": "EUR",
+      "phone_code": "+34",
+      "tax_id_type": "VAT",
+      "country_name": "Spain"
+    },
+    {
+      "country_code": "FI",
+      "language_code": "FI",
+      "currency_code": "EUR",
+      "phone_code": "+358",
+      "tax_id_type": "VAT",
+      "country_name": "Finland"
+    },
+    {
+      "country_code": "FM",
+      "language_code": "EN",
+      "currency_code": "USD",
+      "phone_code": "+691",
+      "tax_id_type": "Other",
+      "country_name": "Micronesia, Federated States of"
+    },
+    {
+      "country_code": "FR",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+33",
+      "tax_id_type": "VAT",
+      "country_name": "France"
+    },
+    {
+      "country_code": "GB",
+      "language_code": "EN",
+      "currency_code": "GBP",
+      "phone_code": "+44",
+      "tax_id_type": "VAT_UK",
+      "country_name": "United Kingdom"
+    },
+    {
+      "country_code": "GE",
+      "language_code": "KA",
+      "currency_code": "GEL",
+      "phone_code": "+995",
+      "tax_id_type": "Other",
+      "country_name": "Georgia"
+    },
+    {
+      "country_code": "GG",
+      "language_code": "EN",
+      "currency_code": "GBP",
+      "phone_code": "+44",
+      "tax_id_type": "Other",
+      "country_name": "Guernsey"
+    },
+    {
+      "country_code": "GI",
+      "language_code": "EN",
+      "currency_code": "GIP",
+      "phone_code": "+350",
+      "tax_id_type": "Other",
+      "country_name": "Gibraltar"
+    },
+    {
+      "country_code": "GR",
+      "language_code": "EL",
+      "currency_code": "EUR",
+      "phone_code": "+30",
+      "tax_id_type": "Other",
+      "country_name": "Greece"
+    },
+    {
+      "country_code": "HK",
+      "language_code": "ZH",
+      "currency_code": "HKD",
+      "phone_code": "+852",
+      "tax_id_type": "Other",
+      "country_name": "Hong Kong"
+    },
+    {
+      "country_code": "HR",
+      "language_code": "HR",
+      "currency_code": "EUR",
+      "phone_code": "+385",
+      "tax_id_type": "Other",
+      "country_name": "Croatia"
+    },
+    {
+      "country_code": "HU",
+      "language_code": "HU",
+      "currency_code": "HUF",
+      "phone_code": "+36",
+      "tax_id_type": "Other",
+      "country_name": "Hungary"
+    },
+    {
+      "country_code": "ID",
+      "language_code": "ID",
+      "currency_code": "IDR",
+      "phone_code": "+62",
+      "tax_id_type": "Other",
+      "country_name": "Indonesia"
+    },
+    {
+      "country_code": "IE",
+      "language_code": "EN",
+      "currency_code": "EUR",
+      "phone_code": "+353",
+      "tax_id_type": "VAT_IE",
+      "country_name": "Ireland"
+    },
+    {
+      "country_code": "IL",
+      "language_code": "HE",
+      "currency_code": "ILS",
+      "phone_code": "+972",
+      "tax_id_type": "Other",
+      "country_name": "Israel"
+    },
+    {
+      "country_code": "IM",
+      "language_code": "EN",
+      "currency_code": "GBP",
+      "phone_code": "+44",
+      "tax_id_type": "Other",
+      "country_name": "Isle of Man"
+    },
+    {
+      "country_code": "IN",
+      "language_code": "HI",
+      "currency_code": "INR",
+      "phone_code": "+91",
+      "tax_id_type": "Other",
+      "country_name": "India"
+    },
+    {
+      "country_code": "IS",
+      "language_code": "IS",
+      "currency_code": "ISK",
+      "phone_code": "+354",
+      "tax_id_type": "Other",
+      "country_name": "Iceland"
+    },
+    {
+      "country_code": "IT",
+      "language_code": "IT",
+      "currency_code": "EUR",
+      "phone_code": "+39",
+      "tax_id_type": "VAT",
+      "country_name": "Italy"
+    },
+    {
+      "country_code": "JE",
+      "language_code": "EN",
+      "currency_code": "GBP",
+      "phone_code": "+44",
+      "tax_id_type": "Other",
+      "country_name": "Jersey"
+    },
+    {
+      "country_code": "JM",
+      "language_code": "EN",
+      "currency_code": "JMD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Jamaica"
+    },
+    {
+      "country_code": "JP",
+      "language_code": "JA",
+      "currency_code": "JPY",
+      "phone_code": "+81",
+      "tax_id_type": "Other",
+      "country_name": "Japan"
+    },
+    {
+      "country_code": "KR",
+      "language_code": "KO",
+      "currency_code": "KRW",
+      "phone_code": "+82",
+      "tax_id_type": "Other",
+      "country_name": "Korea, Republic of"
+    },
+    {
+      "country_code": "KY",
+      "language_code": "EN",
+      "currency_code": "KYD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Cayman Islands"
+    },
+    {
+      "country_code": "KZ",
+      "language_code": "KK",
+      "currency_code": "KZT",
+      "phone_code": "+7",
+      "tax_id_type": "Other",
+      "country_name": "Kazakhstan"
+    },
+    {
+      "country_code": "LA",
+      "language_code": "LO",
+      "currency_code": "LAK",
+      "phone_code": "+856",
+      "tax_id_type": "Other",
+      "country_name": "Laos"
+    },
+    {
+      "country_code": "LS",
+      "language_code": "EN",
+      "currency_code": "LSL",
+      "phone_code": "+266",
+      "tax_id_type": "Other",
+      "country_name": "Lesotho"
+    },
+    {
+      "country_code": "LT",
+      "language_code": "LT",
+      "currency_code": "EUR",
+      "phone_code": "+370",
+      "tax_id_type": "Other",
+      "country_name": "Lithuania"
+    },
+    {
+      "country_code": "LU",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+352",
+      "tax_id_type": "VAT",
+      "country_name": "Luxembourg"
+    },
+    {
+      "country_code": "LV",
+      "language_code": "LV",
+      "currency_code": "EUR",
+      "phone_code": "+371",
+      "tax_id_type": "Other",
+      "country_name": "Latvia"
+    },
+    {
+      "country_code": "MA",
+      "language_code": "AR",
+      "currency_code": "MAD",
+      "phone_code": "+212",
+      "tax_id_type": "Other",
+      "country_name": "Morocco"
+    },
+    {
+      "country_code": "MC",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+377",
+      "tax_id_type": "Other",
+      "country_name": "Monaco"
+    },
+    {
+      "country_code": "MF",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+590",
+      "tax_id_type": "Other",
+      "country_name": "Saint Martin"
+    },
+    {
+      "country_code": "MK",
+      "language_code": "MK",
+      "currency_code": "MKD",
+      "phone_code": "+389",
+      "tax_id_type": "Other",
+      "country_name": "North Macedonia"
+    },
+    {
+      "country_code": "MO",
+      "language_code": "ZH",
+      "currency_code": "MOP",
+      "phone_code": "+853",
+      "tax_id_type": "Other",
+      "country_name": "Macao"
+    },
+    {
+      "country_code": "MT",
+      "language_code": "MT",
+      "currency_code": "EUR",
+      "phone_code": "+356",
+      "tax_id_type": "VAT",
+      "country_name": "Malta"
+    },
+    {
+      "country_code": "MX",
+      "language_code": "ES",
+      "currency_code": "MXN",
+      "phone_code": "+52",
+      "tax_id_type": "Other",
+      "country_name": "Mexico"
+    },
+    {
+      "country_code": "MY",
+      "language_code": "MS",
+      "currency_code": "MYR",
+      "phone_code": "+60",
+      "tax_id_type": "Other",
+      "country_name": "Malaysia"
+    },
+    {
+      "country_code": "NG",
+      "language_code": "EN",
+      "currency_code": "NGN",
+      "phone_code": "+234",
+      "tax_id_type": "Other",
+      "country_name": "Nigeria"
+    },
+    {
+      "country_code": "NL",
+      "language_code": "NL",
+      "currency_code": "EUR",
+      "phone_code": "+31",
+      "tax_id_type": "VAT",
+      "country_name": "Netherlands"
+    },
+    {
+      "country_code": "NO",
+      "language_code": "NO",
+      "currency_code": "NOK",
+      "phone_code": "+47",
+      "tax_id_type": "Other",
+      "country_name": "Norway"
+    },
+    {
+      "country_code": "NZ",
+      "language_code": "EN",
+      "currency_code": "NZD",
+      "phone_code": "+64",
+      "tax_id_type": "Other",
+      "country_name": "New Zealand"
+    },
+    {
+      "country_code": "PH",
+      "language_code": "TL",
+      "currency_code": "PHP",
+      "phone_code": "+63",
+      "tax_id_type": "Other",
+      "country_name": "Philippines"
+    },
+    {
+      "country_code": "PL",
+      "language_code": "PL",
+      "currency_code": "PLN",
+      "phone_code": "+48",
+      "tax_id_type": "Other",
+      "country_name": "Poland"
+    },
+    {
+      "country_code": "PM",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+508",
+      "tax_id_type": "Other",
+      "country_name": "Saint Pierre and Miquelon"
+    },
+    {
+      "country_code": "PR",
+      "language_code": "ES",
+      "currency_code": "USD",
+      "phone_code": "+1",
+      "tax_id_type": "EIN",
+      "country_name": "Puerto Rico"
+    },
+    {
+      "country_code": "PS",
+      "language_code": "AR",
+      "currency_code": "ILS",
+      "phone_code": "+970",
+      "tax_id_type": "Other",
+      "country_name": "Palestine"
+    },
+    {
+      "country_code": "PT",
+      "language_code": "PT",
+      "currency_code": "EUR",
+      "phone_code": "+351",
+      "tax_id_type": "VAT",
+      "country_name": "Portugal"
+    },
+    {
+      "country_code": "PY",
+      "language_code": "ES",
+      "currency_code": "PYG",
+      "phone_code": "+595",
+      "tax_id_type": "Other",
+      "country_name": "Paraguay"
+    },
+    {
+      "country_code": "QA",
+      "language_code": "AR",
+      "currency_code": "QAR",
+      "phone_code": "+974",
+      "tax_id_type": "Other",
+      "country_name": "Qatar"
+    },
+    {
+      "country_code": "RE",
+      "language_code": "FR",
+      "currency_code": "EUR",
+      "phone_code": "+262",
+      "tax_id_type": "Other",
+      "country_name": "Reunion"
+    },
+    {
+      "country_code": "RO",
+      "language_code": "RO",
+      "currency_code": "RON",
+      "phone_code": "+40",
+      "tax_id_type": "Other",
+      "country_name": "Romania"
+    },
+    {
+      "country_code": "RS",
+      "language_code": "SR",
+      "currency_code": "RSD",
+      "phone_code": "+381",
+      "tax_id_type": "Other",
+      "country_name": "Serbia"
+    },
+    {
+      "country_code": "RU",
+      "language_code": "RU",
+      "currency_code": "RUB",
+      "phone_code": "+7",
+      "tax_id_type": "Other",
+      "country_name": "Russian Federation"
+    },
+    {
+      "country_code": "SA",
+      "language_code": "AR",
+      "currency_code": "SAR",
+      "phone_code": "+966",
+      "tax_id_type": "Other",
+      "country_name": "Saudi Arabia"
+    },
+    {
+      "country_code": "SE",
+      "language_code": "SV",
+      "currency_code": "SEK",
+      "phone_code": "+46",
+      "tax_id_type": "VAT",
+      "country_name": "Sweden"
+    },
+    {
+      "country_code": "SG",
+      "language_code": "EN",
+      "currency_code": "SGD",
+      "phone_code": "+65",
+      "tax_id_type": "Other",
+      "country_name": "Singapore"
+    },
+    {
+      "country_code": "SI",
+      "language_code": "SL",
+      "currency_code": "EUR",
+      "phone_code": "+386",
+      "tax_id_type": "Other",
+      "country_name": "Slovenia"
+    },
+    {
+      "country_code": "SK",
+      "language_code": "SK",
+      "currency_code": "EUR",
+      "phone_code": "+421",
+      "tax_id_type": "Other",
+      "country_name": "Slovakia"
+    },
+    {
+      "country_code": "SN",
+      "language_code": "FR",
+      "currency_code": "XOF",
+      "phone_code": "+221",
+      "tax_id_type": "Other",
+      "country_name": "Senegal"
+    },
+    {
+      "country_code": "ST",
+      "language_code": "PT",
+      "currency_code": "STN",
+      "phone_code": "+239",
+      "tax_id_type": "Other",
+      "country_name": "Sao Tome and Principe"
+    },
+    {
+      "country_code": "SX",
+      "language_code": "NL",
+      "currency_code": "ANG",
+      "phone_code": "+1721",
+      "tax_id_type": "Other",
+      "country_name": "Sint Maarten"
+    },
+    {
+      "country_code": "TH",
+      "language_code": "TH",
+      "currency_code": "THB",
+      "phone_code": "+66",
+      "tax_id_type": "Other",
+      "country_name": "Thailand"
+    },
+    {
+      "country_code": "TL",
+      "language_code": "PT",
+      "currency_code": "USD",
+      "phone_code": "+670",
+      "tax_id_type": "Other",
+      "country_name": "Timor-Leste"
+    },
+    {
+      "country_code": "TR",
+      "language_code": "TR",
+      "currency_code": "TRY",
+      "phone_code": "+90",
+      "tax_id_type": "Other",
+      "country_name": "Turkey"
+    },
+    {
+      "country_code": "TT",
+      "language_code": "EN",
+      "currency_code": "TTD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "Trinidad and Tobago"
+    },
+    {
+      "country_code": "TW",
+      "language_code": "ZH",
+      "currency_code": "TWD",
+      "phone_code": "+886",
+      "tax_id_type": "Other",
+      "country_name": "Taiwan"
+    },
+    {
+      "country_code": "UA",
+      "language_code": "UK",
+      "currency_code": "UAH",
+      "phone_code": "+380",
+      "tax_id_type": "Other",
+      "country_name": "Ukraine"
+    },
+    {
+      "country_code": "UM",
+      "language_code": "EN",
+      "currency_code": "USD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "United States Minor Outlying Islands"
+    },
+    {
+      "country_code": "US",
+      "language_code": "EN",
+      "currency_code": "USD",
+      "phone_code": "+1",
+      "tax_id_type": "EIN",
+      "country_name": "United States of America"
+    },
+    {
+      "country_code": "UY",
+      "language_code": "ES",
+      "currency_code": "UYU",
+      "phone_code": "+598",
+      "tax_id_type": "Other",
+      "country_name": "Uruguay"
+    },
+    {
+      "country_code": "VA",
+      "language_code": "IT",
+      "currency_code": "EUR",
+      "phone_code": "+39",
+      "tax_id_type": "Other",
+      "country_name": "Holy See (Vatican City State)"
+    },
+    {
+      "country_code": "VI",
+      "language_code": "EN",
+      "currency_code": "USD",
+      "phone_code": "+1",
+      "tax_id_type": "Other",
+      "country_name": "U. S. Virgin Islands"
+    },
+    {
+      "country_code": "XK",
+      "language_code": "SQ",
+      "currency_code": "EUR",
+      "phone_code": "+383",
+      "tax_id_type": "Other",
+      "country_name": "Kosovo"
+    },
+    {
+      "country_code": "ZA",
+      "language_code": "EN",
+      "currency_code": "ZAR",
+      "phone_code": "+27",
+      "tax_id_type": "Other",
+      "country_name": "South Africa"
+    }
+  ]
+}

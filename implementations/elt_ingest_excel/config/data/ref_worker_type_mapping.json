@@ -1,0 +1,172 @@
+[
+	{
+		"user_type" : "CASUAL",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "CONTRACTORS",
+		"department_1" : "CHAIR'S ASSISTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "CONTRACTORS",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "CONTRACTORS",
+		"department_1" : "LITTLETHIEF",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "CONTRACTORS",
+		"department_1" : "SECURITAS",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "BOARD & COUNCIL",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "COGNIZANT",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "FSP",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "LITTLETHIEF",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "NATIONAL LEAGUES(FAS USERS)",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "ORION",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "SECURITAS",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FA EXTERNAL CONTRACTOR",
+		"department_1" : "TWO CIRCLE",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "FIXED TERM",
+		"department_1" : "CHAIR",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "FIXED TERM",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "ADVANTAGE",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "CHAIR",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "COGNIZANT",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "INNOVATE IT",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "LITTLETHIEF",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "ORION",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "REAL-WIRELESS",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "SECURITAS",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "NULL",
+		"department_1" : "STATSPORTS",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "PERMANENT",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "Sole Trader"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "ADVANTAGE",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "COGNIZANT",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "CONSULTANT",
+		"mapped_value" : "REVIEW"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "FIRST RESPONSE GROUP",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "NLS LEAGUES",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "ORION",
+		"mapped_value" : "Supplier Staff"
+	},
+	{
+		"user_type" : "THIRD PARTY",
+		"department_1" : "SECURITAS",
+		"mapped_value" : "Supplier Staff"
+	}
+]

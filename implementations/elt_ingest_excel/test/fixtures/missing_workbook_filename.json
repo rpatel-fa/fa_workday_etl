@@ -1,0 +1,10 @@
+[
+  {
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "targetTableName": "table1"
+      }
+    ]
+  }
+]

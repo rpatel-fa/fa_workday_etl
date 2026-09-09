@@ -1,0 +1,490 @@
+# Transform spec - ap_cfa_claims  (*** CFA CLAIMS ONLY — NOT CFA DISTRIBUTIONS ***)
+#
+# *** CRITICAL NAME CLARITY (2026-08-24):
+#     "CFA" is an ambiguous Finance shorthand. Two sibling transforms exist / will exist:
+#       1. ap_cfa_distributions  <- Separate transform, for the monthly FA Grant / EP
+#          Workforce & Leadership / EP WorkforceIS etc. CFA "distributions" workbook.
+#          Source/target folders:  .../eib/ap/cfa_distributions/.  Labels: "CFA Distributions".
+#       2. ap_cfa_claims         <- THIS transform.  Handles the SEPARATE CFA-Claims
+#          workbook (Sheet Name / County FA / County FA GP ID / Total Claim / Budget Code /
+#          Supplier Name / Workday Supplier ID — 12 cols, flat, different schema).
+#          Source/target folders: .../eib/ap/cfa_claims/.  Labels: "CFA Claims".
+#     Do not mix these up.  When searching / adding code grep for either "cfa_claims"
+#     or "cfa_distributions" explicitly, never bare "cfa".
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors. Lives in
+# config/transform_specs/ (not config/transforms/, which the build globs as runnable profiles).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) - live in the build profile
+# config/transforms/ap_cfa_claims.yaml (the build-consumed source of truth). Not restated here.
+#
+# Source workbook: SC_1.0 CFA Claims - Finance Approval - <Month> <YYYY>_UPDATED CODES.xlsx
+#   (exemplar file: "Copy of SC_1.0 CFA Claims - Finance Approval - August 2026_UPDATED CODES.xlsx")
+# Data sheet: "1.0 CFA Claims - Finance Approv"  (header row 1, data rows 2..N, cols A..L = 12 cols)
+#
+#   Col A = Sheet Name / Claim Category  (e.g. "03 Disability Non CFA Payments",
+#                                         "0.6 AdHoc Payments" — per-row key #1; grouped
+#                                         by payment-type; used as InvoiceNumber suffix + trace)
+#   B = County FA                        (e.g. "Bedfordshire FA" / "CP Sport" — claimant
+#                                         identity; informational, NOT the legal-entity code;
+#                                         Company = constant "FA" THE FA GROUP - FA across the board)
+#   C = County FA GP ID                  (e.g. BED013 / CPS001 — legacy GP creditor code;
+#                                         RETAINED for traceability + skip-row gate, but
+#                                         NOT used for resolution — same pattern as Distributions)
+#   D = Total Claim (£)                  (net claim line amount — PurchasesAmount; all
+#                                         positive, integer £ + .xx pence e.g. 2575 / 1888.33)
+#   E = Budget Code                      (distribution / accounting string in TWO different
+#                                         formats in the same source — either raw no-separators
+#                                         "1177504007PGRW0039G030" or dash-separated
+#                                         "1224-407003-00000000-0000" — the helper normalises
+#                                         to the dash-separated form before lowest-hierarchy
+#                                         worktag lookup.  EXACTLY the same Distribution/Cost
+#                                         Code semantic as Distributions FM col G.)
+#   F = Head of Approval                 (e.g. Stacey Mullock / John Folwell — informational
+#                                         comment; NOT written to EIB, preserved in memo)
+#   G = Processed By                     (Stuart Richmond in exemplar — informational;
+#                                         NOT written to EIB, preserved in memo)
+#   H = Processed Date                   (date, 2026-07-27 / 2026-08-01 per payment-group —
+#                                         authoritative InvoiceDate; also ReceiptDate and
+#                                         the batchIdToken date source.  Per-payment-group,
+#                                         can differ across the batch; uniformity gate is
+#                                         RAISED-AS-ISSUE, not hard-fail like Distributions)
+#   I = Payment Run                      ("August" in exemplar — informational, not keyed)
+#   J = Budget Code Naming               (human-readable label for the Budget Code, e.g.
+#                                         "DWF_PartnerAugust2026" / "CFA_COACHDEVWORKFUND" —
+#                                         used as the Item Description (EIB DI); 54/272 distinct)
+#   K = Supplier Name                    (exact Workday Supplier name, uppercase, informational
+#                                         only — NOT used for resolution; Workday Supplier ID
+#                                         is the canonical lookup key)
+#   L = Workday Supplier ID             *** AP-FINANCE-TEAM-CURATED COLUMN ***
+#                                         Workday Supplier Reference ID (S-XXXXXX), directly
+#                                         the authoritative key for the EIB Supplier column (O).
+#                                         Supplier is a DIRECT PASSTHROUGH.  Column L is the
+#                                         SOLE source of truth; we do NOT load the Supplier
+#                                         Spreadsheet; we do NOT do the County FA GP ID →
+#                                         Creditor ID → Supplier Spreadsheet two-part lookup.
+#                                         Non-blank gate; blank Workday Supplier ID = skip +
+#                                         report unresolvedSupplierRows.
+#
+# Key structural notes (aligned with Distributions):
+#   * Company is ALWAYS CONSTANT "FA" → THE FA GROUP - FA via ResolveMappedCompany("FA").
+#     The Claims source tab has no explicit Company column; County FA (B) is the claimant,
+#     not the paying legal entity.  Paying legal entity is unambiguously The FA Group Ltd.
+#   * batchIdToken = "CFAC" + MMYY derived from the PER-FILE-PAYMENT-RUN-MODE date.
+#     Payments can have TWO ProcessedDate values (2026-07-27 + 2026-08-01 in exemplar).
+#     The BOOTSTRAP (first non-skippable row) date is the date that drives batchIdToken;
+#     a uniformity issue counter (mixedBatchRows) counts mismatches and surfaces it as a
+#     batch-level warning, not a hard-fail.  Month-on-month Just Works: new source file
+#     → first valid row date → token auto-updates.
+#   * InvoiceNumber (EIB G / Col K) = "{col J Budget Code Naming}_{col I Payment Run}_{4-digit YYYY from col H Processed Date}_{per-group increment}"
+#     CHANGED 2026-08-25 per Finance AP / CFA-end-user request.  CFA recipients prefer a
+#     human-meaningful reference they can trace back to the Budget Code + Payment Run.
+#     Composite group key = "{J}_{I}_{YYYY}" (Budget Code Naming + Payment Run literal +
+#     4-digit Processed-Date year).  Within each group rows are numbered 1..N in source
+#     order, RESETTING per group (so each new Budget-Code-Naming / Payment-Run / Year
+#     combo restarts from 1).  Example: "DWF_PartnerAugust2026_August_2026_1",
+#     "CFA_COACHDEVWORKFUND_August_2026_1", etc.  Uniqueness across the batch is
+#     guaranteed because the per-group increment disambiguates rows that share the same
+#     Budget Code Naming (which repeats heavily — 54 distinct values across 272 rows).
+#     Year is per-row from Processed Date H (not the bootstrap batch token year) so that
+#     any edge-case January-processed claims with a prior-year Processed Date still
+#     carry the correct year segment.  Processed Date month itself is NOT used — the
+#     Payment Run column I is authoritative for the month segment.
+#   * SuppliersInvoiceNumber (EIB target BG / Suppliers Invoice Number) = EXACT 1:1 MIRROR
+#     of target K / Invoice Number.  SAME VALUE ON EVERY ROW (not recomputed independently
+#     — reuses the same string instance already produced by Rule 8 to guarantee bitwise
+#     equality across the two columns, so no off-by-one / separator drift is possible).
+#     CHANGED 2026-08-25 per Finance AP user follow-up + v2 hand-edit witness.  The CFA
+#     Workday system validates cross-column consistency between the two invoice-number
+#     fields and rejects submissions where they diverge.  v1 of the built output wrote a
+#     legacy "{col C GP ID}-{col A Sheet Name}-{dataRowIndex}" composite to BG which was
+#     unique-but-incompatible; when Finance users hand-edited the 271 BG cells in v2 to
+#     equal their K counterparts, the EIB succeeded, confirming the mirror requirement.
+#     Legacy AU target ("EIB AU") from the pre-shift documentation is OBSOLETE — the
+#     current Submit Supplier Invoice v46.2 template renumbered this field to Column BG
+#     ("Suppliers Invoice Number" label on header row 5).
+#   * Item Description (EIB DI) = UCASE(TRIM(col J (Budget Code Naming))).
+#     Budget Code Naming is the Finance-approved label (DWF_PartnerAugust2026 etc.).
+#   * Tax: NO TAX ON CFA CLAIMS.  All 272 rows in the exemplar are a zero-Tax environment.
+#     (Source has no Tax Amount / Tax Detail / Tax Code columns at all — 12 cols total,
+#     none tax-related.)  Tax applicability per row is ALWAYS Outside_of_Scope /
+#     Zero_Rated / Nonrecoverable_Allocate.  The VBA hardcodes the no-tax path; no
+#     conditional_on_tax_amount branch is ever taken.  (If Finance ever add Tax cols,
+#     copy the Distributions conditional pattern verbatim.)
+#   * Memo (EIB EO) = col C (GP ID) + " | " + col A (Sheet Name) + " | " +
+#     col J (Budget Code Naming) + " | by " + col G (Processed By).  Full row trace
+#     without re-opening the source xlsx.
+#
+# Derived-field rules (Claims tab -> EIB mapping).  "1.0 CFA Claims - Finance Approv" IS
+# the direct input.
+#
+#   Rule 0 — Supplier resolution (same pattern as Distributions):
+#             Supplier is read DIRECTLY from source col L ("Workday Supplier ID").
+#             Value = AP-team-curated S-XXXXXX Workday Supplier Reference.
+#             NO Supplier Spreadsheet loaded; NO ResolveSupplierWithCompanyPrecedence;
+#             NO County FA GP ID → Creditor-ID two-part precedence.
+#             Pure passthrough + LenB>0 gate (blank → skip + unresolvedSupplierRows++).
+#             County FA GP ID (col C) retained for trace / skip-gate only, NOT for resolution.
+#   Rule 1 — Company / Legal Entity: CONSTANT "FA".  Resolve via ResolveMappedCompany("FA")
+#            → THE FA GROUP - FA.  Uniformity across batch is trivially satisfied (constant).
+#   Rule 2 — BatchID token / Invoice-Number prefix.  DERIVED from BOOTSTRAP (first valid
+#            row's) col H (Processed Date).  Format = "CFAC" + two-digit-month +
+#            two-digit-year-last-2 (e.g. 2026-07-27 → "CFAC0726").  Subsequent rows with
+#            a DIFFERENT col H date → counted in mixedBatchRows issue counter (raised as
+#            warning), but batchIdToken remains the bootstrap value (not hard-failed —
+#            CFA Claims legitimately contains two payment-run cycles in one Aug 2026 file).
+#   Rule 3 — DocumentType: hard-coded "INVOICE" literal (no DocumentType column in source).
+#   Rule 4 — ItemDescription / Description: UPPER(TRIM(col J "Budget Code Naming")).
+#   Rule 5 — InvoiceDate: col H (Processed Date) verbatim via NormalizeSourceDate (per-row,
+#            can legitimately differ across rows of the same batch).
+#   Rule 6 — ReceiptDate: col H (same as InvoiceDate).  No separate goods-receipt concept
+#            exists for CFA Claims.
+#   Rule 7 — SuppliersInvoiceNumber / Suppliers Invoice Number (EIB target BG, header row 5 label):
+#            EXACT 1:1 COPY of Rule 8 / Invoice Number (Col K).  Same string value, written
+#            simultaneously to both columns K and BG of the same target row to guarantee bitwise
+#            identity (no re-derivation, no independent counters, no separator drift).  Column BG mirror
+#            of K was CHANGED 2026-08-25 from the legacy "{colC}-{colA}-{dataRowIndex}"
+#            composite (v1 — v1 pattern after Finance users hand-edited the 271 BG cells to
+#            match their K column values (v2 witness) to satisfy a Workday cross-column consistency gate that
+#            rejects the diverged pair.  Legacy "EIB AU" pre-shift label is DEPRECATED / OBSOLETE
+#            — refer to Column BG on the current v46.2 template.  Writes same instance
+#            WriteOutputRow assigns target BG = invoiceNumberValue alongside Column K.  No duplicate
+#            work is needed; uniqueness of Rule 8 (J, I, YYYY(H) group counter) re-done separately.
+#   Rule 8 — Invoice Number (EIB G / Col K): "{col J Budget Code Naming}_{col I Payment Run}_{4-digit YYYY from col H Processed Date}_{per-group-resetting increment}"
+#            e.g. "DWF_PartnerAugust2026_August_2026_1", "CFA_COACHDEVWORKFUND_August_2026_1".
+#            Group key = J + I + YYYY(H) ; per-group counter 1..N, restarts per new group.
+#   Rule 9 — Budget Code / Distribution accounting string: col E AS IS, then passed through
+#            NormalizeAccountingSegmentSeparators (dash-normalise) to collapse the two
+#            in-source formats (with-dashes / no-dashes) to the single dash-separated form
+#            that Mapping MASTER v37 stores as OLD CODE.  Written verbatim to DP/EQ..EX
+#            lowest-hierarchy worktag lookups (Cost Centre mandatory, Spend Category mandatory,
+#            remaining 7 Event..Project worktags optional if mapping yields rows).
+#   Rule 10 — PurchasesAmount (net line): col D (Total Claim £) AS IS.  Decimal amounts
+#             preserved — no rounding (exemplar has .67 / .33 partial pounds; Workday
+#             accepts two-decimal GBP line amounts natively).
+#   Rule 11 — TaxAmount: ZERO (no Tax column in source).  Tax applicability = always the
+#             zero-rated / outside-scope branch.  (See Rule 13.)
+#   Rule 12 — TaxDetailID: vbNullString (no such column; informational marker unused in
+#             claims because no tax).
+#   Rule 13 — Tax applicability per-row (CONSTANT OUTSIDE / ZERO / NONRECOVERABLE):
+#             ALWAYS  →  Outside_of_Scope  /  Zero_Rated  /  Nonrecoverable_Allocate
+#             because CFA Claims source has NO TaxAmount/Tax columns and exemplar is
+#             272/272 zero-rated.  If Finance later add a TaxAmount column, copy the
+#             Distributions conditional_on_tax_amount branch pattern verbatim.
+#   Rule 14 — Memo (EIB EO): "GPID | SheetName | BudgetNaming | by ProcessedBy"
+#             = C + " | " + A + " | " + J + " | by " + G
+#
+# Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md); house
+# defaults inherited unchanged: f=Submit=Y, dd=line-number=1, dv=tax-point-date-type=
+# INVOICE/ADJUSTMENT_DATE, dz=tax-option=CALC_TAX_DUE (harmless even on zero-rated rows —
+# Workday sees a 0-rate tax code and computes £0 VAT anyway).
+
+meta:
+  key: ap_cfa_claims
+  label: AP CFA Claims
+  requester: Finance (AP)
+  date_confirmed: 2026-08-24
+  exemplar_to_fork: ap_cfa_distributions
+  note: >
+    "1.0 CFA Claims - Finance Approv" tab IS the direct input (confirmed by Finance
+    2026-08-24).  12-column layout (A..L) with header row 1, data rows 2 onwards.  SAME
+    resolver pattern as CFA Distributions (Workday Supplier ID col L DIRECT passthrough;
+    Supplier Spreadsheet lookup retired; Company = constant FA; batchIdToken derived from
+    date column).  KEY DIFFERENCES vs Distributions: (1) no Distribution/Cost Code label
+    on the accounting string col — it's Budget Code (E); (2) two in-source formats for
+    Budget Code (dash-separated / no-separators) → dash-normalise step added before mapping
+    lookup; (3) InvoiceDate = per-row Processed Date (H, can legitimately vary by payment
+    group within the same file — mixedBatchRows warning only, not hard fail); (4) no
+    Tax Amount column in source → Tax hard-coded zero-rated branch; (5) no per-row unique
+    DocNo column in source → synthetic DocNo/InvoiceNumber suffix uses dataRowIndex to
+    guarantee per-supplier uniqueness because Sheet Name (A) and GP ID (C) both repeat.
+  open_questions:
+    - "Are multiple ProcessedDate values (2026-07-27 + 2026-08-01) in the same file accepted by AP as one batch? If not, split into two files before running this transform."
+    - "Tax: confirm CFA Claims are ALWAYS zero-rated / outside-scope. If some future batch has VAT lines, add a TaxAmount source column and enable the conditional_on_tax_amount branch."
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_passthrough
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_column_separator_normalized
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: per_row_direct_passthrough
+    source_column: Workday Supplier ID
+    source_column_letter: L
+    resolved_via: >
+      AP Team curated value in Claims col L (DIRECT PASSTHROUGH — no lookup).
+      The County FA GP ID → Supplier Spreadsheet two-part precedence is OBSOLETE for
+      CFA Claims (as of 2026-08-24).  AP finance populate the definitive Workday
+      Supplier Reference (S-XXXXXX) in col L; any mismatch with the old GP-ID mapping
+      is INTENTIONAL / authoritative.  blank L → skip + unresolvedSupplierRows.
+    reject_if_unresolved: true
+  company:
+    source_code: constant
+    value: FA
+    source_column_present: false
+    resolved_via: >
+      ResolveMappedCompany("FA") → THE FA GROUP - FA.  The CFA Claims tab carries no
+      explicit legal-entity Company column (County FA B = claimant entity, not paying
+      legal entity).  Uniformity across batch is constant-trivially-satisfied.
+
+accounting_string:
+  source_column: Budget Code
+  source_column_letter: E
+  separator_character_used_in_source: mixed  # some rows use "-", some rows no separator
+  normalize_separators_before_lookup: true   # NormalizeAccountingSegmentSeparators dash-ify
+  source_value_examples:
+    - "1177-504007-PGRW0039-G030"      # standard dash-separated form
+    - "1177504007PGRW0039G030"         # no-separator form (normalize → above)
+    - "1224-407003-00000000-0000"
+    - "1224407003000000000000"
+
+derived_fields:
+  batch_id_token:
+    function: concat_cfac_prefix_plus_mmyy_from_col_h_processed_date_bootstrap_row
+    prefix_literal: CFAC
+    date_source_column: Processed Date
+    date_source_column_letter: H
+    uniformity_handling: >
+      first-valid-row date wins; later mismatches counted in mixedBatchRows issue
+      counter (warning) rather than hard-failing because the August 2026 exemplar
+      legitimately combines 2026-07-27 + 2026-08-01 payment-run cycles in one file.
+  invoice_number_g:
+    function: concat_budgetcodenaming_underscore_paymentrun_underscore_processeddateyear_underscore_pergroupcounter
+    template: "{colJ}_{colI}_{YYYY(colH)}_{perGroupCounter(colJ,colI,YYYY(colH))}"
+    separator_literal: "_"
+    counter_resets_per_group: true
+    group_key_parts:
+      - budget_code_naming_col_j
+      - payment_run_col_i
+      - processed_date_4digit_year_from_col_h
+    counter_start: 1
+    counter_order: source_row_order_non_skipped
+    # IMPLEMENTATION-PLATFORM CONSTRAINT (non-negotiable): counter state MUST use pure-VBA
+    # Collection + keyed items, NOT Scripting.Dictionary.  Mac Excel's VBA host does NOT
+    # ship the Scripting Runtime ActiveX library; any CreateObject("Scripting.Dictionary")
+    # raises Run-time error '429' "ActiveX component can't create object" for Mac AP users
+    # (the primary runtime host for this transform).  See modApCfaClaimsSupplierInvoice.bas
+    # CollectionKeyExists / CollectionSetItemLong / CollectionGetItemLong helpers.
+  suppliers_invoice_number_au:
+    function: concat_gpid_minus_sheetname_minus_datarowindex
+    template: "{colC}-{colA}-{dataRowIndex}"
+    # DEPRECATED / OBSOLETE 2026-08-25.  This was the SuppliersInvoiceNumber formula used on
+    # pre-shift templates and in v1 of the v46.2 build output.  Finance users hand-edited 271
+    # BG cells of v2 to mirror their K counterparts (v2 witness at HOME/Downloads/
+    # Submit_Supplier_Invoice_ap_cfa_claims_output v2.xlsx) so CFA's Workday cross-column
+    # validation gate would accept the EIB — the diverged pair was being rejected.
+    # Replaced permanently by suppliers_invoice_number_bg (1:1 copy of invoice_number_g) below.
+  suppliers_invoice_number_bg:
+    function: mirror_invoice_number_value_from_target_column_k
+    template: "<IDENTICAL-VALUE-WRITTEN-TO-BOTH-COLUMNS-K-AND-BG-IN-SAME-ROW>"
+    copy_of_derived_field: invoice_number_g
+    cross_column_guarantee: "K == BG for every non-skipped data row (bitwise identical string instance — no separate derivation, no independent counter, no separator drift possible).  Uniqueness of BG is inherited FOR FREE from Rule 8's (J,I,YYYY) group counter because both writes reuse the same `invoiceNumberValue` local inside WriteOutputRow.  This spec constraint is what prevents a future cold-start author from writing a fresh independently-computed BG function that recomputes groups counters separately and accidentally drifts."
+    change_witness_date: 2026-08-25
+    change_witness_file: "Submit_Supplier_Invoice_ap_cfa_claims_output v2.xlsx (HOME/Downloads/), diff of BG between v1 and v2: 271/271 cells replaced, all exactly == K."
+  item_description_di:
+    function: upper_trim_source_column
+    source_column: Budget Code Naming
+    source_column_letter: J
+  memo_eo:
+    function: join_pipe_gpid_sheetname_budgetname_processedby
+    template: "{colC} | {colA} | {colJ} | by {colG}"
+  invoice_date_u:
+    source_column: Processed Date
+    source_column_letter: H
+    normalize_source_date: true
+  receipt_date_ag:
+    source_column: Processed Date
+    source_column_letter: H
+    normalize_source_date: true
+
+skip_rule:
+  drop_when:
+    #  ---- TRAILING ADMIN / SUM ROWS (implicit, FIRST check) ----
+    #  Finance often append a footer summary section immediately below the last real
+    #  claim row (e.g. row 273 in the Aug 2026 exemplar: Excel SUM formula in D,
+    #  everything else blank).  These are NOT reject rows (not bad data); they must
+    #  be SILENTLY skipped so the reject sheet and counters are not diluted.
+    - condition: "ALL FOUR blank: B (County FA) AND E (Budget Code) AND F (Head of Approval) AND L (Workday Supplier ID)"
+      disposition: skip_silently_not_counted_as_reject
+      rationale: Trailing admin / summary footer rows Finance append below the last claim line
+    #  ---- NORMAL DATA INTEGRITY GATES (counted as reject rows + reported) ----
+    - col A (Sheet Name / Claim Category) is blank
+    - col C (County FA GP ID — retained gate for data integrity — NOT used for resolution) is blank
+    - col D (Total Claim £ / PurchasesAmount) is blank, 0, or negative
+    - col E (Budget Code / accounting string) is blank
+    - col H (Processed Date / InvoiceDate) is blank
+    - col J (Budget Code Naming / Description) is blank
+    - col L (Workday Supplier ID) is blank   # NEW mandatory gate, AP team must fill
+    - cost_centre_worktag unresolved after lowest-hierarchy Budget Code lookup
+    - spend_category_worktag unresolved after lowest-hierarchy Budget Code lookup
+  retain_for_trace_but_no_longer_lookup:
+    - col C (County FA GP ID): retained for skip-gate integrity + trace; not used for resolution
+  on_drop: reject_row_and_report
+  on_trailer_admin_skip: ignore_silently
+
+
+
+eib_population:
+  population_type: Supplier Invoice
+  template_version: v46.2
+  template_path_reference: target_eib  # (inherited from transforms YAML shell_defaults.target_eib)
+
+mapping:
+  # Standard AP Supplier Invoice EIB column mapping (Submit_Supplier_Invoice_v46.2, 290 cols).
+  # Columns in common with the "9-pack single-line FA-company" archetype are listed
+  # explicitly here so the spec<->.bas hygiene gate cross-checks them 1:1.  Deltas
+  # from the archetype are called out with notes.
+  - target: B
+    function: fixed_literal_sequence
+    note: >
+      Spreadsheet Key / per-row sequential integer starting 1.  Code writes
+      ColumnIndex('B') = rowsProcessed + 1; skips not counted.
+  - target: I
+    function: fixed_literal_Y
+    constant: "Y"
+    note: "Submit = Y house default"
+  - target: K
+    function: concat_budgetcodenaming_underscore_paymentrun_underscore_processeddateyear_underscore_pergroupcounter
+    source_columns:
+      - J (Budget Code Naming — trimmed, kept as-is without UPPER to match CFA's expected underscore form)
+      - I (Payment Run literal — e.g. "August")
+      - H (Processed Date → 4-digit YYYY via Year())
+    note: "Invoice Number = {BudgetCodeNaming}_{PaymentRun}_{YYYY}_{perGroupCounter} — CHANGED 2026-08-25 per Finance/CFA end-user request. Counter resets 1 per unique (J,I,YYYY) group. See derived_fields.invoice_number_g above."
+  - target: R
+    function: mapped_company_constant_fa
+    source_column: "(absent; constant 'FA')"
+    note: "Company = THE FA GROUP - FA via ResolveMappedCompany(FA) — see parties.company above"
+  - target: T
+    function: fixed_literal_GBP
+    note: "Currency = GBP default; CFA Claims source has no currency column (UK domestic only)"
+  - target: U
+    source_column: Workday Supplier ID
+    note: >
+      SUPPLIER (DIRECT PASSTHROUGH from col L, AP-team-curated).  NO Supplier Spreadsheet
+      lookup; NO ResolveSupplierWithCompanyPrecedence; NO County FA GP ID resolution.
+      As of 2026-08-24 the old GP-ID → Creditor-ID two-part precedence is OBSOLETE for
+      CFA Claims; col L is the authoritative Workday Supplier Reference.
+  - target: AF
+    source_column: Processed Date
+    normalize_source_date: true
+    note: "InvoiceDate (per-row, can legitimately vary by payment group within batch)"
+  - target: AG
+    source_column: Processed Date
+    normalize_source_date: true
+    note: "ReceiptDate = InvoiceDate (no separate goods-receipt concept for CFA Claims)"
+  - target: BG
+    function: mirror_invoice_number_value_from_target_column_k
+    copy_of_derived_field: invoice_number_g
+    source_columns:
+      - "<IDENTICAL-VALUE to target K / Invoice Number on the same non-skipped data row — no separate source.  Reuses `invoiceNumberValue` local variable of Rule 8 written to ColumnIndex('K') and ColumnIndex('BG') in the same WriteOutputRow call to guarantee K == BG for every row.  Writes at same time, no separate counter, no separator drift possible."
+    note: >
+      Suppliers Invoice Number = 1:1 mirror of Invoice Number (target K).  CHANGED 2026-08-25 per
+      Finance user v2 hand-edit witness: 271/271 BG cells of v2 replaced to exactly equal their
+      K counterparts because CFA Workday validates cross-column consistency between the two
+      invoice-number fields and rejects diverged pairs.  Legacy target: BG formula was
+      "{colC GP ID}-{colA Sheet Name}-{dataRowIndex}" (DEPRECATED suppliers_invoice_number_au in
+      derived_fields; retained for audit trail only).  Writes same string instance to BG as K so
+      uniqueness of BG is inherited for free from Rule 8's group counter.  Build hygiene
+      mechanically checks mapping target: BG function string matches
+      mirror_invoice_number_value_from_target_column_k; any future author attempting to restore
+      the legacy formula will need to update this spec function first.
+  - target: EK
+    function: fixed_literal_1
+    constant: "1"
+    note: "Line number = 1 house default (single-line invoice per claim row)"
+  - target: EP
+    function: upper_trim_source_column
+    source_column: Budget Code Naming
+    note: "Item Description / Description (EIB DI) = UPPER(TRIM(col J))."
+  - target: EW
+    source_column: Budget Code
+    normalize_separators: true
+    note: "Accounting string (dash-normalised) -> lowest-hierarchy 9-pack worktag lookup"
+  - target: FE
+    function: tax_always_outside_of_scope
+    source_column: "(absent; CFA Claims carry no tax — all 272 rows zero-rated)"
+    note: >
+      Tax Applicability = Outside_of_Scope CONSTANT.  CFA Claims source has NO Tax
+      columns.  Zero-rated / Nonrecoverable branch ALWAYS applied.  Conditional
+      pattern can be re-enabled if Finance later add TaxAmount column (copy verbatim
+      from ap_cfa_distributions Rule 13 / mapping entry).
+  - target: FF
+    function: tax_always_zero_rated
+    source_column: "(absent)"
+    note: "Tax (VAT) Code = Zero_Rated CONSTANT.  See ds above."
+  - target: FH
+    function: fixed_literal_INVOICE_ADJUSTMENT_DATE
+    constant: "INVOICE/ADJUSTMENT_DATE"
+    note: "Tax Point Date Type = Invoice/Adjustment Date house default"
+  - target: FK
+    function: tax_always_nonrecoverable
+    source_column: "(absent)"
+    note: "Tax Recoverability = Nonrecoverable_Allocate CONSTANT.  See ds above."
+  - target: FL
+    function: fixed_literal_CALC_TAX_DUE
+    constant: "CALC_TAX_DUE"
+    note: "Tax Option = Calculate Tax Due house default (harmless on zero-rated lines)"
+  - target: GE
+    source_column: Total Claim (£)
+    note: "PurchasesAmount (net line) = col D (Total Claim £) verbatim.  Decimals allowed."
+  - target: GF
+    source_column: Total Claim (£)
+    note: "Line Amount = col D verbatim (1:1 with PurchasesAmount on single-line invoices)"
+  - target: GQ
+    function: join_pipe_gpid_sheetname_budgetname_processedby
+    note: >
+      Memo = "{C | County FA GP ID} | {A | Sheet Name} | {J | Budget Code Naming} | by {G | Processed By}"
+  - target: GR
+    source_column: Budget Code
+    function: left_segment2_1char_reportingtype
+    normalize_separators: true
+    note: >
+      Reporting Type = LEFT(second Budget Code segment, 1) via ResolveReportingTypeFromFinalCode.
+      Single-char driver seg1 (Cost Centre) / seg2 first char (Reporting Type) convention
+      matches all other FA archetypes; see spec parties.reporting_type above.
+  - target: GT
+    source_column: Budget Code
+    worktag: Cost Centre
+    normalize_separators: true
+  - target: GV
+    source_column: Budget Code
+    worktag: Event
+    optional: true
+    normalize_separators: true
+  - target: GX
+    source_column: Budget Code
+    worktag: Camp
+    optional: true
+    normalize_separators: true
+  - target: GZ
+    source_column: Budget Code
+    worktag: FA Learning
+    optional: true
+    normalize_separators: true
+  - target: HB
+    source_column: Budget Code
+    worktag: Commercial Partner
+    optional: true
+    normalize_separators: true
+  - target: HD
+    source_column: Budget Code
+    worktag: Grant
+    optional: true
+    normalize_separators: true
+  - target: HF
+    source_column: Budget Code
+    worktag: Program
+    optional: true
+    normalize_separators: true
+  - target: HH
+    source_column: Budget Code
+    worktag: Project
+    optional: true
+    normalize_separators: true

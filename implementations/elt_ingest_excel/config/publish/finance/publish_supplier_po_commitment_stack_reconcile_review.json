@@ -1,0 +1,72 @@
+[
+  {
+    "tgtWorkbookPathName": "~/Documents/__data/excel/workday/reconcile",
+    "tgtWorkbookFileName": "supplier_po_commitment_stack_reconcile_review_pack",
+    "sheets": [
+      {
+        "sheetName": "board_summary",
+        "srcTableName": "reconcile_cs_board_summary"
+      },
+      {
+        "sheetName": "report",
+        "srcTableName": "reconcile_cs_report"
+      },
+      {
+        "sheetName": "row_counts",
+        "srcTableName": "reconcile_cs_row_counts"
+      },
+      {
+        "sheetName": "amount_by_currency",
+        "srcTableName": "reconcile_cs_amount_by_currency"
+      },
+      {
+        "sheetName": "currency_coverage",
+        "srcTableName": "reconcile_cs_currency_coverage"
+      },
+      {
+        "sheetName": "commitment_class",
+        "srcTableName": "reconcile_cs_commitment_class_summary"
+      },
+      {
+        "sheetName": "unmapped_suppliers",
+        "srcTableName": "reconcile_cs_unmapped_suppliers"
+      },
+      {
+        "sheetName": "zero_commitments",
+        "srcTableName": "reconcile_cs_zero_commitments"
+      },
+      {
+        "sheetName": "old_soft_cutoff",
+        "srcTableName": "reconcile_cs_old_soft_cutoff"
+      },
+      {
+        "sheetName": "finance_actions",
+        "srcTableName": "reconcile_cs_finance_actions"
+      },
+      {
+        "sheetName": "audit_po_coverage",
+        "srcTableName": "reconcile_cs_audit_coverage"
+      },
+      {
+        "sheetName": "audit_po_non_overlap",
+        "srcTableName": "reconcile_cs_audit_non_overlap"
+      },
+      {
+        "sheetName": "audit_po_reconcile",
+        "srcTableName": "reconcile_cs_audit_reconcile"
+      },
+      {
+        "sheetName": "audit_po_only_triage",
+        "srcTableName": "reconcile_cs_audit_only_triage"
+      },
+      {
+        "sheetName": "audit_commitment_compare",
+        "srcTableName": "reconcile_cs_audit_commitment_compare"
+      },
+      {
+        "sheetName": "all_issues",
+        "srcTableName": "reconciliation_supplier_po_receipt_issues"
+      }
+    ]
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "description": "The 9 valid Workday payment terms — the list the Customer EIB's own drop-down validates Customer Payment!C against. The EIB carries a Ref ID per term and it does NOT match the display value (and is inconsistently cased: NET_21 but Net_7). The accepted upload writes the DISPLAY value ('Net 30'), so that is what the template offers; reference_id is recorded for traceability only.",
+  "key_column": "payment_term",
+  "provenance": "Transcribed 2026-07-15 from the Customer EIB's Payment_Term named range ('Customer Specific Named Ranges'!E2, FA E2E Customers V1.xlsm). A snapshot, not a link. NOT the migration's 5 distinct output values — Net 21, EOM + 30 Days, Net 14 and Immediate are valid but appear on zero migrated rows.",
+  "rows": [
+    {
+      "payment_term": "Net 21",
+      "reference_id": "NET_21"
+    },
+    {
+      "payment_term": "EOM + 30 Days",
+      "reference_id": "EOM_+_30_D"
+    },
+    {
+      "payment_term": "Net 14",
+      "reference_id": "NET_14"
+    },
+    {
+      "payment_term": "Immediate",
+      "reference_id": "Immediate"
+    },
+    {
+      "payment_term": "Net 7",
+      "reference_id": "Net_7"
+    },
+    {
+      "payment_term": "Net 60",
+      "reference_id": "Net_60"
+    },
+    {
+      "payment_term": "Net 90",
+      "reference_id": "NET_90"
+    },
+    {
+      "payment_term": "Net 30",
+      "reference_id": "NET_30"
+    },
+    {
+      "payment_term": "Net 120",
+      "reference_id": "NET_120"
+    }
+  ]
+}

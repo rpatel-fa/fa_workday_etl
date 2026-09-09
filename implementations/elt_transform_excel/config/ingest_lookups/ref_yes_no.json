@@ -1,0 +1,13 @@
+{
+  "description": "Standard Yes/No values used by Workday EIB fields in the AR customer input template (Public flags and tax ID Yes/No fields).",
+  "key_column": "yes_no",
+  "provenance": "Snapshot created 2026-07-22 for elt_transform_excel/ar_customer. Values align to the template defaults already in use ('Yes'). A COPY, not a link.",
+  "rows": [
+    {
+      "yes_no": "Yes"
+    },
+    {
+      "yes_no": "No"
+    }
+  ]
+}

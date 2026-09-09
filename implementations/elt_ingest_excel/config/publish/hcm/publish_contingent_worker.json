@@ -1,0 +1,34 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/threeplus/hcm",
+    "srcWorkbookFileName": "HCM Workbook (Blank).xlsm",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_hcm_contingent_worker",
+    "sheets": [
+      {
+        "srcTableName": "workday_contingent_worker_name",
+        "sheetName": "Name",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_contingent_worker_professional_ee",
+        "sheetName": "Professional EE",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_contingent_worker_manager",
+        "sheetName": "Manager",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_contingent_worker_email",
+        "sheetName": "Email",
+        "headerRow": "3",
+        "dataRow": "4"
+      }
+    ]
+  }
+]

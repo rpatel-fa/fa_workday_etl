@@ -1,0 +1,112 @@
+# Transform spec - ar_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (header row, required headers) — live in the build profile
+# config/transforms/ar_invoice.yaml (the build-consumed source of truth). Not restated here.
+
+meta:
+  key: ar_invoice
+  label: AR Invoice
+  requester: Finance (AR)
+  exemplar_to_fork: ar_invoice
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  customer: {source_column: Customer ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  company: {source_column: Company, resolved_via: mapping tab, entity: company}
+
+notes: >
+  Customer Invoice EIB Submit_Customer_Invoice_v46.1 — ALL target columns have been
+  REMAPPED from the earlier pre-v46 Customer Invoice EIB. The mapping: block below is
+  the authoritative target-column shape the .bas module mirrors; see
+  eib_population_defaults.yaml for the single source of truth.
+  AR Invoice (the original AP-style GP extract) carries NO COST CODE accounting string,
+  so Revenue Category and the 9-slot worktag run (FX..GF) are left BLANK by design;
+  Finance may fill them in pre-upload if a specific batch requires coding.
+
+fields:
+  invoice_number:   {source_column: Invoice Number, alias_columns: [Document Number]}
+  invoice_date:     {source_column: Order Date}
+  amount_due:       {source_column: Gross Price, basis: gross}
+  line_amount:      {source_column: Gross Price, basis: gross}
+  line_description: {source_column: "Course Name || '-'|| Course Code"}
+  memo:             {source_column: Comment}
+
+accounting_string:
+  driver: none
+  note: >
+    AR Invoice source layout has no COST CODE / accounting string column
+    (see build profile required_headers). Revenue Category and worktags
+    (FX..GF) are therefore NOT populated mechanically; this matches the
+    confirmed pre-v46 behaviour where these were written to EMPTY cells
+    anyway (pre-v46 KE/ MV columns were not actually present as worktag
+    sinks). Finance adds coding manually pre-upload for batches that need
+    revenue-category-level reporting.
+
+mapping:
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: "Y"
+- target: bo
+  source_column: Invoice Number
+  optional: true
+  fallback:
+    - source_column: Document Number
+  note: Legacy GP Invoice Number. Written verbatim to EIB column BO
+        (Invoice Number on the printed invoice header). If the source
+        extract carries neither `Invoice Number` nor `Document Number`
+        the write is skipped; H stays blank so Workday auto-generates
+        from the submitted batch if Finance does not override.
+- target: j
+  source_column: Company
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+- target: ai
+  default: GBP
+- target: aj
+  source_column: Customer ID
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Customer ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: br
+  source_column: Order Date
+  source_format: dd.mm.yy
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: Gross Price
+- target: co
+  default: Standard
+- target: dv
+  default: "1"
+- target: em
+  derivation: blank_no_accounting_string
+  note: Revenue Category (EM) — no COST CODE driver in this transform so the cell is
+        left blank. See accounting_string note above.
+- target: en
+  source_column: "Course Name || '-'|| Course Code"
+- target: fo
+  source_column: Gross Price
+- target: db
+  source_column: Comment

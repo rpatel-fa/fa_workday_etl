@@ -1,0 +1,14 @@
+supplier invoices = supplier invoices
+document_date = invoice date
+rowid = 1
+
+supplier adjustments = credit notes
+supplier = name???
+document_date = adjustment date
+
+credit notes and returns
+
+document types:
+misc charge
+credit notes
+returns

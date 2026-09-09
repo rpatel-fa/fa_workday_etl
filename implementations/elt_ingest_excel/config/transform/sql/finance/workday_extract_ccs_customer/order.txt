@@ -1,0 +1,1 @@
+src_fin_workday_extract_ccs_customer.sql

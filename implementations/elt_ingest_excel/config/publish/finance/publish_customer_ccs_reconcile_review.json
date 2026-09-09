@@ -1,0 +1,44 @@
+[
+  {
+    "tgtWorkbookPathName": "~/Documents/__data/excel/workday/reconcile",
+    "tgtWorkbookFileName": "customer_ccs_reconcile_review_pack",
+    "sheets": [
+      {
+        "sheetName": "board_summary",
+        "srcTableName": "reconcile_customer_ccs_board_summary"
+      },
+      {
+        "sheetName": "ccs_report",
+        "srcTableName": "reconcile_customer_ccs_report"
+      },
+      {
+        "sheetName": "provenance_case",
+        "srcTableName": "reconcile_customer_ccs_provenance_case_summary"
+      },
+      {
+        "sheetName": "tax_review_pack",
+        "srcTableName": "reconcile_customer_ccs_tax_review_operator_pack"
+      },
+      {
+        "sheetName": "contact_summary",
+        "srcTableName": "reconcile_customer_ccs_contact_summary"
+      },
+      {
+        "sheetName": "contact_case",
+        "srcTableName": "reconcile_customer_ccs_contact_review_case_summary"
+      },
+      {
+        "sheetName": "contact_pattern",
+        "srcTableName": "reconcile_customer_ccs_contact_review_pattern_summary"
+      },
+      {
+        "sheetName": "closure_summary",
+        "srcTableName": "reconcile_customer_ccs_closure_summary"
+      },
+      {
+        "sheetName": "closure_decisions",
+        "srcTableName": "reconcile_customer_ccs_closure_decision_pack"
+      }
+    ]
+  }
+]

@@ -1,0 +1,130 @@
+version: 1
+
+transform:
+  key: ap_referees
+  label: AP Referees (analysis tab, August 2026 refresh — OG, defunct)
+  source_type: AP Referees
+  eib_population_type: Supplier Invoice
+  description: >
+    Referee match-expense workbook ("Copy of Approved 18_08_26_V2_LIVE_V2.xlsx") transformed
+    into the Workday Supplier Invoice EIB.  August 2026 refresh has ELIMINATED the
+    Finance pre-step of building the Integration tab from the Master/Analysis workbook.
+    Now sources the "analysis" tab directly, identical to V2 pipeline.  The 12 Integration-
+    tab fields required by the EIB are DERIVED in-VBA from the Analysis columns:
+      Company          = constant FA (no explicit Company col on Analysis; Cost Code confirms FA-only)
+      BatchID token    = REFS{MM}{YY}ME from MAX(Submission Date) (col 2/B)
+      DocumentType     = constant INVOICE
+      Description (DI) = UPPER(TRIM(Details of Invoice col 6/F))
+      InvoiceDate (U)  = per-row Invoice Date col 4/D
+      ReceiptDate (AG) = batch MAX(Submission Date col 2/B)
+      DocNo (AU)       = INV number col 1/A (NOV17056 etc. -- 1:1 unique)
+      InvoiceNumber (G)= {batch_token}-{INV number} (per-invoice uniqueness)
+      DistributionRef  = Cost Code col 12/L (4-6-8-4 format)
+      PurchasesAmount  = Invoice Total col 7/G (net; TaxAmount hardcoded 0, TaxDetailID=POS)
+      Memo (EO)        = INV number + " " + Cost Code (traceability)
+      Supplier         = DIRECT passthrough of "NEW WORKDAY ID" col 21/U.
+                         Old Creditor-ID -> Supplier Spreadsheet lookup is RETIRED.
+                         VENDOR ID col H 8 is retained for trace only.
+    Skip gates (identical to V2 August 2026):
+      - HH Final Approval != "Approved" -> rejected
+      - NEW WORKDAY ID blank -> rejected (AP not yet allocated a ref)
+      - INV blank / VENDOR ID blank / Details of Invoice blank /
+        Invoice Date blank / Submission Date blank / Cost Code blank /
+        Invoice Total <= 0 -> rejected
+    Uniform zero-tax Outside of Scope / Zero Rated / Nonrecoverable (TaxAmount=0 POS).
+    9-worktag resolution from Cost Code via lowest-hierarchy MAPPING MASTER match.
+    See config/transform_specs/ap_referees.yaml for the full decision record.
+
+runtime:
+  step_list_macro: RunApRefereeSupplierInvoice
+
+source_layout:
+  worksheet_name: analysis
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - INV number
+    - Submission Date
+    - Invoice Date
+    - Details of Invoice
+    - Invoice Total
+    - VENDOR ID
+    - Cost Code
+    - HH Final Approval
+    - NEW WORKDAY ID|WORKDAY SUPPLIER ID|NEW WORKDAY SUPPLIER ID|WORKDAY ID
+  optional_headers:
+    - Reference Number
+    - Full Name (As it appears on your bank account)|Full Name|Full Name As it appears on your bank account
+    - Address
+    - Postcode
+    - Category
+    - PE Approval
+    - PE Approval Date
+    - Telephone No
+    - Email Address
+    - Bank Name
+    - Sort Code|SortCode
+    - Account Number
+    - Account number
+    - A N check
+    - Sort code
+    - S C check
+    - Finance Processed Date
+    - AA|AK|CP|CW|ED|HH|MB|MM|MW|RJ|ST|GL|Raj
+
+transform_constants:
+  fixed_company_code: FA
+  batch_id_derivation: REFS + MM(MAX Submission Date) + YY(MAX Submission Date) + ME
+  uniform_tax:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Nonrecoverable_Allocate
+  fixed_tax_amount: 0
+  fixed_tax_detail_id: POS
+  company_fallback: THE FA GROUP - FA
+  document_type_constant: INVOICE
+  supplier_resolution:
+    source_column: NEW WORKDAY ID
+    lookup_method: direct_passthrough
+    note: >
+      AP/Finance team curate the Workday S-XXXXXX supplier reference directly in
+      the source file as "NEW WORKDAY ID" col U 21.  Old Creditor-ID -> Supplier
+      Spreadsheet lookup is RETIRED.  VENDOR ID col H 8 is retained for audit
+      trace only; it is NOT used for Supplier resolution.
+    mandatory: true
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    cost_centre: "Cost Center"
+    spend_category: "Spend Category"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/referees/source/Copy of Approved 18_08_26_V2_LIVE_V2.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/referees/target/Submit_Supplier_Invoice_ap_referees_output.xlsx
+  source_worksheet_name: analysis
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2

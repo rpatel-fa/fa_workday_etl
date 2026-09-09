@@ -1,0 +1,167 @@
+# Transform spec - ap_commercial_invoice
+#
+# Human decision record + authoritative target-column mapping.
+# Lives in config/transform_specs/ (NOT config/transforms/, which is the build-globbed runnable set).
+# Operational facts live in config/transforms/ap_commercial_invoice.yaml. Not restated here.
+#
+# Source workbook: "Memo Doc - EFAC 2RP- Commercial Payments AP CHECK.xlsx
+# Data sheet : INTEGRATION (header row 1, data rows 2..9 = 8 rows, 11 cols A-K)
+#   Col A = BatchID                     ("EFAC 2RP 2526" on all 8 rows = Early FA Commercial Jul-26 batch)
+#   Col B = CreditorID                   (8 distinct commercial-supplier codes: SAL002, SUT009, CHE043, SLO002,
+#                                          BOR002, GAT004, BLA018, BRA003 — GP creditor codes)
+#   Col C = DocumentType                 ("INVOICE" on all rows)
+#   Col D = Decscription                 (note header misspelling with extra 'c'; all rows = "EFAC 2RP 2526")
+#   Col E = InvoiceDate                  (constant 2025-12-03 across all rows)
+#   Col F = ReceiptDate                  (constant 2025-12-19 across all rows)
+#   Col G = DocNo                        (ALL rows = "EFAC 2RP 2526" — NOT unique per row)
+#   Col H = DistributionReferenceCode    (one value across all 8 rows: "1155-202301-00000000-0000")
+#   Col I = PurchasesAmount              (col header has leading + trailing spaces; 7,342 – 14,000 range)
+#   Col J = TaxAmount                    (0 on all rows)
+#   Col K = TaxDetailID                  ("POS" on all rows)
+#
+# This is Finance AP's canonical GP Integration tab — SAME 11-column schema as
+# ap_prize_funds (identical ordering, misspellings, and column headers match
+# PurchaseAmount's surrounding whitespace — the NormalizeToken/Trim path in
+# FindColumnIndexInRow picks both up). The only material difference from
+# prize_funds is the two map driver (commercial creditor codes are *commercial*
+# not club/creditor codes — the mapping Spreadsheet still matches Reference ID.
+
+meta:
+  key: ap_commercial_invoice
+  label: AP Commercial Invoice
+  requester: Finance (AP)
+  date_confirmed: 2026-09-02
+  exemplar_to_fork: ap_prize_funds
+  note: >
+    Exact same INTEGRATION 11-col schema as ap_prize_funds. Forked from
+    the ap_prize_funds profile/pattern rather than re-authoring. CreditorID
+    col B → Supplier Spreadsheet Reference-ID direct lookup (no
+    hyphen-split, no company precedence — same creditor codes used as bare key,
+    identical to prize_funds key precedence). DistributionReferenceCode col H
+    drives accounting-string worktag map via DistributionReferenceCode col H.
+    See parties block below for exact details.
+
+shared_helpers:
+  supplier_resolution: direct_gp_creditor_id_via_extract
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_distribution_reference_code
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: per_row
+    source_column: CreditorID         # Integration col B
+    source_company_constant: FA
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    key_precedence:
+      1: "{CreditorID}-FA"             # exact match (creditor bound to FA company)
+      2: "{CreditorID}"                # bare creditor fallback
+    reference_id_delimiter: pipe
+    note: >
+      CreditorID col B carries non-hyphenated GP creditor codes (SAL002,
+      SUT009, ...). Resolved using the same Supplier Spreadsheet Reference
+      ID -> Supplier ID lookup as ap_prize_funds. Key precedence =
+      company-then-bare — identical to prize_funds and classic AP pipeline.
+      This variant in shared_helper_registry = "direct_gp_creditor_id_via_extract"
+      — NO hyphen-split is performed on the CreditorID raw value
+      (creditor IDs are plain SAL002-form, no Company suffix embedded).
+  company:
+    source_code: constant
+    constant_value: FA
+    note: >
+      No Company column exists in INTEGRATION tab; uniform "FA" applied to
+      every row. Fixed literal per ap_prize_funds / ap_cfa_claims.
+  accounting_string:
+    source_code: per_row
+    source_column: DistributionReferenceCode   # Integration col H
+    target: Workday hierarchy map (FinalCode 4-segments)
+    separator_normalization: centralised
+    note: >
+      Col H value "1155-202301-00000000-0000" is read as raw cost code
+      passed directly to the 9-pack worktag resolver (ResolveLowestHierarchy
+      AcrossFinalCodeSegments), separator-normalized inside the shared resolver
+      via NormalizeCostCodeSeparators (so variant is
+      direct_distribution_reference_code).
+
+invoice_number_derivation:
+  driver: batch_id_token + CreditorID
+  rule_8_invoice_number_eib_g: "{BatchID}+{CreditorID}"  # EFAC 2RP 2526-SAL002
+  rule_7_suppliers_invoice_number_eib_bg: "{DocNo}-{CreditorID}"   # EFAC 2RP 2526-SAL002
+  note: >
+    DocNo is NOT unique per row (all 8 rows share "EFAC 2RP 2526").
+    DocNo alone would fail Workday per-supplier inv-no uniqueness check.
+    CreditorID suffix is unique per supplier per row, so suffix with
+    batch-token-prefix gives per-row unique ID both G & BG mirror.
+
+eib_constants:
+  output_submit: Y
+  output_default_currency: GBP
+  line_order_eib_em: 1
+  row_id_eib_ek: 1
+  control_amount_eib_as: PurchasesAmount + TaxAmount   # Net + Tax (tax is 0 everywhere)
+  header_consistency_guard_rule_18: true
+  note: >
+    Single-line invoices (each supplier = one row per batch = one EIB row).
+    Not a multi-line shared invoice pattern — so EM/EK both 1.
+
+mapping:
+  # Standard Supplier Invoice EIB v46.2 columns (sheet = Submit Supplier Invoice):
+  #   EIB data starts row 6; clear-range ends col HH.
+  #   House defaults: I=Y, EK=1, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+  # NOTE: Keep this list 1:1 with what WriteOutputRow() actually writes via
+  #   ColumnIndex(...) in modApCommInvSupInv.bas. The hygiene gate
+  #   (build_runner.py --hygiene-only) cross-checks: every mapping key col
+  #   must have a matching ColumnIndex(...) in the .bas, and vice versa.
+  #   Cols AO/AP/AS/AU/AV/AW/AY/AZ/BA/BH/BI/BJ/EL/EX/EY/EZ/FA/FB/FC are NOT
+  #   listed here because the pipeline intentionally leaves them blank /
+  #   does not touch them (Workday defaults). If future needs arise, add
+  #   them both here AND in the .bas ColumnIndex() writes together.
+  "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1 (B=1..N unique; row counter passed from rowsProcessed+1)" }
+  "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
+  "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}; DocNo constant 'EFAC 2RP 2526' across all 8 exemplar rows, so batch+creditor is required to produce a per-supplier-per-batch unique K value within Workday" }
+  "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company (fallback THE FA GROUP - FA)" }
+  "T":  { source: "OUTPUT_DEFAULT_CURRENCY constant", value: "GBP" }
+  "U":  { source: supplier_resolved_supplier_id, rule: "parties.supplier ResolveSupplierWithCompanyPrecedence (Supplier Spreadsheet Reference ID -> Supplier ID; key precedence CreditorID-FA then bare CreditorID)" }
+  "AF": { source: InvoiceDate, rule: "Integration col E coerced @ text format via NormalizeSourceDate" }
+  "AG": { source: ReceiptDate, rule: "Integration col F coerced @ text via NormalizeSourceDate; v46.2 AP Invoice Received Date" }
+  "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; bare DocNo repeats across batch; creditor suffix disambiguates per Workday per-supplier uniqueness rule" }
+  "EK": { source: "HOUSE DEFAULT line_item_rowid_constant", value: "1", rule: "line Row ID = 1 for single-line shared invoice (per Rule 19; EM LineOrder also 1)" }
+  "EP": { source: item_description, rule: "UCase(Trim(Int D Decscription)); header typo 'Decscription' with extra 'c' preserved to match GP INTEGRATION export" }
+  "EW": { source: spend_category, rule: "fields.spend_category - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if no-hit)" }
+  "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }
+  "FF": { source: "tax uniform code", value: "GBR_Zero_Rated" }
+  "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
+  "FK": { source: "tax uniform recoverability", value: "Nonrecoverable_Allocate" }
+  "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
+  "GE": { source: PurchasesAmount, rule: "Unit Cost = Integration col I PurchasesAmount (header whitespace trimmed); no line split; tax=0 CALC no-op" }
+  "GF": { source: PurchasesAmount, rule: "Line Extended Amount (same as GE; single-line, tax=0)" }
+  "GQ": { source: memo, rule: "Rule 13 concat: DocNo + ' ' + CreditorID + ' ' + DistributionReferenceCode (traceability)" }
+  "GR": { source: reporting_type, rule: "LEFT(second segment of DistributionReferenceCode, 1) via ResolveReportingTypeFromFinalCode" }
+  "GT": { source: cost_centre, rule: "fields.cost_centre - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Cost Center hierarchy (reject if no-hit)" }
+  "GV": { source: event, rule: "fields.related_worktags.event - optional blank if no-hit via Mapping MASTER Events Custom Org" }
+  "GX": { source: camp, rule: "fields.related_worktags.camp - optional via Camps Custom Org" }
+  "GZ": { source: fa_learning_course, rule: "fields.related_worktags.fa_learning - optional via FA Learning Custom Org" }
+  "HB": { source: commercial_partner, rule: "fields.related_worktags.commercial_partner - optional via Commercial Partners Custom Worktag" }
+  "HD": { source: grant, rule: "fields.related_worktags.grant - optional via Grant" }
+  "HF": { source: programme, rule: "fields.related_worktags.programme - optional via Program Delivered Org" }
+  "HH": { source: project, rule: "fields.related_worktags.project - optional via Projects (Opex)" }
+
+open_questions:
+  - id: comm_inv_001
+    title: EFAC 2RP future batches size and source content stability
+    status: open
+    parked_pending_finance:
+      - >-
+        Exemplar is 8 rows (EFAC 2RP 2526 = one Jul-26 commercial payments batch).
+        Confirm if future batches keep the INTEGRATION 11-col contract (A..K,
+        same misspellings in D/I header, same header positions) or if a new
+        header/layout variant will be introduced.
+      - >-
+        Confirm uniform Tax=0 + TaxDetailID=POS (Outside of Scope) is stable for
+        all commercial invoices or if a per-row tax-code driver from a
+        different TaxDetailID value (e.g. PON / ZRO) needs to be added.

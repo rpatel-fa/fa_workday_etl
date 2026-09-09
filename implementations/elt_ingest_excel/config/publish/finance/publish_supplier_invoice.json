@@ -1,0 +1,32 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/supplier_invoice",
+    "srcWorkbookFileName": "Submit_Supplier_Invoice_v45.2.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_supplier_invoice_v1",
+    "sheets": [
+      {
+        "srcTableName": "workday_supplier_invoice",
+        "sheetName": "Submit Supplier Invoice",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/supplier_invoice",
+    "srcWorkbookFileName": "Submit_Supplier_Invoice_Adjustment_v46.0.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_supplier_invoice_adjustment_v1",
+    "sheets": [
+      {
+        "srcTableName": "workday_supplier_credit_note",
+        "sheetName": "Submit Supplier Invoice Adjustm",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  }
+]

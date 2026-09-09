@@ -1,0 +1,259 @@
+version: 1
+
+transform:
+  key: ap_taxi
+  label: AP Taxi
+  source_type: AP Taxi Upload Format
+  eib_population_type: Supplier Invoice
+  description: >
+    GENERIC taxi / private-hire company supplier-invoice workbooks transformed into the
+    Workday Supplier Invoice EIB. ONE config covers ALL qualifying *Template* /
+    *TEMPLATE*.xlsx files under /taxi/ for ALL suppliers: currently FIRST CLASS
+    (FIRST CLASS - Full Format -JUL 26 Template_FA_V2.xlsx) plus any future suppliers
+    who drop a TEMPLATE-suffixed workbook with the same "Upload Format" tab.
+    No per-supplier or per-company config is needed — the single ap_taxi profile
+    is intentionally generic. Sources the Finance-prepared "Upload Format" tab
+    directly — openpyxl uniformity scan (Aug 14 2026) confirms 16 columns A–P
+    layout on FIRST CLASS template; the schema matches the stationery Proactis
+    Upload convention exactly except for 2 header names (see source_layout header
+    notes below). Source column B "SupplierID" is formatted as
+    `{CompanyPrefix}-{CreditorID}` (e.g. "FA-1ST002" for FIRST CLASS). VBA splits
+    on the first hyphen per-row to extract the per-row company prefix and bare
+    CreditorID for standard 2-part supplier resolution (`{CreditorID}-{Company}`
+    then bare `{CreditorID}`). The 9 worktags are ALL resolved via Mapping MASTER
+    lookup on the accounting-string code from column K (Seg1=Cost Centre,
+    Seg2=Spend Category, Seg3=Project/Commercial Partner/Grant, Seg4=Program).
+    Tax is driven per-row from source TaxCode column P — current FIRST CLASS file
+    is 100% P20 rows but the per_row_tax table also handles P0/PZ zero-rated for
+    future-proofing.
+    CHANGED 2026-09-09 (7-point structural + tax update from AP same for all of them against
+    Will's hand-edited Aug Ambassador Taxi EIB):
+      (1) Rule 5 AG (ReceivedDate) -> LEAVE BLANK. Do NOT read source ReceivedDate, do NOT
+          fall back to InvoiceDate when blank; Will's Aug file 14/14 AG=None.
+      (2) Rule 16 EM (Line Order col 143) -> per-group 1..N reset counter. CORRECT for mixed
+          single/multi-line batches (Sept). Workday B+EM = authoritative line position tuple;
+          single-line groups trivially produce 1 (matches Aug single group).
+      (3) Rule 19 EK (Row ID col 141) -> EXACT MIRROR of EM (1..N per-group counter). Written
+          from the same lineOrderNext VBA local to guarantee EK == EM per-row byte identity;
+          required for mixed single/multi-line Sept batches; enables CALC_TAX_DUE grouping.
+      (4) Rule 17 AS (Control Amount Total col 45) -> LEAVE BLANK. No per-group SUM of Net
+          (AP confirmed; previously per-group SUM caused reconciliation mismatch).
+      (5) Rule 10 GE (Unit Cost) = GF (Extended Amount) = NET-only. Previously GE = net,
+          GF = net + VAT (pre-addition). GF now matches GE byte-for-byte; Workday CALC_TAX_DUE
+          FL recomputes VAT from FE/FF/FK triple.
+      (6) Rule 11 P20 tax triple -> GBR_Domestic_Purchase_Of_Goods_And_Services /
+          GBR_Standard / Fully_Recoverable (Purchase-domain ref-IDs; previously
+          GBR_Standard_Rated/GBR_Standard_Rated/Recoverable_Allocate which are
+          AR-domain / Customer-Invoice values; overridden per-transform as Private Const
+          shadow in modApTaxiSupplierInvoice.bas rather than shared modFinanceCommon.bas
+          which would break existing AR consumers).
+      (7) Rule 3 K (EIB Invoice Number) / Rule 6 BG (Suppliers Invoice Number) -> K=BG byte
+          identical (both = source InvoiceNumber passthrough; FIRST CLASS taxi values
+          1SE28308, etc already unique without the 3-segment composite K variant).
+
+    CHANGED 2026-08-25 after FIRST CLASS Jul 26 built EIB rejected by Workday:
+    32 rows had 21 unique Invoice Numbers but 32 unique Spreadsheet Key (col 2 values
+    -> Workday read 11 "duplicate external invoice number" errors because each
+    row had a separate header (B grouping key was per-row instead of per-invoice-group.
+    Resolved by adopting the exact AR multiline customer-invoice + SQL supplier_purchase_order
+    multi-position migration pattern:
+      (1) Spreadsheet Key B = ONE shared integer per distinct source Col C InvoiceNumber group
+          (not per row);
+      (2) Line Order EM col 143 = 1..N reset per B group;
+      (3) Control Amount Total AS col 45 — CHANGED 2026-09-09: LEAVE BLANK per AP confirmation
+          (same Stationery Ambassador Taxi fix applies to all AP transforms);
+      (4) Header fields Company/Currency/Supplier/InvoiceDate ARE repeated
+          identical every row (no blanking of "continuation" rows; Workday uses
+          B+EM to group, not blank headers; ReceivedDate intentionally excluded from
+          consistency guard — 4 strict fields not 5);
+      (5) BG Suppliers Invoice Number = bitwise mirror of K (same single local
+          written twice; no separate recompute);
+      (6) Rule 18 pre-write guard: if any 4 strict header fields diverge within same
+          InvoiceNumber group the Runner errors before writing (catches
+          source corruption before EIB reaches Workday validator.
+    FIRST CLASS Jul 26 exemplar group stats after this change: 32 rows → 21 distinct Invoice
+    groups; 8 split-invoice groups (1 5-row, 7 2-row) all header-clean; 13 1-row groups.
+
+    See config/transform_specs/ap_taxi.yaml for the full decision record and
+    per-column mapping classes.
+
+runtime:
+  step_list_macro: RunApTaxiSupplierInvoice
+
+source_layout:
+  worksheet_name: Upload Format
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - Template
+    - SupplierID
+    - InvoiceNumber
+    - InvoiceDate
+    - ReceivedDate
+    - Currency
+    - Tray
+    - CreatedBy
+    - PONumber
+    - ItemCode
+    # NOTE: col K cost-code header on FIRST CLASS template = "Account". This is
+    # the first confirmed taxi supplier. If future taxi TEMPLATE files use
+    # "New Cost Code" / "Final Cost Code" stationery-style naming instead, VBA
+    # FindColumnIndexInRow MUST extend the fallback chain to try "Account"
+    # first, then "New Cost Code", then "Final Cost Code". Listed primary =
+    # "Account" since FIRST CLASS is the only confirmed taxi supplier today.
+    - Account
+    - Net
+    - Tax
+    - Gross
+    # NOTE: col O description header on FIRST CLASS template =
+    # "Description/BOOKED BY". If future taxi TEMPLATE files use the simpler
+    # "Description" stationery-style naming instead, VBA FindColumnIndexInRow
+    # MUST try "Description/BOOKED BY" first then "Description" fallback.
+    - Description/BOOKED BY
+    - TaxCode
+  allowed_all_blank_required_headers:
+    # PONumber (col I) is a header that MUST exist on the source sheet (it is
+    # part of the 16-column Upload Format A..P contract, checked by VBA guard
+    # min=16), but 100% of data rows may be blank for a given supplier (FIRST
+    # CLASS Jul 26 V2 has 28/28 blank PONumber rows because POs are not used
+    # for taxi invoices). Listing the header here tells validate_input.py NOT
+    # to fail "REQUIRED COLS NON-ZERO" if every sampled row for this column
+    # is blank. Future taxi suppliers who populate PONumber still pass (even
+    # though the header is in this list — only 100%-blank is tolerated).
+    - PONumber
+
+transform_constants:
+  # Supplier resolution contract — explicit so cold-start agents don't guess.
+  # Two-part supplier precedence: exact per-company match (precedence 1) then bare fallback (precedence 2).
+  # Company code is NEVER hardcoded here — it is derived PER ROW from the SupplierID
+  # column B "{CompanyPrefix}-{CreditorID}" split (left segment = company,
+  # right = bare creditor ID). companyCodePerRow is then mapped via runner
+  # company-mapping rows ("FA", "WNSL", etc.), falling back to the
+  # company_fallback entity name when no runner mapping entry exists.
+  supplier_resolution:
+    mode: per_row_split
+    source_column: SupplierID
+    split_delimiter: "-"
+    split_count: 2
+    segments:
+      - index: 1
+        name: Company
+        note: Resolves Workday company ref-id via mapping sheet entity=company
+      - index: 2
+        name: CreditorID
+        note: Bare creditor prefix — combined with Company for 2-part supplier match
+    key_precedence:
+      1: "{CreditorID}-{Company}"
+      2: "{CreditorID}"
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    reference_id_delimiter: pipe
+  # Per-row tax classification driven by source column P "TaxCode" (STRING values).
+  # Canonical convention matches amex_trains validator:
+  #   driver_column = TaxCode
+  #   rate_0 branch = P0 / PZ → 0% Outside / Zero / Nonrecoverable
+  #   rate_20 branch = P20 → 20% Standard Rated Recoverable
+  # Current FIRST CLASS template = 100% P20 rows; zero branches kept for future suppliers.
+  per_row_tax:
+    driver_column: TaxCode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  # All 9 worktags resolved from col K "Account" 4-segment accounting string via
+  # Mapping MASTER lowest-hierarchy match.
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  # No fixed literal worktags — spend_category (DP) is resolved per-row from Seg2 of
+  # the accounting string, not hardcoded like AMEX transforms.
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  # source_layout defaults — SHARED across ALL taxi supplier variants below.
+  # Per-ap_stationery convention: the "Upload Format" tab, row 1 headers,
+  # row 2 data start, is a taxi-wide contract (if a future supplier uses a
+  # different tab name, override source_worksheet_name PER VARIANT like
+  # ar_gbe_invoice does per tab).
+  source_worksheet_name: Upload Format
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.
+  #
+  # Per-supplier folder convention (matches stationery Supplier/{Company?}/source + target pattern):
+  #   taxi/{supplier}/source/  <- user places TEMPLATE .xlsx here
+  #   taxi/{supplier}/target/  <- Runner writes EIB output here
+  #
+  # ONE DROPDOWN ROW PER SUPPLIER VARIANT. All variants below share the SAME VBA
+  # step-list macro (RunApTaxiSupplierInvoice), the SAME source_layout schema
+  # (Upload Format tab, headers row 1 / data row 2, 16 columns A–P), the SAME
+  # transform_constants (9-worktag Mapping MASTER pipeline, per-row SupplierID
+  # split, per-row TaxCode driver). The only per-variant differences are:
+  # (1) profile_key / profile_label shown in the Runner dropdown,
+  # (2) source_data path to the supplier's Upload Format workbook,
+  # (3) output_file_path target.
+  #
+  # WHEN ADDING A NEW TAXI SUPPLIER:
+  #   (a) create taxi/{NEW_SUPPLIER}/source/ and taxi/{NEW_SUPPLIER}/target/
+  #       folders, drop the TEMPLATE-suffixed Upload Format workbook in source/,
+  #   (b) copy the ap_taxi_first_class block below, rename profile_key to
+  #       ap_taxi_{supplier_slug} (lowercase, underscores), update label and
+  #       both file paths,
+  #   (c) if the new supplier's template uses a different tab name than
+  #       "Upload Format", add source_worksheet_name: {their tab name} to the
+  #       variant block (like ar_gbe_invoice per-variant tab overrides),
+  #   (d) re-run create_runner_shell.py --overwrite then build_runner.py,
+  #       or hand-edit the config sheet row — VBA is generic.
+  variants:
+    - profile_key: ap_taxi_first_class
+      profile_label: AP Taxi First Class
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/first_class/source/FIRST CLASS - Full Format -JUL 26 Template_FA_V2.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/first_class/target/Submit_Supplier_Invoice_ap_taxi_first_class_output.xlsx
+    # ------------------------------------------------------------------
+    # Future taxi supplier template — uncomment and populate paths.
+    # Add a new block per supplier. The base profile_key "ap_taxi" is
+    # deliberately not used as a binding (it describes the archetype, not
+    # a concrete supplier run).
+    # ------------------------------------------------------------------
+    # - profile_key: ap_taxi_addison_lee
+    #   profile_label: AP Taxi Addison Lee
+    #   source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/addison_lee/source/<ADDISON LEE TEMPLATE>.xlsx
+    #   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/addison_lee/target/Submit_Supplier_Invoice_ap_taxi_addison_lee_output.xlsx
+    # - profile_key: ap_taxi_uber_for_business
+    #   profile_label: AP Taxi Uber For Business
+    #   source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/uber_for_business/source/<U4B TEMPLATE>.xlsx
+    #   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/taxi/uber_for_business/target/Submit_Supplier_Invoice_ap_taxi_uber_for_business_output.xlsx

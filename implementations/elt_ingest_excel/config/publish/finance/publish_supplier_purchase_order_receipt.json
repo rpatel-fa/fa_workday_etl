@@ -1,0 +1,32 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/eib/eib_template",
+    "srcWorkbookFileName": "Submit_Purchase_Order_v46.0.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_supplier_po_commitment_stack",
+    "sheets": [
+      {
+        "srcTableName": "workday_supplier_po_commitment_stack",
+        "sheetName": "Submit Purchase Order",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/eib/eib_template",
+    "srcWorkbookFileName": "Submit_Receipt_v46.0.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_supplier_po_commitment_stack_receipt",
+    "sheets": [
+      {
+        "srcTableName": "workday_supplier_po_commitment_stack_receipt",
+        "sheetName": "Submit Receipt",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  }
+]

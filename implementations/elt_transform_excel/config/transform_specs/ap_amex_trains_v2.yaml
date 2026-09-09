@@ -1,0 +1,434 @@
+# Transform spec — ap_amex_trains_v2  (RAW Amex → EIB, no Finance massage)
+#
+# The human decision record that drives the .bas module (via the mapping: section below).
+# Filled once by the transform requester / finance, then consumed by an authoring session.
+# Lives in config/transform_specs/ (NOT config/transforms/, which the build globs as runnable
+# profiles). Not read by any build tooling — it is an authoring input and an auditable record
+# of who chose each coding.
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) — live in the build profile
+# config/transforms/ap_amex_trains_v2.yaml (the build-consumed source of truth). Not restated here.
+#
+# Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md); house
+# defaults inherited unchanged: f=Y, dd=1, dv=INVOICE/ADJUSTMENT_DATE, dz=CALC_TAX_DUE.
+#
+# Key differences from ap_amex_trains (v1):
+#   • v1 required Finance to pre-compute Final Code, INVOICE NUMBER2, INVOICE DATE,
+#     SUPPLIER INVOICE NUMBER, ITEM DESCRIPTION, VAT Percentage, and Journal Name? in the
+#     source workbook.  v2 derives all of these from the RAW Amex export plus the
+#     minimally-added BJ..BO columns (values set only on row 1 / first data record, then
+#     filled down automatically).
+#   • v1 hardcoded company code "FA".  v2 resolves the company dynamically from each row's
+#     Account name (e.g. "FOOTBALL ASSOCIATION") via the entity='company' ingest lookup, so
+#     a different entity on the statement would route to its Workday company automatically.
+#   • Final Code is derived in-VBA from "Ref 2" using the same pipeline Finance had built
+#     into the "CC Updated New" sheet formulas: clean → pad to 22 chars → split into four
+#     segments (4|6|8|4) → look up Seg2 first char on the 'seg 2' tab to produce the
+#     canonical 6-digit accounting element 2 → join Seg1-Column1-Seg3-Seg4.
+#
+# See docs/ADDING_A_TRANSFORM.md for the blank template and how a session consumes this.
+
+meta:
+  key: ap_amex_trains_v2
+  label: AP AMEX Trains V2 (Raw Ref 2 → Final Code)
+  requester: Finance (AP)
+  date_confirmed: 2026-08-11
+  exemplar_to_fork: ap_amex_trains   # closest existing transform to copy
+
+shared_helpers:
+  supplier_resolution: fixed_reference_id
+  company_resolution: per_row_account_name_mapping
+  accounting_string_derivation: amex_padded_22char_pipeline
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: none
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: AME001
+    resolved_via: Supplier Spreadsheet     # control-sheet input
+    key_column: Reference ID
+    value_column: Supplier ID
+  company:
+    source_value_column: Account name      # e.g. "FOOTBALL ASSOCIATION" — resolved per-row via the
+    resolved_via: mapping tab, entity=company   # entity='company' ingest lookup (ref_company.json),
+                                                 # so FOOTBALL ASSOCIATION → THE FA GROUP - FA
+
+# One entry per EIB field that is NOT a fixed house default. Each states exactly where the
+# value comes from so the authoring session does not guess a finance-semantic mapping.
+fields:
+  invoice_number:                             # EIB g
+    derivation: header_level_from_filename
+    rule: Parse "AMEX TRAINS {MMM} {YY}" from the source file name (e.g. "AMEX TRAINS APR 26_UPDATED.xlsx" → "AMEX TRAINS APR 26").  Reused across every row.
+  invoice_date:                               # EIB u
+    derivation: header_level_from_statement_date
+    source_column: Statement date             # raw column R (already per-statement, not per-row)
+    rule: Take the first data row's Statement date, format as YYYY-MM-DD.  Reused across every row.
+  supplier_invoice_number:                    # EIB au
+    derivation: header_level_from_statement_id_and_date
+    source_columns: [Statement ID, Statement date]
+    rule: >-
+      First data row's Statement ID + "_" + DDMMYY(Statement date).
+      Example: 976026926121 + "_" + 010526 → "976026926121_010526".
+      Reused across every row.
+  item_description:                           # EIB di
+    derivation: header_level_from_filename
+    rule: Same value as invoice_number (the per-file batch label).
+  memo:                                       # EIB eo
+    derivation: per_row_from_travel_context
+    source_columns: [Traveller name, Departure date, Destination airport]
+    rule: Traveller name + " " + DDMMYY(Departure date) + " " + Destination airport.
+          Departure date and Destination airport are read from the raw BJ..BO fill-down
+          block (Finance enters them on record 1; the transform fills them to every row).
+  line_amount:                                # EIB ed + ee
+    source_column: Net amount
+    basis: net                                # net, because CALC_TAX_DUE has Workday add the VAT
+  spend_category:                             # EIB dp
+    value: Staff_Travel_Trains
+  reporting_type:                             # EIB ep
+    derivation: derived_final_code_segment2_left
+    rule: |-
+      Final Code accounting element 2 first character → mapped via the canonical
+      supplier PO reporting-type table (mirrored in modFinanceCommon.ResolveReportingTypeCode):
+      1/2/3/7/8/9 → FA Operations, 4 → FA Investments, 5 → NGB, 6 → PGB.
+  cost_centre:                                # EIB eq
+    derivation: per_row_lookup
+    key_source_column: derived_final_code
+    key_rule: lowest-hierarchy matching accounting-string element
+    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  related_worktags:
+    event:
+      target: er
+      source_column: derived_final_code
+      worktag_business_object_key: Events - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    camp:
+      target: es
+      source_column: derived_final_code
+      worktag_business_object_key: Camps - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    fa_learning_course:
+      target: et
+      source_column: derived_final_code
+      worktag_business_object_key: FA Learning - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    commercial_partner:
+      target: eu
+      source_column: derived_final_code
+      worktag_business_object_key: Commercial Partners - Custom Worktag
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    grant:
+      target: ev
+      source_column: derived_final_code
+      worktag_business_object_key: Grant
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    programme:
+      target: ew
+      source_column: derived_final_code
+      worktag_business_object_key: Program - Delivered Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    project:
+      target: ex
+      source_column: derived_final_code
+      worktag_business_object_key: Projects (Opex)
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+
+# --- Derived Final Code pipeline (replaces the CC Updated New sheet formulas) ---
+#
+# Input : "Ref 2" source column (raw Amex BTA export — e.g. "11623XXXXX000000000000")
+# Output: "Final Code" accounting string "SEG1-SEG2-SEG3-SEG4" ready for cost-centre /
+#         worktag / reporting-type lookups.
+#
+# Step 1 — Strip separators: remove all "-", " ", "."  from Ref 2.
+# Step 2 — Right-pad to 22 characters with "0".
+# Step 3 — Split to fixed segments:  LEFT 4  → Seg1
+#                                    MID 5-10 → Seg2   (6 chars)
+#                                    MID 11-18 → Seg3   (8 chars)
+#                                    MID 19-22 → Seg4   (4 chars)
+# Step 4 — Seg2 first-char lookup ("seg 2" tab / hardcoded mirror — tiny 4-entry table):
+#             3 → 302101   (Stafftravel&Entertaining/Trains, Opex)
+#             4 → 402201   (Stafftravel&Entertaining/Trains, FA Investments)
+#             5 → 502201   (Stafftravel&Entertaining/Trains, NGB)
+#             6 → 602201   (Stafftravel&Entertaining/Trains, PGB)
+#             any other first char → "Error"  (row is rejected, reported to Finance).
+# Step 5 — New Code = Seg1 + "-" + Column1 + "-" + Seg3 + "-" + Seg4
+# Step 6 — (Not used in v2: manual override columns were the Finance workaround in v1.)
+# Final Code = New Code.
+
+derived_fields:
+  derived_final_code:
+    input_column: Ref 2
+    pipeline:
+      - strip: ["-", " ", "."]
+      - pad_right: {length: 22, char: "0"}
+      - split_fixed: {seg1: 4, seg2: 6, seg3: 8, seg4: 4}
+      - seg2_first_char_map:
+          "3": "302101"
+          "4": "402201"
+          "5": "502201"
+          "6": "602201"
+          on_unmapped: ErrorStringAndReject
+      - join: ["{seg1}", "{seg2_mapped}", "{seg3}", "{seg4}"]
+        separator: "-"
+  derived_vat_percentage:
+    source_columns: [VAT, Net amount]
+    rule: If Net amount > 0 then ROUND(VAT / Net amount * 100, 0) else 0.
+          Used per-row to drive the GBR_Standard_Rated vs GBR_Zero_Rated split.
+  filled_down_travel_context:
+    source_columns:
+      - Travel ref 4          # BJ — may be blank
+      - Departure airport     # BK — may be blank
+      - Departure date        # BL — used in Journal Name? (memo EO)
+      - Destination airport   # BM — used in Journal Name? (memo EO)
+      - Traveller first name  # BN — may be blank
+      - Booking Source        # BO — may be blank
+    rule: Finance enters these values on the FIRST data row only.
+          The VBA transform copies them down to every row before consuming them so
+          the per-row Journal Name? formula has the same context on every line of the
+          statement.  If the source file already has them filled, the copy is a no-op.
+
+tax:
+  mode: per_row                               # uniform | per_row
+  driver_derivation: derived_vat_percentage
+  # Tenant-specific Workday IDs. These appear in NO source file — finance must supply them.
+  # Rail passenger fares are zero-rated (0%); booking/admin fees are standard-rated (20%).
+  sets:
+    - when_rate: 0
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    - when_rate: 20
+      applicability: GBR_Standard_Rated
+      code: GBR_Standard_Rated
+      recoverability: Recoverable_Allocate
+
+eib_house_defaults:
+  supplier_reference_id: AME001               # hardcoded; Amex = single supplier
+  fixed_spend_category: Staff_Travel_Trains
+  submit_flag: "Y"
+  default_currency: GBP
+  tax_point_date_type: INVOICE/ADJUSTMENT_DATE
+  tax_option: CALC_TAX_DUE
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet_name: MAPPING MASTER
+
+worktag_business_objects:
+  cost_centre: "Cost Center"
+  spend_category: "Spend Category"
+  event: "Events - Custom Org"
+  camp: "Camps - Custom Org"
+  fa_learning: "FA Learning - Custom Org"
+  commercial_partner: "Commercial Partners - Custom Worktag"
+  grant: "Grant"
+  program: "Program - Delivered Org"
+  project: "Projects (Opex)"
+
+final_code_derivation:
+  padded_length: 22
+  pad_char: "0"
+  strip_chars: ["-", " ", "."]
+  segment_lengths: [4, 6, 8, 4]
+  seg2_first_char_map:
+    "3": "302101"
+    "4": "402201"
+    "5": "502201"
+    "6": "602201"
+  on_unmapped_seg2_char: ErrorStringAndReject
+  error_token: "Error"
+  output_joiner: "-"
+
+skip_rule:
+  drop_when:
+    - Currency blank
+    - Ref 2 blank
+    - Net amount == 0
+    - derived_final_code contains "Error"     # Seg2 first char not in the 3/4/5/6 set
+    - cost_centre unresolved
+
+open_questions: []    # must be empty before authoring begins
+
+mapping:
+- target: b
+  function: sequence
+- target: f
+  default: "Y"
+- target: g
+  derivation: header_level_invoice_number_from_filename
+- target: l
+  derivation: per_row_account_name_via_company_mapping
+  source_column: Account name
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+    on_fail_default: THE FA GROUP - FA
+- target: "n"
+  default: GBP
+  source_column: Currency
+- target: o
+  source_value: AME001
+  lookup:
+    file: Supplier Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Supplier ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: u
+  derivation: header_level_statement_date
+  source_column: Statement date
+  source_format: dd/mm/yyyy or Excel date serial
+  target_format: YYYY-MM-DD
+- target: au
+  derivation: header_level_statement_id_plus_ddmmyy
+  source_columns: [Statement ID, Statement date]
+- target: dd
+  default: 1
+- target: di
+  derivation: header_level_invoice_number_from_filename
+- target: dp
+  default: Staff_Travel_Trains
+- target: ds
+  derivation: derived_vat_percentage
+  function: vat_rate
+- target: dt
+  derivation: derived_vat_percentage
+  function: vat_rate
+- target: dv
+  default: INVOICE/ADJUSTMENT_DATE
+- target: dy
+  derivation: derived_vat_percentage
+  function: vat_rate
+- target: dz
+  default: CALC_TAX_DUE
+- target: ed
+  source_column: Net amount
+- target: ee
+  source_column: Net amount
+- target: eo
+  derivation: per_row_travel_context_memo
+  source_columns: [Traveller name, Departure date, Destination airport]
+- target: ep
+  derivation: derived_final_code
+  function: reporting_type_from_final_code
+- target: eq
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Cost Center
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+    on_fail: reject
+- target: er
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Events - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: es
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Camps - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: et
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: FA Learning - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: eu
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Commercial Partners - Custom Worktag
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ev
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Grant
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ew
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Program - Delivered Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ex
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Projects (Opex)
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID

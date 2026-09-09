@@ -1,0 +1,315 @@
+{
+  "_meta": {
+    "name": "workday_customer_valid_values.json",
+    "description": "Valid-value contract for the GP-to-Workday customer migration. This dictionary is a CLOSED deliverable — it covers ONLY the 10 Workday Customer workbook sheets that were actually populated, validated, and sent to Workday via the FIN Master Customer Workbook EIB. No other Workday tables are in scope for this payload definition. Each entry corresponds to an x_valid_values_key in the companion schema file workday_customer_payload.schema.json.",
+    "schema_ref": "workday_customer_payload.schema.json",
+    "convention": "All paths use dot-notation relative to the consolidated payload root. Array-item paths use the '[]' component with no index, because valid values never depend on array position.",
+    "value_categories": {
+      "enum_closed": "Closed set — only the listed values are accepted by Workday FIN Master Customer Workbook EIB validation for the GP migration load.",
+      "pattern_format": "Open set but must match a regex / ISO format. Examples are illustrative only; they are NOT a closed list.",
+      "rule_based": "The correct value is not a static list. Decision tables and Workday-EIB level rules are included below."
+    }
+  },
+
+  "root.customer_category": {
+    "category": "enum_closed",
+    "workday_context": "Workday Customer Category classification on the Customer Name sheet.",
+    "values": [
+      "Miscellaneous",
+      "Football Clubs",
+      "Broadcasting",
+      "County FA's",
+      "Sponsorship",
+      "Experiences by Wembley",
+      "Intercompany",
+      "Licensing",
+      "Tours",
+      "Women's National League"
+    ]
+  },
+
+  "root.worktag_only":    { "category": "enum_closed", "values": ["Yes", "No"] },
+  "root.submit":          { "category": "enum_closed", "values": ["Yes", "No"] },
+  "root.create_customer_from_financial_institution": { "category": "enum_closed", "values": ["Yes", "No"] },
+  "root.create_customer_from_supplier":               { "category": "enum_closed", "values": ["Yes", "No"] },
+  "root.create_customer_from_tax_authority":          { "category": "enum_closed", "values": ["Yes", "No"] },
+  "root.create_customer_from_investor":               { "category": "enum_closed", "values": ["Yes", "No"] },
+
+  "customer_groups[].customer_group": {
+    "category": "enum_closed",
+    "workday_context": "Customer Group on the Customer Groups sheet. Each record is one group assignment per customer.",
+    "alphabetical_buckets": [
+      "Customers A - L",
+      "Customers M - Z",
+      "Customers 0 - 9"
+    ],
+    "class_mapped_values": [
+      "Disciplinary",
+      "FA Learning",
+      "Barclays Girls Football Schools Partnerships",
+      "Referees"
+    ],
+    "all_valid_values": [
+      "Customers A - L",
+      "Customers M - Z",
+      "Customers 0 - 9",
+      "Disciplinary",
+      "FA Learning",
+      "Barclays Girls Football Schools Partnerships",
+      "Referees"
+    ],
+    "usage_rule": "Always assign exactly one alphabetical bucket. Additional class-based groups can be added alongside it."
+  },
+
+  "tax.tax_code": {
+    "category": "enum_closed",
+    "workday_context": "Default transaction tax code on the Customer Tax sheet.",
+    "values": ["GBR 20% VAT (20%)"]
+  },
+
+  "tax.tax_id_type": {
+    "category": "enum_closed",
+    "workday_context": "Workday Tax ID Type label on the Customer Tax sheet.",
+    "all_valid_values": [
+      "VAT Reg No",
+      "Company Number",
+      "UTR - Unique Taxpayer Reference",
+      "COTAX Reference",
+      "DUNS",
+      "Employer Accounts Office Reference Number",
+      "ECON",
+      "E-File VAT Registration Number",
+      "EORI Code - Economic Operator Registration and Identification code",
+      "HMRC Office Number",
+      "Legal form of the Company",
+      "NINO - National Insurance Number",
+      "Employer PAYE Reference",
+      "USt-IdNr (VAT)",
+      "SIRET",
+      "VAT No",
+      "UID-number",
+      "ABN",
+      "Employer ID Number",
+      "TIN"
+    ],
+    "per_country_defaults": [
+      { "country_code": "GB", "default_tax_id_type": "VAT Reg No" },
+      { "country_code": "US", "default_tax_id_type": "Employer ID Number" },
+      { "country_code": "DE", "default_tax_id_type": "USt-IdNr (VAT)" },
+      { "country_code": "FR", "default_tax_id_type": "SIRET" },
+      { "country_code": "IE", "default_tax_id_type": "VAT No" },
+      { "country_code": "CH", "default_tax_id_type": "UID-number" },
+      { "country_code": "AU", "default_tax_id_type": "ABN" },
+      { "country_code": "* (other)", "default_tax_id_type": "TIN" }
+    ],
+    "gb_selection_rules_by_tax_id_pattern": [
+      { "tax_id_pattern": "^[0-9]{9}$",        "label": "VAT Reg No" },
+      { "tax_id_pattern": "^[A-Za-z0-9]{8}$",  "label": "Company Number" },
+      { "tax_id_pattern": "^[0-9]{10}$",       "label": "UTR - Unique Taxpayer Reference" },
+      { "tax_id_pattern": "* (other GB)",      "label": "VAT Reg No" }
+    ]
+  },
+
+  "tax.primary_tax_id":     { "category": "enum_closed", "values": ["Yes", "No"] },
+  "tax.transaction_tax_id": { "category": "enum_closed", "values": ["Yes", "No"] },
+
+  "tax.transaction_tax_status": {
+    "category": "enum_closed",
+    "workday_context": "Workday Transaction Tax Status classification on the Customer Tax sheet.",
+    "eu_country_codes_for_this_rule": [
+      "AT","BE","BG","HR","CY","CZ","DE","DK","EE","ES","FI","FR",
+      "GR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO",
+      "SE","SI","SK"
+    ],
+    "selection_rules": [
+      { "country_group": "Great Britain", "services_flag": true,  "result": "Customer of Services" },
+      { "country_group": "Great Britain", "services_flag": false, "result": "Customer of Goods" },
+      { "country_group": "EU 27",         "vat_registered": true,  "result": "VAT Registered in THIS EU country- Domestic Scenario" },
+      { "country_group": "EU 27",         "exempt_flag": true,     "result": "EU Company - Exempt in THIS country" },
+      { "country_group": "EU 27",         "vat_registered": false, "exempt_flag": false, "result": "EU Company - Not Registered in this country" },
+      { "country_group": "Rest of World", "vat_registered": true,  "result": "VAT Registered in THIS NON EU country- Domestic Scenario" },
+      { "country_group": "Rest of World", "vat_registered": false, "result": "Non EU Company Not VAT registered in this country" }
+    ],
+    "all_valid_values": [
+      "Customer of Services",
+      "Customer of Goods",
+      "VAT Registered in THIS EU country- Domestic Scenario",
+      "EU Company - Exempt in THIS country",
+      "EU Company - Not Registered in this country",
+      "VAT Registered in THIS NON EU country- Domestic Scenario",
+      "Non EU Company Not VAT registered in this country"
+    ]
+  },
+
+  "payment.payment_terms": {
+    "category": "enum_closed",
+    "workday_context": "Workday Payment Terms label on the Customer Payment sheet.",
+    "workday_labels": [
+      "Immediate",
+      "Net 7",
+      "Net 14",
+      "Net 21",
+      "Net 30",
+      "Net 60",
+      "Net 90",
+      "Net 120",
+      "EOM + 30 Days"
+    ]
+  },
+
+  "payment.default_payment_type": {
+    "category": "enum_closed",
+    "workday_context": "Default payment mechanism on the Customer Payment sheet.",
+    "all_valid_values": ["Manual", "BACS", "EFT", "SEPA", "Wire"],
+    "default_for_gp_migration": "Manual"
+  },
+
+  "currencies.accepted_currencies_plus": {
+    "category": "enum_closed",
+    "workday_context": "Acceptance scope on the Customer Currencies sheet.",
+    "all_valid_values": ["All Currencies", "Currency Specific"]
+  },
+
+  "currencies.default_currency": {
+    "category": "pattern_format",
+    "pattern": "^[A-Z]{3}$",
+    "workday_context": "Default transaction currency on the Customer Currencies sheet.",
+    "examples": ["GBP","EUR","USD","CHF","AUD","PLN","SEK","AED","QAR","DKK","NOK"]
+  },
+
+  "document_delivery.always_separate_payments": { "category": "enum_closed", "values": ["Yes", "No"] },
+  "document_delivery.mandate_required":            { "category": "enum_closed", "values": ["Yes", "No"] },
+
+  "document_delivery.invoice_delivery_method": {
+    "category": "enum_closed",
+    "all_valid_values": ["Email", "Print", "Electronic Invoicing"]
+  },
+  "document_delivery.statement_delivery_method": {
+    "category": "enum_closed",
+    "all_valid_values": ["Email", "Print"]
+  },
+  "document_delivery.dunning_delivery_method": {
+    "category": "enum_closed",
+    "all_valid_values": ["Email", "Print"]
+  },
+  "document_delivery.invoice_notification_email_recipients": {
+    "category": "enum_closed",
+    "value_for_gp_migration": "Bill-To Contact Emails on Invoice",
+    "all_valid_values": [
+      "Bill-To Contact Emails on Invoice",
+      "Bill-To Primary Contact",
+      "Statement Contact Emails",
+      "Remit-To Contact Emails"
+    ]
+  },
+  "document_delivery.statement_notification_email_recipients": {
+    "category": "enum_closed",
+    "value_for_gp_migration": "Statement Contact Emails",
+    "all_valid_values": [
+      "Statement Contact Emails",
+      "Bill-To Primary Contact",
+      "Bill-To Contact Emails on Invoice"
+    ]
+  },
+
+  "addresses[].country_code": {
+    "category": "pattern_format",
+    "pattern": "^[A-Z]{2}$",
+    "workday_context": "ISO 3166-1 alpha-2 country code on the Customer Address sheet."
+  },
+  "addresses[].country": {
+    "category": "rule_based",
+    "workday_context": "Full country name on the Customer Address sheet.",
+    "selection_rule": "Must correspond exactly to the country name Workday recognises for the given addresses[].country_code."
+  },
+  "addresses[].defaulted_business_site_address": { "category": "enum_closed", "values": ["Yes", "No"] },
+  "addresses[].delete_flag":                     { "category": "enum_closed", "values": ["Yes", "No"] },
+  "addresses[].do_not_replace_all":              { "category": "enum_closed", "values": ["Yes", "No"] },
+  "addresses[].is_public":                       { "category": "enum_closed", "values": ["Yes", "No"] },
+  "addresses[].is_primary":                      { "category": "enum_closed", "values": ["Yes", "No"] },
+
+  "addresses[].per_country_component_requirements": {
+    "category": "rule_based",
+    "workday_context": "Controls, per country, whether each address component is required / optional / not accepted.",
+    "components_controlled": [
+      "region (State/Province)",
+      "subregion (County)",
+      "city (Municipality)",
+      "submunicipality (City Subdivision 1 workbook slot)",
+      "address_line_2",
+      "address_line_3",
+      "address_line_4",
+      "postal_code"
+    ],
+    "cell_values": ["required", "not accepted", "optional (blank cell in rules table)"],
+    "authoritative_rules_source": "Workday FIN Master Customer Workbook → 'Address Requirements' sheet (one row per country).",
+    "example_countries_requiring_subregion_county": ["ZA", "US", "CA", "IN"],
+    "example_countries_requiring_city_subdivision_1": ["ZA", "FI", "SK", "MX", "AX"],
+    "postal_code_relocation_when_not_accepted": "If a country marks postal_code='not accepted' AND address_line_2='not accepted', the postal_code value is placed into address_line_2 (either alone or appended, up to 35 chars, excluding PO Box patterns)."
+  },
+
+  "phones[].country_code":               { "category": "pattern_format", "pattern": "^[A-Z]{2}$" },
+  "phones[].international_phone_code":   { "category": "pattern_format", "pattern": "^[0-9]{1,4}$" },
+  "phones[].phone_number": {
+    "category": "pattern_format",
+    "pattern": "^[0-9]{7,15}$",
+    "workday_context": "Subscriber digits on the Customer Phone sheet.",
+    "rules": [
+      "Digits only, no '+', no leading 0, no country-code prefix.",
+      "Minimum 7 digits, maximum 15 digits.",
+      "Values that collapse to patterns beginning '0*12345' (placeholder/test values) must not be loaded."
+    ]
+  },
+  "phones[].is_public":           { "category": "enum_closed", "values": ["Yes", "No"] },
+  "phones[].primary_flag":        { "category": "enum_closed", "values": ["Yes", "No"] },
+  "phones[].delete_flag":         { "category": "enum_closed", "values": ["Yes", "No"] },
+  "phones[].do_not_replace_all":  { "category": "enum_closed", "values": ["Yes", "No"] },
+  "phones[].phone_type":          { "category": "enum_closed", "values": ["primary", "secondary", "tertiary"] },
+  "phones[].phone_device_type":   { "category": "enum_closed", "values": ["Landline", "Mobile", "VoIP", "TollFree", "Premium", "Unknown"] },
+  "phones[].use_for":             { "category": "enum_closed", "values": ["Business", "Personal", "Home", "Work", "Billing", "Shipping", "Remittance"] },
+
+  "emails[].email_address": {
+    "category": "pattern_format",
+    "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+    "workday_context": "Email address on the Customer Email sheet (RFC 5322 practical subset). Case-insensitive for dedupe."
+  },
+  "emails[].email_type":          { "category": "enum_closed", "values": ["to", "cc", "bcc"] },
+  "emails[].is_public":           { "category": "enum_closed", "values": ["Yes", "No"] },
+  "emails[].primary_flag":        { "category": "enum_closed", "values": ["Yes", "No"] },
+  "emails[].delete_flag":         { "category": "enum_closed", "values": ["Yes", "No"] },
+  "emails[].do_not_replace_all":  { "category": "enum_closed", "values": ["Yes", "No"] },
+  "emails[].use_for": {
+    "category": "enum_closed",
+    "value_for_gp_migration": "Business",
+    "values": ["Business", "Personal", "Home", "Work", "Billing", "Shipping", "Remittance"]
+  },
+
+  "_x_yes_no_fields_union": {
+    "_meta": "Convenience union of every Yes/No flag field in the active payload, for teams that want to auto-render boolean dropdowns without walking the schema.",
+    "paths": [
+      "root.worktag_only",
+      "root.submit",
+      "root.create_customer_from_financial_institution",
+      "root.create_customer_from_supplier",
+      "root.create_customer_from_tax_authority",
+      "root.create_customer_from_investor",
+      "tax.primary_tax_id",
+      "tax.transaction_tax_id",
+      "document_delivery.always_separate_payments",
+      "document_delivery.mandate_required",
+      "addresses[].is_public",
+      "addresses[].is_primary",
+      "addresses[].delete_flag",
+      "addresses[].do_not_replace_all",
+      "addresses[].defaulted_business_site_address",
+      "phones[].is_public",
+      "phones[].primary_flag",
+      "phones[].delete_flag",
+      "phones[].do_not_replace_all",
+      "emails[].is_public",
+      "emails[].primary_flag",
+      "emails[].delete_flag",
+      "emails[].do_not_replace_all"
+    ]
+  }
+}

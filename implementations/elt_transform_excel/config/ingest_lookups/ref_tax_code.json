@@ -1,0 +1,421 @@
+{
+  "description": "Workday customer tax code values for the AR customer template. Snapshot of the Customer EIB `Tax_Code` named range; the SQL default `GBR 20% VAT (20%)` is surfaced first.",
+  "key_column": "tax_code",
+  "provenance": "Transcribed 2026-07-22 from the Customer EIB `Tax_Code` named range (Tenant Default Named Ranges!AE2, FA E2E Customers V1.xlsm). A snapshot, not a link.",
+  "rows": [
+    {
+      "tax_code": "GBR 20% VAT (20%)"
+    },
+    {
+      "tax_code": "NZL Exempt"
+    },
+    {
+      "tax_code": "NZL 15% GST (15%)"
+    },
+    {
+      "tax_code": "NZL 12.5% GST (12.5%)"
+    },
+    {
+      "tax_code": "GBR 5% VAT (5%)"
+    },
+    {
+      "tax_code": "GBR Zero Rated (0%)"
+    },
+    {
+      "tax_code": "NLD Exempt"
+    },
+    {
+      "tax_code": "NLD Zero Rated (0%)"
+    },
+    {
+      "tax_code": "NLD 6% VAT (6%)"
+    },
+    {
+      "tax_code": "NLD 21% VAT (21%)"
+    },
+    {
+      "tax_code": "IRL Exempt"
+    },
+    {
+      "tax_code": "IRL Zero Rated (0%)"
+    },
+    {
+      "tax_code": "IRL 4.8% VAT (4.8%)"
+    },
+    {
+      "tax_code": "IRL 5.2% VAT (5.2%)"
+    },
+    {
+      "tax_code": "FRA Exempt"
+    },
+    {
+      "tax_code": "DEU 19% VAT (19%)"
+    },
+    {
+      "tax_code": "DEU 7% VAT (7%)"
+    },
+    {
+      "tax_code": "DEU Zero Rated (0%)"
+    },
+    {
+      "tax_code": "DEU Exempt"
+    },
+    {
+      "tax_code": "LUX 17% VAT (17%)"
+    },
+    {
+      "tax_code": "LUX 14% VAT (14%)"
+    },
+    {
+      "tax_code": "LUX 3% VAT (3%)"
+    },
+    {
+      "tax_code": "LUX Zero Rated (0%)"
+    },
+    {
+      "tax_code": "AUT 20% VAT (20%)"
+    },
+    {
+      "tax_code": "AUT Zero Rated (0%)"
+    },
+    {
+      "tax_code": "AUT 10% VAT (10%)"
+    },
+    {
+      "tax_code": "AUT 13% VAT (13%)"
+    },
+    {
+      "tax_code": "BEL Zero Rated (0%)"
+    },
+    {
+      "tax_code": "BEL 6% VAT (6%)"
+    },
+    {
+      "tax_code": "BEL 12% VAT (12%)"
+    },
+    {
+      "tax_code": "BEL 21% VAT (21%)"
+    },
+    {
+      "tax_code": "MEX 16% VAT (16%)"
+    },
+    {
+      "tax_code": "MEX Zero Rated (0%)"
+    },
+    {
+      "tax_code": "MEX Exempt"
+    },
+    {
+      "tax_code": "ITA Zero Rated (0%)"
+    },
+    {
+      "tax_code": "ITA 10% VAT (10%)"
+    },
+    {
+      "tax_code": "ITA 4% VAT (4%)"
+    },
+    {
+      "tax_code": "ITA 22% VAT (22%)"
+    },
+    {
+      "tax_code": "ESP Zero Rated (0%)"
+    },
+    {
+      "tax_code": "ESP 10% VAT (10%)"
+    },
+    {
+      "tax_code": "ESP 4% VAT (4%)"
+    },
+    {
+      "tax_code": "ESP 21% VAT (21%)"
+    },
+    {
+      "tax_code": "CHE Exempt"
+    },
+    {
+      "tax_code": "CHE Zero Rated (0%)"
+    },
+    {
+      "tax_code": "CHE 3.8% VAT (3.8%)"
+    },
+    {
+      "tax_code": "CHE 2.5% VAT (2.5%)"
+    },
+    {
+      "tax_code": "CHE 8% VAT (8%)"
+    },
+    {
+      "tax_code": "ZAF Zero Rated (0%)"
+    },
+    {
+      "tax_code": "ZAF 14% VAT (14%)"
+    },
+    {
+      "tax_code": "MYS AJP (6%)"
+    },
+    {
+      "tax_code": "MYS AJS (6%)"
+    },
+    {
+      "tax_code": "MYS TX RE (6%)"
+    },
+    {
+      "tax_code": "MYS RS (0%)"
+    },
+    {
+      "tax_code": "MYS ZRL (0%)"
+    },
+    {
+      "tax_code": "MYS NR (0%)"
+    },
+    {
+      "tax_code": "MYS BL (6%)"
+    },
+    {
+      "tax_code": "MYS ZP Zero Rated (0%)"
+    },
+    {
+      "tax_code": "MYS EP"
+    },
+    {
+      "tax_code": "MYS OP (0%)"
+    },
+    {
+      "tax_code": "MYS GP (0%)"
+    },
+    {
+      "tax_code": "MYS OS (0%)"
+    },
+    {
+      "tax_code": "MYS GS (0%)"
+    },
+    {
+      "tax_code": "MYS IS Exempt"
+    },
+    {
+      "tax_code": "MYS ZRE (0%)"
+    },
+    {
+      "tax_code": "MYS ES43 Exempt"
+    },
+    {
+      "tax_code": "MYS ES Exempt"
+    },
+    {
+      "tax_code": "MYS IM (0%)"
+    },
+    {
+      "tax_code": "MYS TX CG (6%)"
+    },
+    {
+      "tax_code": "MYS TX E43 (6%)"
+    },
+    {
+      "tax_code": "MYS TX N43 (6%)"
+    },
+    {
+      "tax_code": "MYS TX (6%)"
+    },
+    {
+      "tax_code": "MYS DS (6%)"
+    },
+    {
+      "tax_code": "MYS SR (6%)"
+    },
+    {
+      "tax_code": "NZL Zero Rated (0%)"
+    },
+    {
+      "tax_code": "AUS Exempt"
+    },
+    {
+      "tax_code": "AUS 10% GST (10%)"
+    },
+    {
+      "tax_code": "AUS Zero Rated (0%)"
+    },
+    {
+      "tax_code": "GBR Exempt"
+    },
+    {
+      "tax_code": "IRL 9% VAT (9%)"
+    },
+    {
+      "tax_code": "IRL 13.5% VAT (13.5%)"
+    },
+    {
+      "tax_code": "IRL 23% VAT (23%)"
+    },
+    {
+      "tax_code": "SWE Exempt"
+    },
+    {
+      "tax_code": "SWE 6% VAT (6%)"
+    },
+    {
+      "tax_code": "SWE 12% VAT (12%)"
+    },
+    {
+      "tax_code": "SWE 25% VAT (25%)"
+    },
+    {
+      "tax_code": "NOR Exempt"
+    },
+    {
+      "tax_code": "NOR Zero Rated (0%)"
+    },
+    {
+      "tax_code": "NOR 10% VAT (10%)"
+    },
+    {
+      "tax_code": "NOR 15% VAT (15%)"
+    },
+    {
+      "tax_code": "NOR 25% VAT (25%)"
+    },
+    {
+      "tax_code": "DNK Exempt"
+    },
+    {
+      "tax_code": "DNK Zero Rated (0%)"
+    },
+    {
+      "tax_code": "DNK 25% VAT (25%)"
+    },
+    {
+      "tax_code": "FRA 20% VAT (20%)"
+    },
+    {
+      "tax_code": "FRA 10% VAT (10%)"
+    },
+    {
+      "tax_code": "FRA 8.5% VAT (8.5%)"
+    },
+    {
+      "tax_code": "FRA 5.5% VAT (5.5%)"
+    },
+    {
+      "tax_code": "FRA Zero Rated (0%)"
+    },
+    {
+      "tax_code": "NLD 2.5% WTHD"
+    },
+    {
+      "tax_code": "NLD 0% WTHD"
+    },
+    {
+      "tax_code": "NLD 3% WTHD"
+    },
+    {
+      "tax_code": "NLD 5% WTHD"
+    },
+    {
+      "tax_code": "NLD 7% WTHD"
+    },
+    {
+      "tax_code": "NLD 10% WTHD"
+    },
+    {
+      "tax_code": "NLD 12.5% WTHD"
+    },
+    {
+      "tax_code": "NLD 15% WTHD"
+    },
+    {
+      "tax_code": "NLD 20% WTHD"
+    },
+    {
+      "tax_code": "NLD 25% WTHD"
+    },
+    {
+      "tax_code": "NZL 0% NRWT"
+    },
+    {
+      "tax_code": "NZL 5% NRWT"
+    },
+    {
+      "tax_code": "NZL 10% NRWT"
+    },
+    {
+      "tax_code": "NZL 15% NRWT"
+    },
+    {
+      "tax_code": "NZL 30% NRWT"
+    },
+    {
+      "tax_code": "NZL 3% RWT"
+    },
+    {
+      "tax_code": "NZL 5% RWT"
+    },
+    {
+      "tax_code": "NZL 10.5% RWT"
+    },
+    {
+      "tax_code": "NZL 17.5% RWT"
+    },
+    {
+      "tax_code": "NZL 28% RWT"
+    },
+    {
+      "tax_code": "NZL 30% RWT"
+    },
+    {
+      "tax_code": "NZL 33% RWT"
+    },
+    {
+      "tax_code": "AUS 49% No Tax Id Rate"
+    },
+    {
+      "tax_code": "AUS 0% NRWT"
+    },
+    {
+      "tax_code": "AUS 10% NRWT"
+    },
+    {
+      "tax_code": "AUS 15% NRWT"
+    },
+    {
+      "tax_code": "AUS 30% NRWT"
+    },
+    {
+      "tax_code": "GBR 20% WTHD"
+    },
+    {
+      "tax_code": "GBR 0% WTHD"
+    },
+    {
+      "tax_code": "GBR 5% WTHD"
+    },
+    {
+      "tax_code": "GBR 10% WTHD"
+    },
+    {
+      "tax_code": "GBR 12.5% WTHD"
+    },
+    {
+      "tax_code": "GBR 15% WTHD"
+    },
+    {
+      "tax_code": "IRL 20% WTHD"
+    },
+    {
+      "tax_code": "IRL 0% WTHD"
+    },
+    {
+      "tax_code": "IRL 3% WTHD"
+    },
+    {
+      "tax_code": "IRL 5% WTHD"
+    },
+    {
+      "tax_code": "IRL 7% WTHD"
+    },
+    {
+      "tax_code": "IRL 10% WTHD"
+    },
+    {
+      "tax_code": "IRL 15% WTHD"
+    }
+  ]
+}

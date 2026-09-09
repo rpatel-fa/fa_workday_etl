@@ -1,0 +1,11 @@
+../../ref/ref_location_mapping.sql
+../../ref/ref_worker_type_mapping.sql
+src_hcm_contingent_worker_base.sql
+src_hcm_contingent_worker_nrm.sql
+src_hcm_contingent_worker_match.sql
+src_hcm_contingent_worker.sql
+src_hcm_contingent_worker_mgr.sql
+workday_contingent_worker_name.sql
+workday_contingent_worker_professional_ee.sql
+workday_contingent_worker_manager.sql
+workday_contingent_worker_email.sql

@@ -1,0 +1,17 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/customer_invoice",
+    "srcWorkbookFileName": "DC_Customer_Invoice_Adjustment_v46.1.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_customer_invoice_adjustment_v1",
+    "sheets": [
+      {
+        "srcTableName": "workday_customer_invoice_adjustment",
+        "sheetName": "Submit Customer Invoice Adjustm",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  }
+]

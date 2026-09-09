@@ -1,0 +1,186 @@
+# Ingest spec - ar_customer_credit_note
+#
+# Defines the AR-facing template workbook that Finance (AR) populate by hand to create customer
+# credit notes. This is the INPUT side: it declares the columns the template must expose and
+# nothing else. The target-column mapping into the EIB is a separate, later artifact
+# (config/transform_specs/<key>.yaml) — not restated here. See docs/CONFIGURATION.md
+# ("Ingest Specs").
+#
+# Terminology: AR say "credit note"; Workday calls this a Customer Invoice Adjustment. The EIB
+# is DC_Customer_Invoice_Adjustment_v46.1.xlsx, sheet "Submit Customer Invoice Adjustm" — a
+# DIFFERENT workbook and a different column layout from the Customer Invoice EIB. The column
+# letters below are the adjustment EIB's, and they do not correspond to the invoice EIB's.
+#
+# Provenance: the column set is the subset of the MS Dynamics GP HATB extract that survives into
+# workday_customer_credit_note, derived from elt_ingest_excel's
+# config/transform/sql/finance/customer_invoice/. In GP, credit notes are the rows of the same
+# extract whose document_type does NOT contain 'INVOICE'; AR get a separate template instead
+# (confirmed 2026-07-15), so there is no Document Type column here.
+#
+# Sibling: ar_customer_invoice.yaml.
+
+meta:
+  key: ar_customer_credit_note
+  label: AR Customer Credit Note
+  requester: Finance (AR)
+  eib_population_type: Customer Invoice Adjustment
+  purpose: >
+    Standard input workbook for AR to raise customer credit notes, replacing the practice of
+    cloning the full GP HATB extract. Carries only fields AR populate; house defaults and
+    derived values are excluded by design.
+  derived_from: elt_ingest_excel/config/transform/sql/finance/customer_invoice/
+
+template:
+  worksheet_name: Customer Credit Note
+  header_row: 1
+  data_start_row: 2
+  grain: one row per credit note line
+
+columns:
+
+- name: Company
+  required: true
+  type: enum
+  description: >
+    Owning business unit. Resolved to the Workday company (THE FA GROUP - FA/NFC/WNSL) through
+    the Runner's mapping tab, as every existing transform does.
+  allowed_values: [FA, NFC, WNSL]
+  example: FA
+  feeds: EIB column l (Company)
+
+- name: Customer ID
+  required: true
+  type: text
+  description: >
+    The Workday Customer ID being credited. Populates both the Customer and Sold To Customer
+    fields — the migration writes the same value to both.
+  example: C-001234
+  feeds: EIB columns aj (Customer) and ak (Sold To Customer) - same value to both
+  cross_reference: ar_customer.yaml -> Customer ID
+
+- name: Document Number
+  required: true
+  type: text
+  description: >
+    AR's credit note reference (legacy GP Credit Note Number). Populates the EIB Customer Invoice
+    Number column (same field as invoice template) and is also written into the line-level memo
+    for traceability on the printed adjustment.
+  example: CRN-2026-0042
+  feeds: EIB columns h (Customer Invoice Number) AND fc (Line Memo)
+
+- name: Document Date
+  required: true
+  type: date
+  description: Credit note date. Reformatted to YYYY-MM-DD for the EIB.
+  format: DD/MM/YYYY
+  feeds: EIB column bl (Invoice Date)
+
+- name: Currency
+  required: true
+  type: text
+  description: >
+    ISO 4217 code, uppercase (^[A-Z]{3}$). Must be a Workday-valid currency — not every ISO code
+    is. Not enumerated here: the list is long and tenant-defined, so a copy would drift; validate
+    the template's drop-down against the reference below.
+  allowed_values_ref: >
+    ref_workday_validate_customer_currency, sourced from the 'Currency' sheet of
+    'FIN Master Customer Workbook Instructions.xlsx' (see elt_ingest_excel/docs/finance-customer.md)
+  default: GBP
+  example: GBP
+  feeds: EIB column bk (Currency)
+
+- name: Amount
+  required: true
+  type: number
+  description: >
+    Credit amount in the credit note Currency, entered as a POSITIVE value. Direction is carried
+    by Increase Amount Due, not by the sign — a negative here would double-negate. Zero-amount
+    rows are dropped downstream.
+  feeds: EIB column fb (Extended Amount)
+
+- name: Increase Amount Due
+  required: true
+  type: enum
+  description: >
+    Direction of the adjustment. N credits the customer (reduces what they owe) and is the
+    normal credit note case; Y increases the amount due (a debit adjustment). The migration
+    fixes this to N.
+  allowed_values: [N, Y]
+  default: N
+  feeds: EIB column bh (Increase Amount Due)
+
+- name: Adjustment Reason
+  required: true
+  type: text
+  description: >
+    Workday adjustment reason. The migration hard-codes 'Conversion'; AR-raised credit notes
+    need a genuine reason. See open_questions - the allowed list is not yet supplied. This
+    column has no equivalent in the invoice template.
+  feeds: EIB column bg (Adjustment Reason)
+
+- name: Customer Invoice Type
+  required: true
+  type: text
+  description: Workday invoice type. The migration fixes this to Standard.
+  default: Standard
+  feeds: EIB column cf (Customer Invoice Type)
+
+- name: Revenue Category
+  required: true
+  type: text
+  description: >
+    Workday revenue category for the credit note line. The migration hard-codes 'AR Conversion'.
+    See open_questions.
+  feeds: EIB column dz (Revenue Category)
+
+- name: Line Item Description
+  required: true
+  type: text
+  description: >
+    Description shown on the credit note line. The migration hard-codes
+    'Open AR Adjustment Conversion'.
+  feeds: EIB column ea (Line Item Description)
+
+- name: Memo
+  required: false
+  type: text
+  description: >
+    Header-level narrative. Distinct from Line Item Description and from the line memo that
+    Document Number populates — the adjustment EIB carries all three.
+  feeds: EIB column cq (Memo)
+
+# Columns deliberately NOT in the template, with the reason.
+excluded:
+- {column: Document Type, reason: this template is credit notes only - the GP split on document_type is not reproduced}
+- {column: Spreadsheet Key, reason: generated as a row sequence by the transform}
+- {column: Add Only / Auto Complete / Submit, reason: house default Y}
+- {column: Payment Status, reason: house default Unpaid}
+- {column: Document Status, reason: house default Approved}
+- {column: Invoice Line Row ID, reason: house default 1 - one line per row at this grain}
+- column: Adjusted Invoice
+  reason: >
+    The migration does not link an adjustment to an original invoice - see open_questions. This is
+    the largest gap between the conversion shape and BAU credit notes.
+- {column: Exchange Rate, reason: present in the GP FA sheet only and never read by the transform SQL}
+
+open_questions:
+- id: adjusted_invoice_link
+  question: >
+    Must an AR credit note reference the original invoice it adjusts? The migration does not —
+    conversion adjustments stand alone against the customer. If BAU credit notes must link to a
+    specific invoice, this template needs an Adjusted Invoice column and the transform needs a
+    target column that the conversion mapping never used.
+  blocking: true
+  owner: Finance (AR)
+- id: adjustment_reason_values
+  question: >
+    What is the allowed Adjustment Reason list for AR-raised credit notes? The migration's
+    'Conversion' is a conversion-only value and must not be the default for new credit notes.
+    Needed before the template can offer a validated drop-down.
+  blocking: true
+  owner: Finance (AR)
+- id: revenue_category_values
+  question: >
+    Same as ar_customer_invoice.yaml's revenue_category_values - resolve once for both templates.
+  blocking: true
+  owner: Finance (AR)

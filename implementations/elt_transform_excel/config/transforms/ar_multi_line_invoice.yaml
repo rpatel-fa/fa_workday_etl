@@ -1,0 +1,150 @@
+version: 1
+
+transform:
+  key: ar_multi_line_invoice
+  label: AR Multi Line Invoice
+  source_type: AR Multi Line Invoice
+  eib_population_type: Customer Invoice
+  start_row: 6
+  description: >
+    Multi-Line Accounts Receivable invoice extracts transformed into the Workday Customer
+    Invoice EIB workbook v46.1. ALL source rows together produce a single Workday Customer
+    Invoice with multiple lines. Invoice-level fields (Company, Customer, Invoice Date,
+    Currency, Payment Status, Document Status, Customer Invoice Type, Invoice-Level Memo)
+    are uniform across every source row; the first data row supplies these values and the
+    header-level Amount Due (CM) is the SUM of every source row's GROSS amount. Each source
+    row writes one invoice line with incrementing line IDs (DV), per-line COST CODE mapped
+    to Revenue Category (EM), Billable Project at both header (BN) and line (GF), and a
+    9-slot Worktags+ run FX..GF (FX=Cost Centre, FY=Reporting Type, FZ=Camp, GA=Event,
+    GB=Commercial Partner, GC=FA Learning, GD=Grant, GE=Programme, GF=Project line).
+    Reporting Type is derived from the first character of accounting element 2,
+    the eight remaining objects are
+    resolved via the finance Mapping MASTER's lowest-hierarchy Final Code match, mirroring
+    the supplier-invoice account-string flow used by ap_amex_trains_v2.
+
+runtime:
+  step_list_macro: RunArMultiLineInvoiceCustomerInvoice
+
+source_layout:
+  worksheet_resolution: first_sheet
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  required_headers:
+    - DATE OF INVOICE
+    - CUSTOMER ID
+    - INVOICE LINE DESCRIPTION|INVOICE  LINE DESCRIPTION
+    - GROSS
+    - COST CODE
+
+transform_constants:
+  fixed_company_code: FA
+  fixed_currency: GBP
+  fixed_invoice_type: Standard
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    revenue_category: "Revenue Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    programme: "Program - Delivered Org"
+    project: "Projects (Opex)"
+    sales_item: "Sales Item"
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: silent_blank
+  customer_invoice_eib_columns:
+    # --- HEADER identifier columns (D, G, BO all populated with same invoice ref) ---
+    customer_invoice_ref_id: D        # Customer_Invoice_Reference_ID / "Customer Invoice" Row5 field
+    customer_invoice_id: G            # "Customer Invoice ID" Row5 field
+    invoice_number: BO                # "Invoice Number" Row5 field (display number shown in Workday)
+    # --- HEADER fields (Submit Customer Invoice v46.1 Row5 field names + shared eib_population_defaults registry) ---
+    spreadsheet_key: B                # Spreadsheet Key* (1..N sequential)
+    add_only: C                       # Add Only flag — fixed "Y" for insert EIB (never update existing)
+    header_comment: E                 # Comment
+    submit: H                         # Submit Y/N flag
+    locked_in_workday: I              # Locked in Workday Y/N flag
+    company: J                        # Company*
+    row_id_header_1: K                # Row ID* (address section 1)
+    row_id_header_2: L                # Row ID* (address section 2)
+    row_id_header_3: M                # Row ID* (address section 3)
+    currency: AI                      # Currency
+    customer: AJ                      # Customer*
+    sold_to_customer: AK              # Sold To Customer
+    billable_project_header: BN       # Billable Project (header-level)
+    invoice_date: BR                  # Invoice Date
+    payment_status: CK                # Payment Status
+    document_status: CL               # Document Status
+    amount_due: CM                    # Amount Due
+    customer_invoice_type: CO         # Customer Invoice Type
+    header_tax_code: CP               # Tax Code (header-level)
+    customer_po_number: CQ            # Customer PO Number
+    include_customer_worktags: CY     # Include Customer Worktags Y/N
+    header_worktags_plus: CZ          # Worktags+ (header-level custom block)
+    header_memo: DB                   # Memo / Header-level description
+    # --- LINE identifier and Row ID ---
+    row_id_line: DS                   # Row ID* (Customer Invoice Line Replacement)
+    line_reference: DU                # Customer Invoice Line Reference ID
+    line_order: DV                    # Line Order (1..N within single invoice)
+    # --- LINE fields ---
+    sales_item: EJ                    # Sales Item
+    revenue_category: EM              # Revenue Category
+    line_item_description: EN         # Line Item Description
+    line_tax_applicability: FA        # Tax Applicability
+    line_tax_code: FB                # Tax Code
+    line_quantity: FH                 # Quantity
+    line_unit_of_measure: FI          # Unit of Measure
+    line_unit_cost: FL                # Unit Cost
+    line_extended_amount: FO          # Extended Amount (line value excl VAT)
+    line_transaction_date: FP         # Transaction Date
+    line_from_date: FQ                # From Date
+    line_to_date: FR                  # To Date
+    deferred_revenue: FS              # Deferred Revenue Y/N
+    line_memo: FV                     # Memo (line-level)
+    billable_project_line: GF         # Project (line-level)
+    # --- Accounting-string / Worktag hierarchy FX..GF (9 slots, shared with AP) ---
+    cost_centre: FX
+    reporting_type: FY
+    camp: FZ
+    event: GA
+    commercial_partner: GB
+    fa_learning_course: GC
+    grant: GD
+    programme: GE
+    project_line_worktag: GF
+    # --- 9-pack write order for the account-string worktags (order of Array() in .bas) ---
+    worktags_plus_order:
+      sales_item: EJ
+      reporting_type: FY
+      event: GA
+      camp: FZ
+      fa_learning: GC
+      commercial_partner: GB
+      grant: GD
+      programme: GE
+      cost_centre: FX
+  final_code_derivation:
+    strip_chars: [" "]
+    segment_lengths: [4, 6, 8, 4]
+    output_joiner: "-"
+    seg2_first_char_map:
+      # Seg2 first char drives the Reporting Type (FY) for AR revenue,
+      # mirroring the AP flow used by ap_amex_trains_v2.
+      # Values resolved via ResolveReportingTypeCode (modFinanceCommon).
+      # TBD by Finance: confirm AR seg2 chars map 1:1 with AP categories.
+    on_unmapped_seg2_char: SilentBlankUnlessOverridden
+    error_token: ""
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/multi_line_invoice/source/MULTIPLE COST CODES ONE INVOICE TEMPLATE.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/multi_line_invoice/target/Submit_Customer_Invoice_v46.1_ar_multi_line_invoice_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_resolution: first_sheet
+  source_header_row: 1
+  source_data_start_row: 2

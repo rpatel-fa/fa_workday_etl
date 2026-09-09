@@ -1,0 +1,14 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/workday_ccs/sbx",
+    "workbookFileName": "Extract_Customers - SBX.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "11",
+        "dataRow": "12",
+        "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  }  
+]

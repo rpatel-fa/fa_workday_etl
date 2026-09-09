@@ -1,0 +1,140 @@
+version: 1
+
+transform:
+  key: ap_amex_hotel
+  label: AP AMEX Hotel (V2)
+  source_type: AP AMEX Hotel
+  eib_population_type: Supplier Invoice
+  description: >
+    American Express hotel invoice workbook transformed into the Workday Supplier
+    Invoice EIB. Field mapping lives in the mapping: section of
+    config/transform_specs/ap_amex_hotel.yaml. V2 (2026-08-12) automates the
+    Final Code derivation from the raw AMEX "Default Expense Cost Code" column
+    (strip → pad 22 → split Seg1/2/3/4 → Seg2 first-char map 3/4/5/6 → join),
+    with optional Finance-populated Seg1/Seg2/Seg3/Seg4 Override columns applied
+    on top for edge cases. The V1 manual "Final Code" column is no longer consumed.
+
+runtime:
+  step_list_macro: RunApAmexHotelSupplierInvoice
+
+source_layout:
+  worksheet_name: New CC Updated
+  worksheet_resolution: named
+  header_row: 9
+  data_start_row: 10
+  header_detection: scan_required_headers
+  required_headers:
+    - Transaction Account Currency Code
+    - Transaction ID
+    - Transaction Date
+    - Supplier Reference
+    - Transaction Merchant Narrative
+    - Transaction Account Amount
+    - Default Expense Cost Code
+    - Traveller Name
+    - Hotel Arrival Date
+    - Hotel Departure Date
+  blank_header_columns:
+    - display_name: Hotel Name (raw AMEX export col AH, row 9 header is blank)
+      column_letter: AH
+  optional_headers:
+    - Seg1
+    - Seg2
+    - Seg3
+    - Seg4
+    - Seg1 Overwrite
+    - Seg2 Overwrite
+    - Seg3 Overwrite
+    - Seg3 Overwrite3
+    - Seg4 Overwrite
+
+transform_constants:
+  fixed_company_code: FA
+  fixed_supplier_reference_id: AME001
+  fixed_spend_category: Hotel_Staff_Costs
+  uniform_tax:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Nonrecoverable_Allocate
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  final_code_derivation:
+    padded_length: 22
+    pad_char: "0"
+    strip_chars: ["-", " ", "."]
+    segment_lengths: [4, 6, 8, 4]
+    seg2_first_char_map:
+      "3": "302101"
+      "4": "402201"
+      "5": "502201"
+      "6": "602201"
+    on_unmapped_seg2_char: ErrorStringAndRejectUnlessOverridden
+    error_token: "Error"
+    output_joiner: "-"
+    optional_v1_helper_headers:
+      seg1: "Seg1"
+      seg2: "Seg2"
+      seg3: "Seg3"
+      seg4: "Seg4"
+      seg2_format: raw_6char_placeholder_recompute_seg2_map
+    optional_override_headers:
+      seg1: "Seg1 Overwrite"
+      seg2: "Seg2 Overwrite"
+      seg3_aliases: ["Seg3 Overwrite", "Seg3 Overwrite3"]
+      seg4: "Seg4 Overwrite"
+      seg2_format: final_accounting_code_6digit
+  memo_derivation:
+    strategy: concat_space_join
+    source_steps:
+      traveller_name:
+        source_column: "Traveller Name"
+        sanitize: strip_honorific_prefixes
+        strip_honorific_prefixes: ["Mr", "Mr.", "Mrs", "Mrs.", "Miss", "Ms", "Ms.", "Dr", "Dr.", "Doctor"]
+      hotel_name:
+        source_resolution: blank_header_column_letter_AH
+        source_column_letter: AH
+      stay_date_range:
+        derivation: ddmmyy_join_dash
+        arrival_column: "Hotel Arrival Date"
+        departure_column: "Hotel Departure Date"
+        date_format: DDMMYY
+    concat_order: [traveller_name_sanitized, hotel_name, stay_date_range]
+    fallback_optional_column: "Journal Name?"
+    target_eib_column: IL
+  worktag_business_objects:
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  fixed_literal_worktags:
+    spend_category:
+      value: Hotel_Staff_Costs
+      target_eib_column: EW
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/source/AMEX HOTELS APR 26_UPDATED.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/target/Submit_Supplier_Invoice_ap_amex_hotel_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: New CC Updated
+  source_worksheet_resolution: named
+  source_header_row: 9
+  source_data_start_row: 10

@@ -1,0 +1,105 @@
+# Transform spec - ar_discipline_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (header row, required headers) — live in the build profile
+# config/transforms/ar_discipline_invoice.yaml (the build-consumed source of truth). Not restated here.
+
+meta:
+  key: ar_discipline_invoice
+  label: AR Discipline Invoice
+  requester: Finance (AR)
+  exemplar_to_fork: ar_invoice
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  customer: {source_column: Customer Number, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  company: {fixed: THE FA GROUP - FA}
+
+notes: >
+  Customer Invoice EIB Submit_Customer_Invoice_v46.1 — company FA, Currency GBP fixed
+  (source extract has neither column). Customer Invoice Type is DSC (discipline fine)
+  with the DSC indicator Y mapped to the correct column. ALL target columns remapped
+  from the pre-v46 layout; see eib_population_defaults.yaml for the canonical registry.
+  The source extract has no COST CODE / accounting string → Revenue Category EM and
+  the 9 worktag slots FX..GF are left BLANK (Finance may code pre-upload).
+
+fields:
+  invoice_number:   {source_column: Document Number}
+  invoice_date:     {source_column: Document Date}
+  amount_due:       {source_column: Original Trx Amount, basis: gross}
+  line_amount:      {source_column: Original Trx Amount, basis: gross}
+  memo:             {source_column: Document Number}
+
+accounting_string:
+  driver: none
+  note: >
+    Discipline fines extract has no accounting-string driver; Revenue Category EM
+    and worktags FX..GF are blank. Discipline DSC Customer Invoice Type handles
+    any required statutory defaults downstream in Workday.
+
+mapping:
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: "Y"
+- target: bo
+  source_column: Document Number
+  note: Legacy GP Invoice Number (carried on the source as `Document Number`). Written
+        verbatim to EIB BO (Invoice Number on the printed invoice header); the earlier
+        v46-pre fixup routed this into MT (Memo) alone — DB now carries the narrative
+        as well, for display continuity on the EIB upload sheet.
+- target: j
+  default: THE FA GROUP - FA
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+- target: ai
+  default: GBP
+- target: aj
+  source_column: Customer Number
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Customer ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: br
+  source_column: Document Date
+  source_format: dd/mm/yyyy
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: Original Trx Amount
+- target: co
+  default: DSC
+- target: cy
+  default: "Y"
+  note: Include Customer Worktags (CY) — discipline fines are typically coded to the
+        customer's inherited default worktags; the DSC indicator in customer_invoice_type=DSC
+        drives the statutory discriminator.
+- target: dv
+  default: "1"
+- target: em
+  derivation: blank_no_accounting_string
+- target: en
+  default: "NULL"
+- target: fo
+  source_column: Original Trx Amount
+- target: db
+  source_column: Document Number

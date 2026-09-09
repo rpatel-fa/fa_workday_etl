@@ -1,0 +1,62 @@
+# build_manifest.yaml
+#
+# Single source of truth for which transforms are included in the runner build.
+# Toggling a transform "on" or "off" is done by editing THIS file, NOT by moving
+# YAML profile files around on disk.
+#
+# - active_profiles: transform keys whose YAML profile will be bound into the
+#   runner (dropdown, VeryHidden registry sheet, and all build_runner checks).
+#   The .yaml files for each key are expected at:
+#       config/transforms/<key>.yaml
+#
+# - defunct_profiles: transform keys that exist on disk (profiles in
+#   config/transforms/, .bas in vba_src/transforms/, specs in
+#   config/transform_specs/) but are EXPLICITLY EXCLUDED from the build.
+#   build_runner.py verifies that these files exist and will WARN if any
+#   defunct key has a missing profile (indicates either a typo in the manifest
+#   or a forgotten profile file).
+#
+# - default_profile_key: which active profile is the "default" used by
+#   create_runner_shell.py when it pre-populates the Runner control sheet.
+#   Must match a key in active_profiles (not defunct_profiles).
+#
+version: 1
+
+default_profile_key: ap_referees_v2
+
+active_profiles:
+  # AP - Supplier Invoices
+  - ap_amex_hotel
+  - ap_amex_trains
+  - ap_amex_trains_v2
+  - ap_cfa_claims
+  - ap_cfa_distributions
+  - ap_commercial_invoice
+  - ap_prize_funds
+  - ap_stationery
+  - ap_referees_v2
+  - ap_taxi
+  - ap_travel_places
+  - ap_wnl_grants_invoice
+
+  # AR - Customer Invoices
+  - ar_bulk_invoice
+  - ar_gbe_invoice
+  - ar_integration_invoice
+  - ar_multi_line_invoice
+
+defunct_profiles:
+  # Discipline, Single Invoice, Invoice Run — declared defunct 2026-08-19.
+  # Still present on disk (transforms/ , .bas, transform_specs/) but no longer
+  # offered in the runner dropdown and excluded from build binding.
+  - ar_discipline_invoice
+  - ar_invoice
+  - ar_invoice_run
+
+  # AP Referees V1 (OG) — declared defunct 2026-08-24.
+  # Originally consumed the Finance-built Integration tab; superseded by V2
+  # after business confirmed the "analysis" tab as the canonical single source.
+  # V1's August 2026 refresh had been back-ported to analysis-tab parity with V2,
+  # making the two profiles byte-identical in runtime behaviour and output shape.
+  # Files retained on disk for git traceability (transforms/, .bas, transform_specs/).
+  - ap_referees

@@ -1,0 +1,238 @@
+# Transform spec - ar_gbe_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts - identity, EIB population type, template/source/output paths, source
+# layout (worksheet, header row, required headers) and the two tab variants - live in the
+# build profile config/transforms/ar_gbe_invoice.yaml. Not restated here.
+#
+# ONE transform, TWO variant sources (Governing Body Endorsement player-registration
+# invoices). Same workbook, two IDENTICALLY-shaped tabs run as separate Runner selections:
+#   "Mens GBE"   -> AR Invoice GBE Mens
+#   "Womens GBE" -> AR Invoice GBE Womens
+# The one-transform-many-sources pattern mirrors ap_stationery; here the "many sources" are
+# two tabs of one file, selected per-variant via source_worksheet_name.
+#
+# Source layout (both tabs, header row 1, data rows 2..N; col A is blank, data starts col B):
+#   B Date | C Club | D Player | E Type | F Gross | G VAT | H Net | I Reference
+#   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col G (the data is still
+#   present). VAT is therefore read as OPTIONAL and the VAT rate is derived from
+#   (Gross - Net) / Net, which is present on both tabs regardless of the VAT header.
+#
+# Data shape = one source row = one single-line Workday Customer Invoice. Each row is one
+# club/player GBE line with its own unique Reference (e.g. FOOT01/67/S-2024-1649).
+
+meta:
+  key: ar_gbe_invoice
+  label: AR Invoice GBE
+  requester: Finance (AR)
+  date_confirmed: 2026-09-02
+  exemplar_to_fork: ar_bulk_invoice   # one-row-one-invoice v46.1 Customer Invoice
+  note: >
+    Structural fork of ar_bulk_invoice with three deliberate differences:
+    (1) CUSTOMER RESOLVED BY CLUB NAME (two-level cascade with SQL-migration L2).
+        GBE carries only the club name (col C "Club"), not a GP Reference ID or a
+        Workday Customer ID. The .bas matches it against the Workday customer extract
+        "Customer" (name) column via a shared helper (customer_name_resolution =
+        two_level_l1_l2_sql_migration). Precision-first at every level:
+          L1 = exact normalised name match (upper/collapse-whitespace, WFC->WOMEN FC, WOMENS->WOMEN).
+               L1 ambiguous -> REJECT immediately (no fallback).
+          L2 = source name transformed by the SAME rules as the GP data-migration SQL
+               (elt_ingest_excel/.../src_fin_customer_raw.sql lines 105-128) first, then L1-normalised.
+               L2 rules: strip dots, WOMEN'S/WOMENS->WOMEN, FOOTBALL CLUB->FC, strip parenthetical content,
+               UNITED->UTD (word boundary), AND->& (word boundary), peel trailing legal suffixes
+               LIMITED/LTD/COMPANY/PLC/LLP/INC. Only tried on L1 MISS (not on L1 ambiguous).
+               L2 ambiguous -> REJECT immediately.
+        A miss after both L1+L2 -> REJECT. Never guess.
+        This two-level cascade fixes the 2026-09-02 class of rejects where the GP migration SQL
+        had shortened the customer's display name in the extract but GBE's source carried the
+        long form (e.g. source "Oxford United FC" matches extract "OXFORD UTD FC" at L2).
+    (2) NO COST CODE. GBE has no accounting-string column, so Revenue Category (EM) and the
+        9-slot FX..GF worktags stay blank (Finance codes pre-upload). The worktag pipeline is
+        declared + wired inert for Customer-Invoice archetype parity (costCodeColumn resolves
+        to 0 -> every Mapping-MASTER lookup is guard-skipped).
+    (3) VAT rate derived from (Gross - Net) / Net rather than a VAT column, so the Womens tab
+        (missing the VAT header) is handled identically.
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+  customer_name_resolution: two_level_l1_l2_sql_migration
+
+parties:
+  customer:
+    source_column: Club
+    resolved_via: Customer Spreadsheet
+    key_column: Customer            # the extract NAME column header (col A), NOT "Reference ID"
+    value_column: Customer ID
+    match: two_level_cascade_l1_exact_l2_sql_migration
+    normalisation_level_1_exact:
+      - upper_case
+      - collapse_whitespace
+      - "WFC -> WOMEN FC"
+      - "WOMENS -> WOMEN"
+    normalisation_level_2_sql_migration:
+      - strip_dots
+      - "WOMEN'S -> WOMEN"
+      - "WOMENS -> WOMEN (idempotent)"
+      - "FOOTBALL CLUB -> FC"
+      - strip_parenthetical_content
+      - "UNITED -> UTD (word boundary)"
+      - "AND -> & (word boundary)"
+      - strip_trailing_legal_suffixes LIMITED LTD COMPANY PLC LLP INC
+    cascade_order: L1_then_L2_on_miss
+    on_ambiguous: reject_at_level
+    on_unresolved: reject_after_both_levels
+    note: >
+      Unlike every other AR transform (which keys on the pipe-delimited "Reference ID"
+      column), GBE keys on the club name. Resolved via shared customer_name_resolution
+      helper (two_level_l1_l2_sql_migration). Ambiguous at L1 or L2 -> rejected.
+  company: {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}
+
+notes: >
+  GBE (Governing Body Endorsement) invoices bill football clubs for player-registration
+  endorsement panels/extensions. One source row = one single-line Workday Customer Invoice.
+  v46.1 layout. Amounts + tax mirror ar_bulk_invoice / ar_multi_line_invoice: GROSS (col F)
+  -> Amount Due (CM), Unit Cost (FL) and Extended Amount (FO); Line Tax Applicability (FA)
+  and Line Tax Code (FB) driven by the derived VAT rate (20% -> GBR_Standard_Rated, else
+  GBR_Outside_of_Scope / GBR_Zero_Rated). The GBE Reference (col I) is written verbatim to
+  the three header identifier columns D / G / BO and to the header Memo (DB). Line Item
+  Description (EN) + line Memo (FV) = Player + " - " + Type.
+
+tax:
+  mode: per_row_derived
+  driver: (Gross - Net) / Net           # VAT rate derived; col G "VAT" header is optional/absent on Womens tab
+  rate_20:
+    applicability: GBR_Standard_Rated
+    code: GBR_Standard_Rated
+    note: All current GBE exemplar rows are 20% standard-rated (100/500 and 1000/5000).
+  rate_0:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    note: Future zero-rated GBE batches; derived automatically when VAT rate < 20.
+
+accounting_string:
+  driver: none
+  note: >
+    GBE has no COST CODE / accounting-string column. Revenue Category (EM) and the 9-slot
+    FX..GF worktags are left blank; Finance codes pre-upload. Pipeline retained inert for
+    archetype parity (see meta.note item 2).
+
+skip_rule:
+  drop_when:
+    - Date blank
+    - Club blank
+    - Gross == 0
+    - customer unresolved (club name not matched in customer extract)
+    - customer ambiguous (club name maps to >1 Customer ID)
+
+mapping:
+# EIB-level + line-level columns for one-row-one-invoice. House defaults: submit=Y,
+# auto_complete=Y, currency=GBP, payment=Unpaid, document=Approved, invoice_type=Standard.
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: ""
+- target: d
+  source_column: Reference
+  note: Customer Invoice Reference ID = GBE Reference (col I), verbatim. Same value to D/G/BO.
+- target: g
+  source_column: Reference
+- target: bo
+  source_column: Reference
+- target: j
+  derivation: fixed_company_code_via_mapping
+  source_value: FA
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+    on_fail_default: THE FA GROUP - FA
+- target: ai
+  default: GBP
+- target: aj
+  source_column: Club
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Customer          # NAME column, matched on two-level cascade (L1 exact norm, L2 SQL-migration-transforms-then-norm)
+    output_column: Customer ID
+    equality: two_level_cascade_l1_exact_l2_sql_migration
+    on_fail: reject_after_L1_and_L2
+    on_ambiguous: reject_at_matching_level
+- target: br
+  source_column: Date
+  source_format: Excel date serial or dd/mm/yyyy
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: Gross
+- target: co
+  default: Standard
+- target: db
+  source_column: Reference
+  note: Header Memo (DB) = GBE Reference for traceability.
+- target: ds
+  default: "1"
+- target: dv
+  default: "1"
+- target: en
+  derivation: player_dash_type
+  source_columns: [Player, Type]
+  note: Line Item Description = Player + " - " + Type (e.g. "Boubacar Kamara - Extension").
+- target: fa
+  derivation: applicability_from_derived_vat_rate
+- target: fb
+  derivation: tax_code_from_derived_vat_rate
+- target: fl
+  source_column: Gross
+  note: Unit Cost FL = GROSS (mirrors ar_bulk / ar_multi_line gross-into-amounts convention).
+- target: fo
+  source_column: Gross
+  note: Extended Amount FO = GROSS.
+- target: fp
+  source_column: Date
+  source_format: Excel date serial or dd/mm/yyyy
+  target_format: YYYY-MM-DD
+- target: fv
+  derivation: player_dash_type
+  source_columns: [Player, Type]
+
+unused_source_columns:
+  # Columns present in the source that are NOT written to the EIB output.
+  - VAT:   # NOT written directly; only used (as Gross-Net cross-check) to derive the VAT rate. Header absent on Womens tab.
+  - Net:   # Used only to derive the VAT rate ((Gross-Net)/Net); the line/header amounts use GROSS.
+
+open_questions:
+  - id: gbe_customer_id_from_ar
+    decision: >
+      DECIDED 2026-09-07: the interim name-matching approach is now PRODUCTIONIZED as a
+      SHARED helper (customer_name_resolution.two_level_l1_l2_sql_migration) with a
+      mechanically-enforced SSO contract (shared_helper_registry.yaml + VBA in
+      modFinanceCommon.bas). The engine now runs TWO precision-first levels:
+        L1 = exact normalized match (legacy behavior),
+        L2 = GP data-migration SQL transforms applied to source THEN normalized.
+      This eliminates the bulk of the initial class of rejects (names containing
+      "United FC" that the SQL migration had abbreviated to "UTD FC" in the extract).
+      The INLINE COLUMN option remains preferred if AR ever delivers a column of
+      pre-allocated Customer IDs — but the name-match path is no longer a stub.
+    parked_pending_ar:
+      - >-
+        If/when AR delivers an inline Workday Customer ID column, add a third
+        precedence tier: INLINE ID wins highest, then fall back to name cascade.
+      - >-
+        If AR delivers GP Reference IDs (not Workday IDs) inline, resolve via the
+        customer extract's "Reference ID" column rather than the name column.
+    interim_behaviour: >
+      Two-level name cascade (shared helper). Ambiguous at L1/L2 -> reject. Miss at
+      both -> reject. No inline-ID reading wired yet; add when AR file ships.
+    owner: Finance (AR)
+    status: active_name_cascade_waiting_for_ar_inline_ids

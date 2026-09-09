@@ -1,0 +1,38 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/workday_ccs/sbx",
+    "workbookFileName": "Extract_Customers - SBX.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "11",
+        "dataRow": "12",
+        "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/workday_ccs/e2e",
+    "workbookFileName": "Extract_Suppliers_20260611.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "13",
+        "dataRow": "14",
+        "targetTableName": "fin_workday_extract_supplier"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/workday",
+    "workbookFileName": "20260616 3+_All_Contingent Worker_Data_for_Okta.xlsx",
+    "sheets": [
+      {
+        "sheetName": "3+ All Worker Data for Okta",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_workday_extract_cw"
+      }
+    ]
+  }  
+]

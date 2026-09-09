@@ -1,0 +1,132 @@
+# Transform spec - ar_invoice_run
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and source
+# layout (header row, required headers) - live in the build profile
+# config/transforms/ar_invoice_run.yaml (the build-consumed source of truth). Not restated here.
+#
+# Shape: a flatter AR extract than ar_invoice / ar_discipline_invoice (one row per club per
+# affiliation charge). Same Customer Invoice EIB target. Forked from ar_discipline_invoice
+# (fixed company + single customer lookup on the source "Code" column).
+
+meta:
+  key: ar_invoice_run
+  label: AR Invoice Run
+  requester: Finance (AR)
+  date_confirmed: 2026-07-28
+  exemplar_to_fork: ar_discipline_invoice
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  customer: {source_column: Code, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  company:  {source_code: WNSL, resolved_via: mapping tab, entity: company}
+  # Decided 2026-07-28: the whole WNL run posts to a single company (WNSL). Source column E
+  # ("FA WNL Code": WNL AFFILIATION / FINES) is NOT a company code and is not the company driver;
+  # it is left unmapped in this transform.
+
+fields:
+  invoice_date:     {source_column: Date}                 # EIB br - real Excel date in source
+  line_amount:      {source_column: NET, basis: net}      # EIB fo - net taxable line amount (VAT itemised via tax code, decided 2026-07-30)
+  amount_due:       {source_column: TOTAL, basis: gross}  # EIB cm - gross control total (net + Workday-calculated VAT)
+  line_description: {source_column: Invoice type}         # EIB en - e.g. "League affilation fee"
+  memo:             {source_column: Club Name}            # EIB db - records the club being invoiced
+
+cost_centre:
+  derivation: none
+  # Confirmed 2026-07-28 + reaffirmed for v46.1 column remap: WNL Cost Code column is a
+  # season label ("26/27 Season") not a 4-6-8-4 accounting string; it does NOT drive
+  # Cost Centre or any worktag in the new EIB worktag slot FX. Revenue Category (EM)
+  # is also blank. Workday will post these to the default derived worktags on the
+  # ledger account unless Finance add manual overrides pre-upload. Re-visit this block
+  # if Finance later supply a real accounting string for the WNL run.
+
+tax:
+  mode: per_row
+  driver_source_column: FA WNL Code
+  # Decided 2026-07-30: itemise output VAT on the LINE-level tax code FB (v46.1).
+  # Extended Amount (fo) carries the NET; Workday calculates VAT from line Tax Code (fb);
+  # Amount Due (cm) stays the gross TOTAL as the control figure. Source VAT column (I)
+  # is used only to reconcile Workday's calculated tax at load time - not written.
+  sets:
+    - when_value: FINES          # fines are zero-rated (GBR Zero Rated (0%))
+      code: GBR_Zero_Rated
+    - default: true              # every other invoice type is standard-rated (GBR 20% VAT (20%))
+      code: GBR_200_VAT
+  # Decided 2026-07-30 + unchanged for v46.1: line Tax Applicability (EIB col FA) is
+  # left BLANK deliberately - do not populate it until 3+ confirm the correct output-VAT
+  # Applicability Ref ID. Add an fa mapping row when confirmed.
+
+accounting_string:
+  driver: none
+  note: >
+    WNL Cost Code is a season label, not an account string. See cost_centre: block.
+
+skip_rule:
+  drop_when:
+    - Code blank
+    - Date blank
+    - TOTAL == 0
+
+mapping:
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: "Y"
+- target: bo
+  source_column: Invoice Number
+  optional: true
+  fallback:
+    - source_column: Document Number
+  note: Legacy GP Invoice Number (WNL club-invoice run) → v46.1 EIB BO (Invoice Number).
+        Preferred source column is `Invoice Number`; `Document Number` accepted as an alias.
+        If neither column exists the write is skipped — a batch run typically auto-generates
+        its invoice refs in Workday.
+- target: j
+  default: THE FA GROUP - WNSL
+  source_value: WNSL
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+- target: ai
+  default: GBP
+- target: aj
+  source_column: Code
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Customer ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: br
+  source_column: Date
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: TOTAL          # Amount Due - gross control total (unchanged semantics, new col CM)
+- target: co
+  default: Standard
+- target: dv
+  default: "1"
+- target: en
+  source_column: Invoice type
+- target: fb
+  source_column: FA WNL Code    # line Tax Code FB - per_row (FINES -> GBR_Zero_Rated, else GBR_200_VAT)
+- target: fo
+  source_column: NET            # Extended Amount FO - net taxable (VAT calc by Workday from FB)
+- target: db
+  source_column: Club Name

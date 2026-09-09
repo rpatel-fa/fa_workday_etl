@@ -1,0 +1,55 @@
+{
+  "description": "The 12 valid Workday customer categories — the list the Customer EIB's own drop-down validates Customer Name!D against.",
+  "key_column": "customer_category",
+  "provenance": "Transcribed 2026-07-15 from the Customer EIB's Customer_Category named range ('Customer Specific Named Ranges'!A, FA E2E Customers V1.xlsm). A snapshot, not a link. NOT the migration's 10 distinct output values — 'Football Agents' and 'Individual person (Customer)' are valid but appear on zero migrated rows.",
+  "rows": [
+    {
+      "customer_category": "Broadcasting",
+      "reference_id": "Broadcasting"
+    },
+    {
+      "customer_category": "Football Agents",
+      "reference_id": "Football Agents"
+    },
+    {
+      "customer_category": "Miscellaneous",
+      "reference_id": "Miscellaneous"
+    },
+    {
+      "customer_category": "Intercompany",
+      "reference_id": "Intercompany"
+    },
+    {
+      "customer_category": "Individual person (Customer)",
+      "reference_id": "Individual person (Customer)"
+    },
+    {
+      "customer_category": "Football Clubs",
+      "reference_id": "Football Clubs"
+    },
+    {
+      "customer_category": "County FA's",
+      "reference_id": "County FA's"
+    },
+    {
+      "customer_category": "Experiences by Wembley",
+      "reference_id": "Experiences by Wembley"
+    },
+    {
+      "customer_category": "Women's National League",
+      "reference_id": "Women's National League"
+    },
+    {
+      "customer_category": "Tours",
+      "reference_id": "Tours"
+    },
+    {
+      "customer_category": "Licensing",
+      "reference_id": "Licensing"
+    },
+    {
+      "customer_category": "Sponsorship",
+      "reference_id": "Sponsorship"
+    }
+  ]
+}

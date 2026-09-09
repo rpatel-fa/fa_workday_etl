@@ -1,0 +1,9 @@
+src_fin_workday_customer_map.sql
+src_fin_customer_invoice_base.sql
+src_fin_customer_invoice_nrm.sql
+src_fin_customer_invoice.sql
+workday_customer_invoice.sql
+workday_customer_credit_note.sql
+reconcile_customer_invoice_unresolved.sql
+reconcile_customer_invoice_unresolved_workday.sql
+reconcile_customer_invoice_unresolved_workday_update.sql

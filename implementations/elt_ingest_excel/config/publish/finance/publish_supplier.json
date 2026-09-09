@@ -1,0 +1,88 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/threeplus/CCS",
+    "srcWorkbookFileName": "FA E2E Suppliers V1.xlsm",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_creditor_supplier_active_v1",
+    "sheets": [
+      {
+        "srcTableName": "workday_supplier_name",
+        "sheetName": "Supplier Name",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_groups",
+        "sheetName": "Supplier Groups",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_alternate_name",
+        "sheetName": "Supplier Alternate Name",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_currencies",
+        "sheetName": "Supplier Currencies",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_tax",
+        "sheetName": "Supplier Tax",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_payment",
+        "sheetName": "Supplier Payment",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_procurement",
+        "sheetName": "Supplier Procurement",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_company_restrictions",
+        "sheetName": "Supplier Company Restrictions",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_settlement_account",
+        "sheetName": "Supplier Settlement Account",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_intermediary_account",
+        "sheetName": "Supplier Intermediary Account",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_address",
+        "sheetName": "Supplier Address",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_phone",
+        "sheetName": "Supplier Phone",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_supplier_email",
+        "sheetName": "Supplier Email",
+        "headerRow": "3",
+        "dataRow": "4"
+      }
+    ]
+  }
+]

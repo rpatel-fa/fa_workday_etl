@@ -1,0 +1,52 @@
+[
+	{
+		"source_column" : "location",
+		"source_value" : "Homebased - SGP",
+		"target_value" : "Homebased - SGP"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "SGP",
+		"target_value" : "St George's Park"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Football Conference",
+		"target_value" : "Wembley Stadium"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "The FA Group",
+		"target_value" : "Wembley Stadium"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Homebased - Wembley",
+		"target_value" : "Homebased - Wembley"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Wembley Stadium",
+		"target_value" : "Wembley Stadium"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Cognizant",
+		"target_value" : "Wembley Stadium"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "St George's Park",
+		"target_value" : "St George's Park"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Wembley",
+		"target_value" : "Wembley Stadium"
+	},
+	{
+		"source_column" : "location",
+		"source_value" : "Homebased",
+		"target_value" : "Homebased - Wembley"
+	}
+]

@@ -1,0 +1,9 @@
+[
+  { "source_type": "customer", "source_value": "DSC_CLUB", "target_value": "Disciplinary" },  
+  { "source_type": "customer", "source_value": "EDUCATION CFA", "target_value": "FA Learning" },
+  { "source_type": "customer", "source_value": "EDUCATION CLUB", "target_value": "FA Learning" },
+  { "source_type": "customer", "source_value": "EDUCATION OTHER", "target_value": "FA Learning" },
+  { "source_type": "supplier", "source_value": "GFSP", "target_value": "Barclays Girls Football Schools Partnerships" },
+  { "source_type": "supplier", "source_value": "REFS CMH", "target_value": "Referees" },
+  { "source_type": "supplier", "source_value": "REFS INAC", "target_value": "Referees" }
+]

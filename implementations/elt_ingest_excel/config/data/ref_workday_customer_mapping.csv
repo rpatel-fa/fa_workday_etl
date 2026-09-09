@@ -1,0 +1,234 @@
+entity_name,Output Column,Source Column (src_fin_customer),Source Column (Input Excel),Notes
+workday_customer_address,Customer ID,customer_id,Customer ID,
+workday_customer_address,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_address,Formatted Address,NULL,NULL,No mapping found
+workday_customer_address,Address Format Type,NULL,NULL,No mapping found
+workday_customer_address,Defaulted Business Site Address,NULL,NULL,No mapping found
+workday_customer_address,Delete,NULL,NULL,No mapping found
+workday_customer_address,Do Not Replace All,NULL,NULL,No mapping found
+workday_customer_address,Last Modified,NULL,NULL,No mapping found
+workday_customer_address,Descriptor,NULL,NULL,No mapping found
+workday_customer_address,Address ID,customer_id + address_code,NULL,Concatenated value
+workday_customer_address,Country,nrm_country_name,Country,
+workday_customer_address,Country Code,nrm_country_code,Country Code,
+workday_customer_address,Region,county (via ref tables),NULL,Complex mapping
+workday_customer_address,Subregion,NULL,NULL,No mapping found
+workday_customer_address,City,city (via ref tables),NULL,Complex mapping
+workday_customer_address,Submunicipality,NULL,NULL,No mapping found
+workday_customer_address,Address Line #1,address_1,Address 1,
+workday_customer_address,Address Line #2,address_2,Address 2,
+workday_customer_address,Address Line #3,address_3,Address 3,
+workday_customer_address,Address Line #4,NULL,NULL,No mapping found
+workday_customer_address,Postal Code,post_code,Post Code,
+workday_customer_address,Public,Yes (constant),NULL,Calculated/derived value
+workday_customer_address,Primary,Yes (constant),NULL,Calculated/derived value
+workday_customer_address,Type,NULL,NULL,No mapping found
+workday_customer_address,Effective Date,NULL,NULL,No mapping found
+workday_customer_address,Use For,NULL,NULL,No mapping found
+workday_customer_address,Use For Tenanted,NULL,NULL,No mapping found
+workday_customer_address,Comments,NULL,NULL,No mapping found
+workday_customer_address,Number of Days,NULL,NULL,No mapping found
+workday_customer_address,Municipality Local,NULL,NULL,No mapping found
+workday_customer_address,Address,NULL,NULL,No mapping found
+workday_customer_bank_account_address,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_bank_account_address,Customer ID,customer_id,Customer ID,
+workday_customer_bank_account_address,Settlement Bank Account ID,customer_id + _BANK,NULL,Concatenated value
+workday_customer_bank_account_address,Intermediary Bank Account ID,NULL,NULL,No mapping found
+workday_customer_bank_account_address,Address ID,customer_id + _BANK_ADDR,NULL,Concatenated value
+workday_customer_bank_account_address,Country,nrm_country_name,Country,
+workday_customer_bank_account_address,Region,county,County,
+workday_customer_bank_account_address,Subregion,NULL,NULL,No mapping found
+workday_customer_bank_account_address,City,city,City,
+workday_customer_bank_account_address,Submunicipality,NULL,NULL,No mapping found
+workday_customer_bank_account_address,Address Line #1,address_1,Address 1,
+workday_customer_bank_account_address,Address Line #2,address_2,Address 2,
+workday_customer_bank_account_address,Address Line #3,address_3,Address 3,
+workday_customer_bank_account_address,Address Line #4,NULL,NULL,No mapping found
+workday_customer_bank_account_address,Postal Code,post_code,Post Code,
+workday_customer_bank_account_address,Public,Yes (constant),NULL,Calculated/derived value
+workday_customer_bank_account_address,Primary,Yes (constant),NULL,Calculated/derived value
+workday_customer_bank_account_address,Effective Date,created_date,Created Date,
+workday_customer_bank_account_address,Type,address_code,Vendor Address Code - Primary,
+workday_customer_bank_account_address,Use For,address_code,Vendor Address Code - Primary,
+workday_customer_bank_account_address,Use For Tenanted,NULL,NULL,No mapping found
+workday_customer_company_restrictions,Customer ID,customer_id,Customer ID,
+workday_customer_company_restrictions,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_company_restrictions,Restricted to Companies,pipe_target_business_unit,Company,
+workday_customer_credit_card,Customer ID,customer_id,Customer ID,
+workday_customer_credit_card,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_credit_card,Merchant Customer Profile ID,NULL,NULL,No mapping found
+workday_customer_credit_card,Primary Card?,NULL,NULL,No mapping found
+workday_customer_credit_card,Merchant Account,NULL,NULL,No mapping found
+workday_customer_credit_card,Credit Card Type,NULL,NULL,No mapping found
+workday_customer_credit_card,First Name,NULL,NULL,No mapping found
+workday_customer_credit_card,Last Name,NULL,NULL,No mapping found
+workday_customer_credit_card,Expiration Date,NULL,NULL,No mapping found
+workday_customer_credit_card,Last 4 Digits of Credit Card Number,NULL,NULL,No mapping found
+workday_customer_credit_card,Customer Profile ID,NULL,NULL,No mapping found
+workday_customer_credit,Customer ID,customer_id,Customer ID,
+workday_customer_credit,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_credit,DUNS Number,NULL,NULL,No mapping found
+workday_customer_credit,Exempt From Dunning,NULL,NULL,No mapping found
+workday_customer_credit,Tax Code,tax_schedule_id,Tax Schedule ID,
+workday_customer_credit,Credit Limit Currency,nrm_currency_code,Currency ID,
+workday_customer_credit,Credit Limit,credit_limit_amount,Credit Limit,
+workday_customer_credit,Hierarchy Credit Limit,NULL,NULL,No mapping found
+workday_customer_credit,Credit Verification Date,created_date,Created Date,
+workday_customer_credit,Commercial Credit Score,NULL,NULL,No mapping found
+workday_customer_credit,Commercial Credit Score Date,NULL,NULL,No mapping found
+workday_customer_credit,Commercial Credit Score Note,NULL,NULL,No mapping found
+workday_customer_credit,Composite Risk Score,NULL,NULL,No mapping found
+workday_customer_credit,Composite Risk Date,NULL,NULL,No mapping found
+workday_customer_credit,Composite Risk Note,NULL,NULL,No mapping found
+workday_customer_credit,Customer Satisfaction Score,NULL,NULL,No mapping found
+workday_customer_credit,Customer Satisfaction Date,NULL,NULL,No mapping found
+workday_customer_credit,Customer Satisfaction Note,NULL,NULL,No mapping found
+workday_customer_currencies,Customer ID,customer_id,Customer ID,
+workday_customer_currencies,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_currencies,Accepted Currencies,nrm_currency_code,Currency ID,
+workday_customer_currencies,Default Currency,nrm_currency_code,Currency ID,
+workday_customer_document_delivery,Customer ID,customer_id,Customer ID,
+workday_customer_document_delivery,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_document_delivery,Always Separate Payments?,NULL,NULL,No mapping found
+workday_customer_document_delivery,Remit-from Customer,NULL,NULL,No mapping found
+workday_customer_document_delivery,Invoice Delivery Method,email_to_address (derived),NULL,Calculated/derived value
+workday_customer_document_delivery,Invoice Notification Email Recipients,email_to_address,Email To Address,
+workday_customer_document_delivery,Statement Delivery Method,email_to_address (derived),NULL,Calculated/derived value
+workday_customer_document_delivery,Statement Notification Email Recipients,email_to_address,Email To Address,
+workday_customer_document_delivery,Dunning Delivery Method,NULL,NULL,No mapping found
+workday_customer_document_delivery,Dunning Letter Notification Email Recipients,NULL,NULL,No mapping found
+workday_customer_document_delivery,Electronic Invoicing Start Date,NULL,NULL,No mapping found
+workday_customer_document_delivery,Electronic Invoicing Government Issued Customer ID,NULL,NULL,No mapping found
+workday_customer_document_delivery,Electronic Invoicing Intermediary Vendor ID,NULL,NULL,No mapping found
+workday_customer_document_delivery,Electronic Invoicing Vendor Issued Customer ID,NULL,NULL,No mapping found
+workday_customer_document_delivery,Mandate Required?,NULL,NULL,No mapping found
+workday_customer_document_delivery,Direct Debit Payment Type,NULL,NULL,No mapping found
+workday_customer_document_delivery,Default Mandate,NULL,NULL,No mapping found
+workday_customer_email,Customer ID,customer_id,Customer ID,
+workday_customer_email,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_email,Email ID,customer_id + suffix + rank,NULL,Concatenated value
+workday_customer_email,Email Address,email_to_address / email_cc_address / email_bcc_address,Email To Address,
+workday_customer_email,Email Comment,NULL,NULL,No mapping found
+workday_customer_email,Public,Yes (constant),NULL,Calculated/derived value
+workday_customer_email,Primary,Derived from email_type and rank,NULL,
+workday_customer_email,Type,email_type (to/cc/bcc),NULL,
+workday_customer_email,Use For,Business (constant),NULL,Calculated/derived value
+workday_customer_email,Use For Tenated,NULL,NULL,No mapping found
+workday_customer_email,Delete,NULL,NULL,No mapping found
+workday_customer_email,Do Not Replace All,NULL,NULL,No mapping found
+workday_customer_email,Comments,NULL,NULL,No mapping found
+workday_customer_email,Email,NULL,NULL,No mapping found
+workday_customer_groups,Customer ID,customer_id,Customer ID,
+workday_customer_groups,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_groups,Customer Group,key_customer_name (derived A-L/M-Z/0-9),NULL,
+workday_customer_intermediary_account,Settlement Bank Account ID,customer_id + _BANK,NULL,Concatenated value
+workday_customer_intermediary_account,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_intermediary_account,Customer ID,customer_id,Customer ID,
+workday_customer_intermediary_account,Intermediary Bank Account ID,customer_id + _INTBANK,NULL,Concatenated value
+workday_customer_intermediary_account,Bank Country,nrm_country_name,Country,
+workday_customer_intermediary_account,Currency,nrm_currency_code,Currency ID,
+workday_customer_intermediary_account,Bank Account Type,CHECKING (constant),NULL,Calculated/derived value
+workday_customer_intermediary_account,Bank Name,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Name on Account,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Bank Account Number,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Bank Account Nickname,short_name + Intermediary,NULL,Complex mapping
+workday_customer_intermediary_account,Routing Transit Number,NULL,NULL,No mapping found
+workday_customer_intermediary_account,IBAN,NULL,NULL,No mapping found
+workday_customer_intermediary_account,SWIFT Bank Identification Code,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Roll Number,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Check Digit,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Branch ID,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Branch Name,NULL,NULL,No mapping found
+workday_customer_intermediary_account,Inactive,inactive (transformed),NULL,Calculated/derived value
+workday_customer_intermediary_account,Bank Instructions,NULL,NULL,No mapping found
+workday_customer_name,Customer ID,customer_id,Customer ID,
+workday_customer_name,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_name,Reference ID,nrm_customer_number,Vendor ID,
+workday_customer_name,Customer Category,customer_class,Vendor Class ID,
+workday_customer_name,Business Entity Name,NULL,NULL,No mapping found
+workday_customer_name,External Entity ID,nrm_customer_number,Vendor ID,
+workday_customer_name,Preferred Locale,nrm_country_code,Country Code,
+workday_customer_name,Preferred Language,nrm_language_code,NULL,
+workday_customer_name,Lockbox,NULL,NULL,No mapping found
+workday_customer_name,Customer Security Segment,NULL,NULL,No mapping found
+workday_customer_name,Worktag Only?,NULL,NULL,No mapping found
+workday_customer_name,Submit?,inactive (transformed),NULL,Calculated/derived value
+workday_customer_name,Create Customer from Financial Institution,NULL,NULL,No mapping found
+workday_customer_name,Create Customer from Supplier,NULL,NULL,No mapping found
+workday_customer_name,Create Customer from Tax Authority,NULL,NULL,No mapping found
+workday_customer_name,Create Customer from Investor,NULL,NULL,No mapping found
+workday_customer_payment,Customer ID,customer_id,Customer ID,
+workday_customer_payment,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_payment,Payment Terms,payment_terms_id (via mapping),NULL,Complex mapping
+workday_customer_payment,Default Payment Type,nrm_currency_code (derived),NULL,Calculated/derived value
+workday_customer_payment,Interest Rule,NULL,NULL,No mapping found
+workday_customer_payment,Late Fee Rule,NULL,NULL,No mapping found
+workday_customer_phone,Customer ID,customer_id,Customer ID,
+workday_customer_phone,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_phone,Phone ID,customer_id + suffix + rank,NULL,Concatenated value
+workday_customer_phone,Phone Country,country,Country,
+workday_customer_phone,Country Code,nrm_country_code,Country Code,
+workday_customer_phone,International Phone Code,nrm_phone_code,NULL,
+workday_customer_phone,Area Code,Derived from phone number,NULL,
+workday_customer_phone,Phone Number,phone_1/phone_2/phone_3/fax (cleaned),Phone Number 1,
+workday_customer_phone,Formatted Phone Number,Derived,NULL,
+workday_customer_phone,Phone Number Extension,NULL,NULL,No mapping found
+workday_customer_phone,Phone Device Type,Derived from phone type,NULL,
+workday_customer_phone,Public,Yes (constant),NULL,Calculated/derived value
+workday_customer_phone,Primary,Derived from phone_type,NULL,
+workday_customer_phone,Type,phone_type (primary/secondary/tertiary/fax),NULL,
+workday_customer_phone,Use For,NULL,NULL,No mapping found
+workday_customer_phone,Use For Tenated,NULL,NULL,No mapping found
+workday_customer_phone,Tenant Formatted Phone,NULL,NULL,No mapping found
+workday_customer_phone,International Formatted Phone,NULL,NULL,No mapping found
+workday_customer_phone,Delete,NULL,NULL,No mapping found
+workday_customer_phone,Do Not Replace All,NULL,NULL,No mapping found
+workday_customer_phone,Comments,NULL,NULL,No mapping found
+workday_customer_phone,Phone,NULL,NULL,No mapping found
+workday_customer_related_worktags,Customer ID,customer_id,Customer ID,
+workday_customer_related_worktags,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_related_worktags,Worktag Type,Customer (constant),NULL,Calculated/derived value
+workday_customer_related_worktags,Required On Transaction?,NULL,NULL,No mapping found
+workday_customer_related_worktags,Required On Transaction For Validation?,NULL,NULL,No mapping found
+workday_customer_related_worktags,Delete Default Value?,NULL,NULL,No mapping found
+workday_customer_related_worktags,Worktag ID Type,NULL,NULL,No mapping found
+workday_customer_related_worktags,Default Worktag ID Value,NULL,NULL,No mapping found
+workday_customer_related_worktags,External Supplier Invoice Source,NULL,NULL,No mapping found
+workday_customer_related_worktags,Replace All Allowed Values?,NULL,NULL,No mapping found
+workday_customer_related_worktags,Delete Allowed Values?,NULL,NULL,No mapping found
+workday_customer_related_worktags,Allowed Worktag ID Value,NULL,NULL,No mapping found
+workday_customer_settlement_account,Customer ID,customer_id,Customer ID,
+workday_customer_settlement_account,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_settlement_account,Settlement Bank Account ID,customer_id + _BANK,NULL,Concatenated value
+workday_customer_settlement_account,Country,nrm_country_name,Country,
+workday_customer_settlement_account,Currency,nrm_currency_code,Currency ID,
+workday_customer_settlement_account,Bank Account Nickname,statement_name or nrm_customer_name,NULL,Complex mapping
+workday_customer_settlement_account,Bank Account Type,Checking (constant),NULL,Calculated/derived value
+workday_customer_settlement_account,Bank Name,NULL,NULL,No mapping found
+workday_customer_settlement_account,Routing Transit Number,NULL,NULL,No mapping found
+workday_customer_settlement_account,Branch ID,NULL,NULL,No mapping found
+workday_customer_settlement_account,Branch Name,NULL,NULL,No mapping found
+workday_customer_settlement_account,Bank Account Number,NULL,NULL,No mapping found
+workday_customer_settlement_account,Check Digit,NULL,NULL,No mapping found
+workday_customer_settlement_account,Name on Account,statement_name or nrm_customer_name,NULL,Complex mapping
+workday_customer_settlement_account,Roll Number,NULL,NULL,No mapping found
+workday_customer_settlement_account,IBAN,NULL,NULL,No mapping found
+workday_customer_settlement_account,SWIFT Bank Identification Code,NULL,NULL,No mapping found
+workday_customer_settlement_account,Accepts Payment Types,nrm_currency_code (derived),NULL,Calculated/derived value
+workday_customer_settlement_account,Payment Types,nrm_currency_code (derived),NULL,Calculated/derived value
+workday_customer_settlement_account,For Supplier Connections Only,NULL,NULL,No mapping found
+workday_customer_settlement_account,Requires Prenote,NULL,NULL,No mapping found
+workday_customer_settlement_account,Payment Type Prenote,NULL,NULL,No mapping found
+workday_customer_settlement_account,Inactive,NULL,NULL,No mapping found
+workday_customer_settlement_account,Bank Instructions,NULL,NULL,No mapping found
+workday_customer_tax,Customer ID,customer_id,Customer ID,
+workday_customer_tax,Customer Name,nrm_customer_name,Vendor Name,
+workday_customer_tax,Tax Code,tax_schedule_id,Tax Schedule ID,
+workday_customer_tax,Tax ID Country,nrm_country_name,Country,
+workday_customer_tax,Tax ID,tax_registration_number,Tax Registration Number,
+workday_customer_tax,Tax ID Type,nrm_tax_id_type,NULL,
+workday_customer_tax,Primary Tax ID?,NULL,NULL,No mapping found
+workday_customer_tax,Transaction Tax ID?,NULL,NULL,No mapping found
+workday_customer_tax,Tax Status Country,nrm_country_name,Country,
+workday_customer_tax,Transaction Tax Status,NULL,NULL,No mapping found
+workday_customer_tax,Withholding Tax Status,NULL,NULL,No mapping found

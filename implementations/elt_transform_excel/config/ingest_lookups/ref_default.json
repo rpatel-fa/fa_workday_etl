@@ -1,0 +1,11 @@
+{
+  "description": "Per-domain default value. Each row gives the fallback value for one domain when a source row leaves it unset (materialised into the Runner's 'mapping' sheet at build time, entity='default').",
+  "key_column": "domain",
+  "provenance": "Transcribed 2026-07-28 from the retired runner_shell/RunnerShellMapping.xlsx 'mapping' tab (default rows). A snapshot, not a link. GBP is the migration-wide default currency for the FA Group.",
+  "rows": [
+    {
+      "domain": "currency",
+      "value": "GBP"
+    }
+  ]
+}

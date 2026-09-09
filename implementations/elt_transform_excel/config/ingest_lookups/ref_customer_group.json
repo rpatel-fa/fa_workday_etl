@@ -1,0 +1,63 @@
+{
+  "description": "The 7 valid Workday customer groups. Two jobs: assignment='selectable' lists what a user may pick as an extra group; assignment='auto_band' rows carry the first_char_from/first_char_to boundaries a transform bands the customer name with (is_fallback='Y' when the first character is outside every band). The band boundaries live here, in config, so they are not hard-coded in a CASE the way workday_customer_groups.sql does it.",
+  "key_column": "customer_group",
+  "provenance": "Transcribed 2026-07-15 from the Customer EIB's Default_Customer_Group named range ('Customer Specific Named Ranges'!C, FA E2E Customers V1.xlsm). A snapshot, not a link. NOT the migration's 5 distinct output values — the two 'Experiences by Wembley' groups are valid but appear on zero migrated rows.",
+  "rows": [
+    {
+      "customer_group": "Customers A - L",
+      "reference_id": "Customers A - L",
+      "assignment": "auto_band",
+      "first_char_from": "A",
+      "first_char_to": "L",
+      "is_fallback": "N"
+    },
+    {
+      "customer_group": "Customers M - Z",
+      "reference_id": "Customers M - Z",
+      "assignment": "auto_band",
+      "first_char_from": "M",
+      "first_char_to": "Z",
+      "is_fallback": "N"
+    },
+    {
+      "customer_group": "Customers 0 - 9",
+      "reference_id": "Customers 0 - 9",
+      "assignment": "auto_band",
+      "first_char_from": "0",
+      "first_char_to": "9",
+      "is_fallback": "Y"
+    },
+    {
+      "customer_group": "Disciplinary",
+      "reference_id": "Disciplinary",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    },
+    {
+      "customer_group": "FA Learning",
+      "reference_id": "FA Learning",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    },
+    {
+      "customer_group": "Experiences by Wembley Seats",
+      "reference_id": "Experiences by Wembley Seats",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    },
+    {
+      "customer_group": "Experiences by Wembley Boxes",
+      "reference_id": "Experiences by Wembley Boxes",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    }
+  ]
+}

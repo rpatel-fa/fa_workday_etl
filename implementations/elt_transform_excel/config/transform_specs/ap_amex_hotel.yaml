@@ -1,0 +1,385 @@
+# Transform spec - ap_amex_hotel  (V2: Default Expense Cost Code → auto-derived Final Code)
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors. Lives in
+# config/transform_specs/ (not config/transforms/, which the build globs as runnable profiles).
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) — live in the build profile
+# config/transforms/ap_amex_hotel.yaml (the build-consumed source of truth). Not restated here.
+#
+# Key change from V1 (June 2026 baseline):
+#   V1 required Finance to pre-compute the "Final Code" column manually for every row.
+#   V2 automates the Final Code derivation from the raw AMEX "Default Expense Cost Code"
+#   column (the same pipeline Finance encoded in cols 92-100 of the "New CC Updated" sheet
+#   formulas).  Finance may still populate the optional override columns (Seg1/Seg2/Seg3/Seg4
+#   Overwrite) for the ~44% of rows that need segment-level corrections; those overrides
+#   are applied on top of the auto-derived base.  The manual "Final Code" column itself is
+#   no longer read or populated.
+
+meta:
+  key: ap_amex_hotel
+  label: "AP AMEX Hotel (V2: Default Cost Code → Final Code)"
+  requester: Finance (AP)
+  date_confirmed: 2026-07-13
+  date_automated_v2: 2026-08-12
+  exemplar_to_fork: ap_amex_trains_v2
+
+shared_helpers:
+  supplier_resolution: fixed_reference_id
+  company_resolution: fixed_literal
+  accounting_string_derivation: amex_padded_22char_pipeline
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: none
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier: {source_code: AME001, resolved_via: Supplier Spreadsheet, key_column: Reference ID, value_column: Supplier ID}
+  company: {source_code: FA, resolved_via: mapping tab, entity: company}
+
+fields:
+  invoice_number: {source_column: Transaction ID}
+  invoice_date: {source_column: Transaction Date, format: Excel serial date}
+  supplier_invoice_number: {source_column: Supplier Reference}
+  item_description: {source_column: Transaction Merchant Narrative}
+  memo:
+    derivation: concat_space_join
+    source_steps:
+      traveller_name:
+        source_column: "Traveller Name"
+        sanitize: strip_honorific_prefixes
+        strip_honorific_prefixes: ["Mr", "Mr.", "Mrs", "Mrs.", "Miss", "Ms", "Ms.", "Dr", "Dr.", "Doctor"]
+      hotel_name:
+        source_resolution: blank_header_column_letter
+        source_column_letter: AH
+      stay_date_range:
+        derivation: ddmmyy_join_dash
+        arrival_column: "Hotel Arrival Date"
+        departure_column: "Hotel Departure Date"
+        date_format: DDMMYY
+    concat_order: [traveller_name_sanitized, hotel_name, stay_date_range]
+    fallback_optional_source_column: "Journal Name?"
+    notes: |-
+      The "Journal Name?" column previously read was a Finance-added derived helper column at
+      col 114 (far-right edge) that itself was computed from raw AMEX export fields:
+        Person        = "Traveller Name" with honorific title prefixes stripped (Mr/Mrs/Miss/Ms/Dr/Doctor)
+        Hotel         = col 34 AH (row-9 header is blank in raw AMEX export; "Deployment Name" in col 25 is NOT the hotel)
+        Stay date     = DDMMYY(Hotel Arrival Date col 46) + "-" + DDMMYY(Hotel Departure Date col 47)
+      798/798 real rows bit-identical. Cols 111-114 (Person/Hotel/Date/Journal Name?) are Finance-only
+      manual helpers, NOT part of the raw AMEX contract. "Journal Name?" col 114 is still accepted as
+      a backwards-compat fallback if present AND the 3 raw source components above are all empty
+      (never observed in practice).
+  line_amount: {source_column: Transaction Account Amount, basis: gross}
+  spend_category: {value: Hotel_Staff_Costs}
+  reporting_type:
+    derivation: derived_final_code_segment2_left
+    rule: |-
+      Auto-derived Final Code accounting element 2 first character → mapped via the canonical
+      supplier PO reporting-type table (mirrored in modFinanceCommon.ResolveReportingTypeCode):
+      1/2/3/7/8/9 → FA Operations, 4 → FA Investments, 5 → NGB, 6 → PGB.
+  cost_centre:
+    derivation: per_row_lookup
+    key_source_column: derived_final_code
+    key_rule: lowest-hierarchy matching accounting-string element
+    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  related_worktags:
+    event:
+      target: er
+      source_column: derived_final_code
+      worktag_business_object_key: Events - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    camp:
+      target: es
+      source_column: derived_final_code
+      worktag_business_object_key: Camps - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    fa_learning_course:
+      target: et
+      source_column: derived_final_code
+      worktag_business_object_key: FA Learning - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    commercial_partner:
+      target: eu
+      source_column: derived_final_code
+      worktag_business_object_key: Commercial Partners - Custom Worktag
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    grant:
+      target: ev
+      source_column: derived_final_code
+      worktag_business_object_key: Grant
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    programme:
+      target: ew
+      source_column: derived_final_code
+      worktag_business_object_key: Program - Delivered Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    project:
+      target: ex
+      source_column: derived_final_code
+      worktag_business_object_key: Projects (Opex)
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+
+# --- Derived Final Code pipeline (automates cols 92-105 of the legacy "New CC Updated" sheet) ---
+#
+# Input : "Default Expense Cost Code" source column (raw AMEX BTA export —
+#         e.g. "10564XXXXX0000000", "1151304101MM00CN2").
+# Output: "Final Code" accounting string "SEG1-SEG2-SEG3-SEG4" ready for cost-centre /
+#         worktag / reporting-type lookups.
+#
+# Step 1 — Strip separators: remove all "-", " ", "."  from Default Expense Cost Code.
+# Step 2 — Right-pad to 22 characters with "0".
+# Step 3 — Split to fixed segments:  LEFT 4    → Seg1
+#                                    MID 5-10  → Seg2   (6 chars)
+#                                    MID 11-18 → Seg3   (8 chars)
+#                                    MID 19-22 → Seg4   (4 chars)
+# Step 4 — Seg2 first-char lookup (tiny 4-entry table, shared with AMEX Trains V2):
+#             3 → 302101
+#             4 → 402201
+#             5 → 502201
+#             6 → 602201
+#             any other first char → "Error"  (row is rejected UNLESS a Seg2 Override is present)
+# Step 5 — Base Code = Seg1 + "-" + Seg2Mapped + "-" + Seg3 + "-" + Seg4
+# Step 6 — Apply optional segment overrides (Finance-populated columns for edge cases;
+#          each override column is read OPTIONALLY — if blank or absent, the base value wins):
+#            Seg1 Overwrite → replaces Seg1 in the joined result
+#            Seg2 Overwrite → replaces the Seg2-mapped value in the joined result
+#            Seg3 Overwrite → replaces Seg3 in the joined result
+#            Seg4 Overwrite → replaces Seg4 in the joined result
+#          (This mirrors the legacy col-105 formula that checked Seg1-4 Overwrite columns.)
+# Step 7 — If Seg2 resolved to "Error" AND no Seg2 Override was supplied → the Final Code
+#          value is "Error" and the row is rejected with a clear explanation so Finance can
+#          either add a Seg2 Override OR codify the missing first-char mapping into step 4.
+
+derived_fields:
+  derived_final_code:
+    input_column: Default Expense Cost Code
+    pipeline:
+      - strip: ["-", " ", "."]
+      - pad_right: {length: 22, char: "0"}
+      - split_fixed: {seg1: 4, seg2: 6, seg3: 8, seg4: 4}
+      - seg2_first_char_map:
+          "3": "302101"
+          "4": "402201"
+          "5": "502201"
+          "6": "602201"
+          on_unmapped: ErrorStringAndRejectUnlessOverridden
+      - optional_segment_overrides:
+          seg1: {source_column: Seg1 Overwrite}
+          seg2: {source_column: Seg2 Overwrite}
+          seg3: {source_column: Seg3 Overwrite}
+          seg4: {source_column: Seg4 Overwrite}
+      - join: ["{seg1}", "{seg2_mapped_or_overridden}", "{seg3}", "{seg4}"]
+        separator: "-"
+
+tax:
+  mode: uniform
+  applicability: GBR_Outside_of_Scope
+  code: GBR_Zero_Rated
+  recoverability: Nonrecoverable_Allocate
+
+skip_rule:
+  drop_when:
+    - Currency blank
+    - Transaction ID blank
+    - Transaction Date blank
+    - Supplier Reference blank
+    - Transaction Merchant Narrative blank
+    - Transaction Account Amount == 0
+    - Default Expense Cost Code blank
+    - derived_final_code contains "Error"    # Seg2 first char not in 3/4/5/6 set and no Seg2 Override supplied
+    - cost_centre unresolved
+
+open_questions: []
+
+mapping:
+- target: b
+  function: sequence
+- target: f
+  default: "Y"
+- target: g
+  source_column: Transaction ID
+- target: l
+  default: THE FA GROUP - FA
+  source_value: FA
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+- target: "n"
+  default: GBP
+  source_column: Transaction Account Currency Code
+- target: o
+  source_value: AME001
+  lookup:
+    file: Supplier Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Supplier ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: u
+  source_column: Transaction Date
+  source_format: Excel serial date
+  target_format: YYYY-MM-DD
+- target: au
+  source_column: Supplier Reference
+- target: dd
+  default: 1
+- target: di
+  source_column: Transaction Merchant Narrative
+- target: dp
+  default: Hotel_Staff_Costs
+- target: ds
+  default: GBR_Outside_of_Scope
+- target: dt
+  default: GBR_Zero_Rated
+- target: dv
+  default: INVOICE/ADJUSTMENT_DATE
+- target: dy
+  default: Nonrecoverable_Allocate
+- target: dz
+  default: CALC_TAX_DUE
+- target: ed
+  source_column: Transaction Account Amount
+- target: ee
+  source_column: Transaction Account Amount
+- target: eo
+  derivation: concat_space_join
+  source_steps:
+    traveller_name:
+      source_column: "Traveller Name"
+      sanitize: strip_honorific_prefixes
+      strip_honorific_prefixes: ["Mr", "Mr.", "Mrs", "Mrs.", "Miss", "Ms", "Ms.", "Dr", "Dr.", "Doctor"]
+    hotel_name:
+      source_resolution: blank_header_column_letter
+      source_column_letter: AH
+    stay_date_range:
+      derivation: ddmmyy_join_dash
+      arrival_column: "Hotel Arrival Date"
+      departure_column: "Hotel Departure Date"
+      date_format: DDMMYY
+  concat_order: [traveller_name_sanitized, hotel_name, stay_date_range]
+  fallback_optional_source_column: "Journal Name?"
+- target: ep
+  derivation: derived_final_code
+  function: reporting_type_from_final_code
+- target: eq
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Cost Center
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+    on_fail: reject
+- target: er
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Events - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: es
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Camps - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: et
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: FA Learning - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: eu
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Commercial Partners - Custom Worktag
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ev
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Grant
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ew
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Program - Delivered Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ex
+  derivation: derived_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Projects (Opex)
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID

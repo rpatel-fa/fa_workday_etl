@@ -1,0 +1,80 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier/delta/delta_3",
+    "workbookFileName": "New Creditors for Workday Aug 6 2026.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Query1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_creditor_new"
+      }    
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract Suppliers 2026-08-05 15_39 BST.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "13",
+        "dataRow": "14",
+        "targetTableName": "fin_supplier_creditor_existing"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/threeplus/Supplier and Customer Master Record workbooks & Instructions Guide",
+    "workbookFileName": "FIN Master Supplier Workbook Instructions.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Address Requirements",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_address"
+      },
+      {
+        "sheetName": "Currency",
+        "headerRow": "2",
+        "dataRow": "3",
+        "targetTableName": "ref_workday_validate_supplier_currency"
+      },
+      {
+        "sheetName": "Bank Account Formatting",
+        "headerRow": "4",
+        "dataRow": "5",
+        "targetTableName": "ref_workday_validate_supplier_bank_format"
+      },
+      {
+        "sheetName": "Country States-Regions",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_region"
+      },
+      {
+        "sheetName": "Postal Code Formatting",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_postal_code"
+      },
+      {
+        "sheetName": "Phone Number",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_phone_format"
+      },
+      {
+        "sheetName": "Address Formats",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_address_format"
+      },
+      {
+        "sheetName": "Tax ID Types",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "ref_workday_validate_supplier_tax_id_type"
+      }
+    ]
+  }
+]

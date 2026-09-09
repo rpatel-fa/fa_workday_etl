@@ -1,0 +1,97 @@
+[
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "Company Number",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "COTAX Reference",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "DUNS",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "Employer Accounts Office Reference Number",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "ECON",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "E-File VAT Registration Number",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "EORI Code - Economic Operator Registration and Identification code",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "HMRC Office Number",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "Legal form of the Company",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "NINO - National Insurance Number",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "Employer PAYE Reference",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "UTR - Unique Taxpayer Reference",
+		"is_default" : false
+	},
+	{
+		"country_code" : "GB",
+		"tax_id_type_label" : "VAT Reg No",
+		"is_default" : false
+	},
+	{
+		"country_code" : "US",
+		"tax_id_type_label" : "Employer ID Number",
+		"is_default" : true
+	},
+	{
+		"country_code" : "DE",
+		"tax_id_type_label" : "USt-IdNr (VAT)",
+		"is_default" : true
+	},
+	{
+		"country_code" : "FR",
+		"tax_id_type_label" : "SIRET",
+		"is_default" : true
+	},
+	{
+		"country_code" : "IE",
+		"tax_id_type_label" : "VAT No",
+		"is_default" : true
+	},
+	{
+		"country_code" : "CH",
+		"tax_id_type_label" : "UID-number",
+		"is_default" : true
+	},
+	{
+		"country_code" : "AU",
+		"tax_id_type_label" : "ABN",
+		"is_default" : true
+	}
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier_purchase_order/prod",
+    "workbookFileName": "The FA - Commitment Stack Report as at 060826.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_po_commitment_stack_report"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier_purchase_order/prod",
+    "workbookFileName": "The FA - PO Receipts Extract 060826 1627.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_po_receipt"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract Suppliers 07.08.2026 2026-08-07 15_46 BST.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "13",
+        "dataRow": "14",
+        "targetTableName": "fin_workday_extract_supplier"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/mapping",
+    "workbookFileName": "Mapping MASTER - v42 08.09.26 - Production.xlsx",
+    "sheets": [
+      {
+        "sheetName": "MAPPING MASTER",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_ref_wd_fdm_mapping"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract_Spend_Categories (21).xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "3",
+        "dataRow": "4",
+        "targetTableName": "fin_ref_wd_spend_category"
+      }
+    ]
+  }
+]

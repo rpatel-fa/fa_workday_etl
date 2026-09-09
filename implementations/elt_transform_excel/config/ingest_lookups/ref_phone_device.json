@@ -1,0 +1,13 @@
+{
+  "description": "Allowed phone device types for the AR customer template. Used by Phone 1/2/3 Device Type so Finance AR choose only the supported Workday values for customer phone rows.",
+  "key_column": "phone_device",
+  "provenance": "Snapshot created 2026-07-21 for elt_transform_excel/ar_customer from the agreed AR customer template design: the allowed values are Landline and Mobile. This is a COPY, not a live link.",
+  "rows": [
+    {
+      "phone_device": "Landline"
+    },
+    {
+      "phone_device": "Mobile"
+    }
+  ]
+}

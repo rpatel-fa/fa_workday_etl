@@ -1,0 +1,125 @@
+version: 1
+
+transform:
+  key: ap_cfa_distributions
+  label: AP CFA Distributions
+  source_type: AP CFA Distributions
+  eib_population_type: Supplier Invoice
+  description: >
+    *** CFA DISTRIBUTIONS ONLY (not CFA Claims — separate transform "ap_cfa_claims" to follow). ***
+    County FA (CFA) grant-distribution workbook ("Distributions - Aug (002) - analysis.xlsm")
+    transformed into the Workday Supplier Invoice EIB. Sources the Finance-prepared
+    "Finance Master sheet" tab (header row 5, data rows 6+, cols A..U, 21 cols).
+    Workday Supplier ID is read DIRECTLY from Finance Master col U "Workday ID"
+    (AP-team-curated S-XXXXXX reference; Creditor-ID Supplier Spreadsheet lookup RETIRED).
+    Source/target folders live under .../eib/ap/cfa_distributions/ (not .../ap/cfa/).
+    Company = constant "FA" (CFA always = THE FA GROUP - FA; Finance Master has no
+    explicit legal-entity Company column - col B = County FA NAME e.g. "AFA" not "FA").
+    batchIdToken = "CFAD" + MMYY derived from Finance Master col K (Batch ID = per-file
+    date e.g. 2026-08-01 → "CFAD0826") - used as InvoiceNumber (G) prefix; month-on-month
+    Just Works when Finance set K to the new month date (no Private Const edits).
+    InvoiceDate and ReceiptDate both = col K (no separate ReceiptDate in Finance Master).
+    DocNo / SuppliersInvoiceNumber (AU) = Finance Master col A (per-row unique key e.g.
+    "AFAAug2026FA Grant"; 54/54 distinct per valid batch → per-supplier uniqueness OK).
+    InvoiceNumber (G) = "{batchIdToken}-{col A}" e.g. "CFAD0826-AFAAug2026FA Grant".
+    Per-row Cost Centre, Spend Category + related worktags resolved from
+    "Distribution/Cost Code" (col G, accounting string: 1077-504007-PNGC0001-0000)
+    against the Mapping MASTER via lowest-hierarchy match (Core vs Prism = Core).
+    Tax applicability determined per-row: if Finance Master I (Tax amount) > 0 →
+    Standard Rated / Recoverable, otherwise → Outside of Scope / Zero Rated / Nonrecoverable
+    (mirrors AMEX trains pattern but driven by TaxAmount presence, not VAT %).
+    See config/transform_specs/ap_cfa_distributions.yaml for the decision record,
+    Finance Master → EIB derived-field rules, and mapping.
+
+runtime:
+  step_list_macro: RunApCfaDistributionsSupplierInvoice
+
+source_layout:
+  worksheet_name: Finance Master sheet
+  worksheet_resolution: named
+  header_row: 5
+  data_start_row: 6
+  header_detection: scan_required_headers
+  required_headers:
+    - CFA
+    - Type
+    - Creditor ID
+    - Document type
+    # Accepts BOTH "Description - remittance" (Finance Master F actual header) AND
+    # the legacy "Decscription|Description" pipe-delimited alias (generic helpers
+    # in modSourceTable.bas match whichever alternative is actually present).
+    - Description - remittance|Decscription|Description
+    - Distribution/Cost Code
+    - Total
+    - Tax amount
+    - Tax detail
+    - Batch ID
+    - Code lookup
+    - Code desc
+    - Name on GP
+    - Workday ID
+
+transform_constants:
+  tax_mode: conditional_on_tax_amount
+  tax_zero_rated:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Nonrecoverable_Allocate
+  tax_standard_rated:
+    applicability: GBR_Standard_Rated
+    code: GBR_Standard_Rated
+    recoverability: Recoverable_Allocate
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    cost_centre: "Cost Center"
+    spend_category: "Spend Category"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+  # NEW 2026-08-24: constants for the new Finance-Master-sheet layout.
+  # (Retained in YAML so a future change of pattern is a one-line literal edit,
+  # not a Private Const hunt in the .bas.)
+  finance_master_constants:
+    constant_company_code: FA
+    batch_id_token_prefix: CFAD
+    batch_id_token_format: prefix + two-digit-month + two-digit-year-last-2
+
+shell_defaults:
+  # CFA DISTRIBUTIONS ONLY (not CFA Claims; future ap_cfa_claims transform uses
+  # a separate /ap/cfa_claims/ folder).  Finance renamed:
+  #   .../eib/ap/cfa/        -->     .../eib/ap/cfa_distributions/
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/source/Distributions - Aug (002) - analysis.xlsm
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/target/Submit_Supplier_Invoice_ap_cfa_distributions_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: Finance Master sheet
+  source_worksheet_resolution: named
+  source_header_row: 5
+  source_data_start_row: 6
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.
+  # NOTE (2026-08-24): supplier_spreadsheet path is STILL INHERITED but is NO LONGER LOADED
+  # at runtime. Supplier resolution is now pure passthrough from Finance Master col U
+  # ("Workday ID"), no lookup performed. The reference is retained for audit / possible
+  # future revert; it is harmless (but unused).

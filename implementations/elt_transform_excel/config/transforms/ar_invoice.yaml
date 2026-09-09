@@ -1,0 +1,83 @@
+version: 1
+
+transform:
+  key: ar_invoice
+  label: AR Invoice
+  source_type: AR Invoice
+  eib_population_type: Customer Invoice
+  start_row: 6
+  description: >
+    First development profile for Accounts Receivable invoice extracts that are
+    transformed into the Workday Customer Invoice EIB workbook.
+
+runtime:
+  # Calls this Sub directly (no step list / interim-workbook pipeline since the
+  # architecture simplification — see docs/todo/archive/build-elt_transform_excel.md).
+  step_list_macro: RunArInvoiceCustomerInvoice
+
+source_layout:
+  worksheet_resolution: first_sheet
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  required_headers:
+    - Company
+    - Order Date
+    - Customer ID
+    - Gross Price
+
+transform_constants:
+  fixed_currency: GBP
+  fixed_invoice_type: Standard
+  company_fallback: ""
+  # No COST CODE / accounting-string driver in this transform's source layout
+  # (see source_layout.required_headers above). Worktags and Revenue Category
+  # are therefore not populated mechanically; Finance may fill them in
+  # pre-upload if required for a specific batch. Kept keys here so the
+  # customer_invoice_eib_columns registry resolves consistently for gates.
+  unmapped_handling: silent_blank
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    revenue_category: "Revenue Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+    sales_item: "Sales Item"
+  derived_worktags:
+    reporting_type:
+      derivation: no cost code driver in source layout; left blank unless Finance overrides
+  # Column conventions inherited from eib_population_defaults.yaml's
+  # customer_invoice_eib_columns. Listed here so verify_gates.py can cross-check
+  # that the transform_spec mapping: block uses the canonical letters.
+  customer_invoice_eib_columns:
+    revenue_category: EM
+    billable_project_header: BN
+    billable_project_line: BN
+    sales_item: EJ
+    worktags_plus_order:
+      sales_item: EJ
+      cost_centre: FX
+      reporting_type: FY
+      camp: FZ
+      event: GA
+      commercial_partner: GB
+      fa_learning: GC
+      grant: GD
+      program: GE
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/InvoiceDetailFALL.csv
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Submit_Customer_Invoice_v46.1_ar_invoice_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_resolution: first_sheet
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

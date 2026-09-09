@@ -1,0 +1,38 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier_invoice",
+    "workbookFileName": "AP DTL TB AUG 4 2026.xlsx",
+    "sheets": [
+      {
+        "sheetName": "FA AP DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_invoice_fa"
+      },
+      {
+        "sheetName": "NFC AP DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_invoice_nfc"
+      },
+      {
+        "sheetName": "WNSL AP DTL TB",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "fin_supplier_invoice_wnsl"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract Suppliers 2026-08-05 15_39 BST.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "13",
+        "dataRow": "14",
+        "targetTableName": "fin_workday_extract_supplier"
+      }
+    ]
+  }
+]

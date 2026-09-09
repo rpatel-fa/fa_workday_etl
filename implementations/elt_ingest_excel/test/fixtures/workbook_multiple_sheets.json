@@ -1,0 +1,38 @@
+[
+  {
+    "workbookFileName": "/data/sales.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Q1",
+        "targetTableName": "sales_q1",
+        "headerRow": 1,
+        "dataRow": 2
+      },
+      {
+        "sheetName": "Q2",
+        "targetTableName": "sales_q2",
+        "headerRow": 1,
+        "dataRow": 2
+      },
+      {
+        "sheetName": "Q3",
+        "targetTableName": "sales_q3",
+        "headerRow": 2,
+        "dataRow": 3
+      }
+    ]
+  },
+  {
+    "workbookFileName": "~/Documents/finance.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Revenue",
+        "targetTableName": "finance_revenue"
+      },
+      {
+        "sheetName": "Expenses",
+        "targetTableName": "finance_expenses"
+      }
+    ]
+  }
+]

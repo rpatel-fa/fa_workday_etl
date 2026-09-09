@@ -1,0 +1,13 @@
+[
+  {
+    "workbookFileName": "/path/to/workbook.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "targetTableName": "table1",
+        "headerRow": 3,
+        "dataRow": 4
+      }
+    ]
+  }
+]

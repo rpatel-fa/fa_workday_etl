@@ -1,0 +1,40 @@
+init.sql
+reconcile_cs_row_counts.sql
+reconcile_cs_amount_by_currency.sql
+reconcile_cs_currency_coverage.sql
+reconcile_cs_unmapped_suppliers.sql
+reconcile_cs_zero_commitments.sql
+reconcile_cs_old_soft_cutoff.sql
+reconcile_cs_commitment_class_summary.sql
+reconcile_cs_finance_actions.sql
+z_reconcile_cs_report.sql
+zz_reconcile_cs_board_summary.sql
+
+-- NOTE: Valid source tables for this module are the UNION of:
+--       (a) All tables materialised by the transform SQL folder
+--           (order.txt under transform/sql/finance/supplier_purchase_order_receipt/)
+--       (b) All 5 source extract tables declared in this module's ingest config:
+--           elt_ingest_excel/config/ingest/finance/supplier_purchase_order_receipt.json
+--           → fin_supplier_po_commitment_stack_report
+--           → fin_supplier_po_receipt               (ingested but UNUSED in output)
+--           → fin_workday_extract_supplier
+--           → fin_ref_wd_fdm_mapping
+--           → fin_ref_wd_spend_category
+--       (c) Any FUTURE Workday post-load extracts that become the 4th-layer
+--           reconciliation TARGETs (PO extract + supplier receipt extract).
+--           When added, they MUST first be declared in the module's ingest
+--           config (supplier_purchase_order_receipt.json) and projected via
+--           a transform-layer base SQL (src_fin_wd_extract_po_base.sql,
+--           src_fin_wd_extract_receipt_base.sql) BEFORE validate/reconcile
+--           SQL is allowed to reference them. See recon-todo.md OPEN-8.
+--
+--       The 5 reconcile_cs_audit_*.sql files (audit_coverage, audit_non_overlap,
+--       audit_reconcile, audit_only_triage, audit_commitment_compare) are
+--       intentionally NOT in the pipeline order. They reference
+--       fin_supplier_po_audit_commitment, which is NEITHER created by this
+--       module's transform layer NOR listed in this module's ingest config.
+--       Run them ad-hoc only after the audit extract is loaded externally.
+--       Do not add them back to order.txt without also:
+--       1. adding the audit extract to this module's supplier_purchase_order_receipt.json
+--       2. building a transform projection SQL for it first.
+

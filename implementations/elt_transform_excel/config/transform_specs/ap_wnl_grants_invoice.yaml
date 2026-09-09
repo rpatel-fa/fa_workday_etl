@@ -1,0 +1,278 @@
+version: 1
+# ---------------------------------------------------------------------------
+# Transform spec - ap_wnl_grants_invoice
+# ---------------------------------------------------------------------------
+# Source:  "/Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/wnl_grants/source/
+#          Ad hoc grants - FA WNL 25-26 Season - End of DEC 25.xlsx"
+#          Tab: integration (lowercase; worksheet_resolution: named so exact-case matches)
+# Target:  Workday Submit_Supplier_Invoice_v46.2.xlsx Supplier Invoice EIB
+# Variant: Single archetype / single concrete binding — INTEGRATION tab schema is identical
+#          to ap_prize_funds and ap_commercial_invoice (11 cols A-K with same two header
+#          anomalies: "Decscription" typo in col D + whitespace-wrapped PurchasesAmount col I).
+#
+# Verified source audit, 2026-09-02:
+#   64 rows x 11 cols on tab "integration".
+#   Headers row 1 A-K exactly:
+#     1 BatchID   2 CreditorID   3 DocumentType   4 Decscription
+#     5 InvoiceDate   6 ReceiptDate   7 DocNo
+#     8 DistributionReferenceCode   9  PurchasesAmount  (leading+trailing spaces)
+#     10 TaxAmount   11 TaxDetailID
+#   Data rows 2..64 = 63 rows. Uniform fields across all rows:
+#     BatchID = "WNLGRNTS DEC 25"
+#     DocumentType = "INVOICE"
+#     Decscription = "WNLGRNTS DEC25"
+#     InvoiceDate = 2025-11-20
+#     ReceiptDate = 2025-12-20
+#     DocNo = "WNLGRNTS DEC 25"
+#     DistributionReferenceCode = "1097-408006-00000000-G055"
+#     TaxAmount = 0
+#     TaxDetailID = "POS"
+#   Per-row unique drivers:
+#     CreditorID = unique per row (19 distinct visible in first-20 rows; full 63 rows all
+#                 distinct — otherwise Rule 8 {BATCH_ID_TOKEN}-{CreditorID} would collide).
+#     PurchasesAmount = unique per row (9 distinct first-20, all vary).
+#
+# Shared-helper variant reuse (see shared_helper_registry.yaml):
+#   supplier_resolution.direct_gp_creditor_id_via_extract  (CreditorID -> Supplier Spreadsheet
+#                                                          key precedence "-FA" then bare)
+#   accounting_string_derivation.direct_distribution_reference_code
+#                                                          (DistributionReferenceCode ->
+#                                                          NormalizeCostCodeSeparators +
+#                                                          9-pack lowest-hierarchy resolver)
+#   worktag_hierarchy_lookup.standard_9pack_lowest_specificity
+#   tax_application.uniform_eib_defaults_3line
+#     (because TaxAmount = 0 uniformly; TaxDetailID POS does not trigger conditional;
+#     applicability Outside of Scope / code Zero_Rated / recoverability
+#     Nonrecoverable_Allocate — identical to Commercial/Prize Funds exemplars)
+
+transform_spec:
+  name: ap_wnl_grants_invoice
+  variant: wnl_grants_ad_hoc_2526_dec25
+  purpose: >
+    Ingest WNL Ad Hoc Grants GP INTEGRATION export (Ad hoc grants - FA WNL 25-26 Season - End
+    of DEC 25.xlsx) and produce a Workday Supplier Invoice EIB. WNL Grants = FA Women's
+    National League grants (MS, Travel Contingency, Cup Rounds 1/2, etc.) paid from the
+    Grants source sheet; Finance pre-aggregate all individual grant rows into a single
+    per-creditor/single-line INTEGRATION row per supplier, similar to Prize Funds.
+  source_type: WNL Ad Hoc Grants GP Integration
+  target_eib_type: Supplier Invoice
+  scope:
+    in_scope:
+      - All 63 rows of the Dec-25 exemplar batch (WNLGRNTS DEC 25)
+      - Future batches that arrive using the same 11-col GP INTEGRATION tab schema
+        (exact header layout, CreditorID per row unique, DistributionReferenceCode in col H)
+    out_of_scope:
+      - Non-Integration tabs ("Memo payment request", "Grants upload Template", "GP DATA",
+        "Sheet1") — these are Finance working tabs, not the EIB-driver input.
+      - Bank-detail columns of Grants upload Template (cols K..M bank acc/sort code) which
+        live in the supplier record (resolved separately via Supplier Spreadsheet), not
+        per-invoice.
+    assumptions:
+      - CreditorID values in the integration tab will always have the supplier record
+        created in Workday (Reference ID either "{CreditorID}-FA" or bare "{CreditorID}").
+        Missing supplier entries → reject row (same rule as Prize Funds/Commercial).
+      - DistributionReferenceCode will always be a valid cost-code string with the canonical
+        4-segment dash layout; mapping MASTER v39 covers every unique code in-scope.
+      - Future WNL grants invoices will continue to be 100% zero-tax (TaxAmount = 0); if
+        Finance begin posting VAT-visible grants, a conditional-tax branch must be added
+        (copy pattern from ap_cfa_distributions).
+      - Source worksheet is named exactly "integration" (lowercase) per the exemplar export.
+        If a new file uses uppercase "INTEGRATION" (Prize/Commercial convention), override
+        shell_defaults.source_worksheet_name via a future variant.
+
+parties:
+  originator:
+    name: Finance AP - WNL Grants operations
+    source_system: Microsoft Excel / Dynamics GP integration export
+  approver:
+    name: FA Finance & SMT (signed off in the Memo payment request tab which is OOP for EIB)
+  data_supplier:
+    name: Finance WNL team (pre-aggregated from per-grant working rows to GP integration sheet)
+
+inputs:
+  primary_source:
+    file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/wnl_grants/source/Ad hoc grants - FA WNL 25-26 Season - End of DEC 25.xlsx
+    sheet: integration
+    header_row: 1
+    data_start_row: 2
+    columns:
+      - name: BatchID
+        source_col: A
+        description: Constant "WNLGRNTS DEC 25" for the Dec-25 batch; used as BATCH_ID_TOKEN
+                     constant & Rule 8 prefix.
+      - name: CreditorID
+        source_col: B
+        description: Unique per row. GP creditor bare code (KEY002 / BOL014 / …). Direct
+                     driver for supplier_resolution.
+      - name: DocumentType
+        source_col: C
+        description: Constant "INVOICE". Only used for skip-rule (skip any non-INVOICE rows
+                     though exemplar has none).
+      - name: Decscription
+        source_col: D
+        description: Per-GP-export header typo (extra 'c') matched exactly. Will map to
+                     EIB EP Item Description after UCase(Trim).
+      - name: InvoiceDate
+        source_col: E
+        description: Invoice date (stored as Excel serial date; coerced to text via
+                     NormalizeSourceDate). Uniform 2025-11-20 in exemplar.
+      - name: ReceiptDate
+        source_col: F
+        description: Goods-receipt / date grant is payable. Uniform 2025-12-20 in exemplar.
+      - name: DocNo
+        source_col: G
+        description: Voucher reference — constant "WNLGRNTS DEC 25" in exemplar. Used as
+                     prefix of BG Suppliers Invoice Number with CreditorID suffix.
+      - name: DistributionReferenceCode
+        source_col: H
+        description: Final-code accounting string. Uniform 1097-408006-00000000-G055 in
+                     exemplar (all 63 rows post to the same WNL grants pot GL).
+      - name: PurchasesAmount
+        source_col: I
+        description: Net grant amount per supplier/row. Header carries leading+trailing
+                     spaces; NormalizeToken trims.
+      - name: TaxAmount
+        source_col: J
+        description: Grant tax amount (always 0 in exemplar). Uniform-tax branch.
+      - name: TaxDetailID
+        source_col: K
+        description: Constant "POS" in exemplar. Not used as a driver for conditional tax.
+
+derived_fields:
+  invoice_number:
+    derivation: Rule 8 — concat(BATCH_ID_TOKEN constant, "-", CreditorID). Unique value per
+                row because CreditorID is unique per row. Uniform BATCH_ID_TOKEN per batch.
+    uniqueness: Per-workbook guaranteed when CreditorID is unique-per-row (true for 63/63
+                exemplar rows). If two rows carry same CreditorID in a future batch → the
+                driver assumption is broken and the rows MUST be combined upstream.
+  suppliers_invoice_number:
+    derivation: Rule 7 — concat(DocNo constant, "-", CreditorID). DocNo is constant for
+                the batch so CreditorID suffix again ensures uniqueness per Workday
+                per-supplier validation.
+  description:
+    derivation: UCase(Trim(source D Decscription)). Misspelled header name preserved in
+                source Layout contract; actual string content cleaned for EIB.
+  reporting_type:
+    derivation: LEFT(second segment of DistributionReferenceCode, 1) via
+                ResolveReportingTypeFromFinalCode. Uniform 4xxxxxx segment = same RT for the
+                whole Dec-25 batch, but code runs per-row for generality.
+  line_order_row_id:
+    derivation: Rule 19 — EM=1, EK=1, single-line submitted invoice per supplier.
+
+shared_helpers:
+  supplier_resolution: direct_gp_creditor_id_via_extract
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_distribution_reference_code
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+transform_rules:
+  skip_rows:
+    - when: DocumentType != "INVOICE"
+  reject_conditions:
+    - rule: CreditorID blank OR zero Supplier Spreadsheet hit after FA-then-bare precedence
+      message: "Missing/Unknown CreditorID (no Workday supplier lookup)"
+    - rule: DistributionReferenceCode blank
+      message: "DistributionReferenceCode (source H) blank"
+    - rule: PurchasesAmount <= 0 (non-numeric or zero grant)
+      message: "PurchasesAmount not a positive number"
+    - rule: GT cost_centre blank after 9-pack resolve (MANDATORY worktag 1 of 2)
+      message: "Mandatory Cost Centre unresolved from DistributionReferenceCode"
+    - rule: EW spend_category blank after 9-pack resolve (MANDATORY worktag 2 of 2)
+      message: "Mandatory Spend Category unresolved from DistributionReferenceCode"
+  data_quality:
+    - CreditorID unique check (reject row level if duplicate within same batch — already
+      true by construction, enforced as an always-on safety check rather than only Rule 8
+      uniqueness)
+    - Row sum of PurchasesAmount (+ TaxAmount if ever non-zero) = header control total (not
+      currently in spec because no such working-tab total is published to Integration —
+      open question #1)
+    - InvoiceDate <= ReceiptDate (exemplar 2025-11-20 <= 2025-12-20 holds)
+
+open_questions:
+  - number: 1
+    question: >
+      Does Finance want a header batch control total validation added (sum of PurchasesAmount
+      63 rows = sum of corresponding Grants upload Template Purchase Amount column)? Not
+      implemented in v1 because no standard control cell is exported to the Integration tab
+      today. If added in future, add a `batch_control_total` source cell lookup + the check
+      before rowsProcessed is incremented.
+    impact: Low — the existing 63-row exemplar has no out-of-range numeric anomalies.
+  - number: 2
+    question: >
+      Future batches may have varied DistributionReferenceCode values across different grant
+      pots. Current exemplar has single code so no batch-level grouping test for mixed
+      posting. Rule of architecture: NO grouping, always 1-row → 1-invoice (same as
+      Prize/Commercial). No per-code grouping aggregation performed; if grouping is needed
+      in future, raise a separate spec-change.
+    impact: Low — consistent with the single-line archetype.
+
+target_eib:
+  template: Submit_Supplier_Invoice_v46.2.xlsx
+  variant: Supplier Invoice Standard
+  mapping:
+    "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1 (rowsProcessed+1; skips not counted)" }
+    "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
+    "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}; CreditorID unique per 63-row batch => 63 distinct K" }
+    "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company (fallback THE FA GROUP - FA)" }
+    "T":  { source: "OUTPUT_DEFAULT_CURRENCY constant", value: "GBP" }
+    "U":  { source: supplier_resolved_supplier_id, rule: "parties.supplier ResolveSupplierWithCompanyPrecedence (Supplier Spreadsheet; key precedence CreditorID-FA then bare CreditorID)" }
+    "AF": { source: InvoiceDate, rule: "Integration col E coerced to text via NormalizeSourceDate" }
+    "AG": { source: ReceiptDate, rule: "Integration col F coerced to text via NormalizeSourceDate" }
+    "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; DocNo constant per batch, suffix disambiguates" }
+    "EK": { source: "HOUSE DEFAULT line_item_rowid_constant", value: "1", rule: "EK=1 + EL=1 single-line submitted invoice (Rule 19)" }
+    "EP": { source: item_description, rule: "UCase(Trim(Int D Decscription)); 'c' typo preserved in source layout token" }
+    "EW": { source: spend_category, rule: "fields.spend_category - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if blank)" }
+    "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }
+    "FF": { source: "tax uniform code", value: "GBR_Zero_Rated" }
+    "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
+    "FK": { source: "tax uniform recoverability", value: "Nonrecoverable_Allocate" }
+    "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
+    "GE": { source: PurchasesAmount, rule: "Unit Cost = Integration col I PurchasesAmount (header whitespace trimmed)" }
+    "GF": { source: PurchasesAmount, rule: "Line Extended Amount (same as GE; single-line, tax=0)" }
+    "GQ": { source: memo, rule: "Rule 13 concat: DocNo + ' ' + CreditorID + ' ' + DistributionReferenceCode (traceability)" }
+    "GR": { source: reporting_type, rule: "LEFT(second segment of DistributionReferenceCode, 1) via ResolveReportingTypeFromFinalCode" }
+    "GT": { source: cost_centre, rule: "fields.cost_centre - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Cost Center hierarchy (reject if blank)" }
+    "GV": { source: event, rule: "fields.related_worktags.event - optional blank via Mapping MASTER Events Custom Org" }
+    "GX": { source: camp, rule: "fields.related_worktags.camp - optional via Camps Custom Org" }
+    "GZ": { source: fa_learning_course, rule: "fields.related_worktags.fa_learning - optional via FA Learning Custom Org" }
+    "HB": { source: commercial_partner, rule: "fields.related_worktags.commercial_partner - optional via Commercial Partners Custom Worktag" }
+    "HD": { source: grant, rule: "fields.related_worktags.grant - optional via Grant" }
+    "HF": { source: programme, rule: "fields.related_worktags.programme - optional via Program Delivered Org" }
+    "HH": { source: project, rule: "fields.related_worktags.project - optional via Projects (Opex)" }
+
+output_columns:
+  # Only the columns actually written via ColumnIndex(...) in the .bas are listed here to
+  # pass the bidirectional spec<->.bas hygiene gate. No EZ/FA/FB/FC duplicate defaults; no
+  # AO/AP/AS/AU/AV/AW/AY/AZ/BA; no BH/BI/BJ unused; no EX/EY.
+  - B (Spreadsheet Key)
+  - I (Submit)
+  - K (Invoice Number — Rule 8)
+  - R (Company)
+  - T (Currency)
+  - U (Supplier)
+  - AF (Invoice Date)
+  - AG (Received Date / AP Date)
+  - BG (Suppliers Invoice Number — Rule 7)
+  - EK (Line Row ID)
+  - EP (Item Description — UCase Trim)
+  - EW (Spend Category)
+  - FE (Tax Applicability — Uniform Outside)
+  - FF (Tax Code — Zero Rated)
+  - FH (Tax Point Date Type)
+  - FK (Tax Recoverability)
+  - FL (Tax Option)
+  - GE (Unit Cost)
+  - GF (Line Extended Amount)
+  - GQ (Memo — Traceability Concat)
+  - GR (Reporting Type)
+  - GT (Cost Centre)
+  - GV (Event — optional)
+  - GX (Camp — optional)
+  - GZ (FA Learning — optional)
+  - HB (Commercial Partner — optional)
+  - HD (Grant — optional)
+  - HF (Program — optional)
+  - HH (Project — optional)

@@ -1,0 +1,279 @@
+# Transform spec - ar_bulk_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts live in config/transforms/ar_bulk_invoice.yaml. Not restated here.
+
+meta:
+  key: ar_bulk_invoice
+  label: AR Bulk Invoice
+  requester: Finance (AR)
+  date_confirmed: 2026-08-12
+  exemplar_to_fork: ap_amex_trains_v2   # account-string / COST CODE driven, like CFA distributions
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  customer: {source_column: CUSTOMER ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  company:  {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}
+
+notes: >
+  Bulk Customer Invoice extract - one source row = one Workday Customer Invoice with a
+  single invoice line. Source carries a COST CODE accounting string (segment format
+  4-6-8-4, e.g. 1039-113006-00000000-0000) which is NEW for AR transforms; we run the
+  same lowest-hierarchy segment lookup used by supplier invoice transforms against the
+  finance Mapping MASTER to populate Revenue Category (EM), Billable Project header (BN)
+  + line Project (GF), Line Tax Code (FB=GBR_200_VAT default for 20% VAT), and the
+  9-slot line worktags FX..GF (Cost Centre/Reporting Type/Camp/Event/Commercial Partner/
+  FA Learning/Grant/Programme/Project). Source columns differ from the multi-line template:
+  header row is row 1, SALES ITEM CODE is col E, Date col F, QUANTITY col G, Net col H,
+  VAT col I, GROSS col J, DESCRIPTION LINE BOTTOM OF INVOICE col K, COST CODE col L.
+
+derived_fields:
+  derived_cost_code_final_code:
+    input_column: COST CODE
+    pipeline:
+      - strip: [" "]
+      - split_fixed: {seg1: 4, seg2: 6, seg3: 8, seg4: 4}
+      - join: ["{seg1}", "{seg2}", "{seg3}", "{seg4}"]
+        separator: "-"
+
+worktag_business_objects:
+  revenue_category: "Revenue Category"
+  cost_centre: "Cost Center"
+  event: "Events - Custom Org"
+  camp: "Camps - Custom Org"
+  fa_learning: "FA Learning - Custom Org"
+  commercial_partner: "Commercial Partners - Custom Worktag"
+  grant: "Grant"
+  program: "Program - Delivered Org"
+  project_opex: "Projects (Opex)"
+  project_capex: "Projects (Capex)"
+  sales_item: "Sales Item"
+
+eib_house_defaults:
+  submit_flag: "Y"
+  auto_complete: "Y"
+  default_currency: GBP
+  payment_status: Unpaid
+  document_status: Approved
+  invoice_type: Standard
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet_name: MAPPING MASTER
+
+accounting_string:
+  driver: COST CODE
+  final_code_key: derived_cost_code_final_code
+  resolution: lowest_hierarchy_segment_via_Mapping_Master
+  note: >
+    Bulk Customer Invoice (one source row = one single-line Workday invoice).
+    v46.1 layout: 9-slot FX..GF account-string worktags, mirroring
+    ar_multi_line_invoice and ap_amex_trains_v2 flows. One source row = one
+    invoice, so BN (Billable Project) and line Project GF are the same value
+    per row; each row writes exactly one invoice with one line.
+
+skip_rule:
+  drop_when:
+    - CUSTOMER ID blank
+    - DATE OF INVOICE blank
+    - GROSS == 0
+    - COST CODE blank
+    - customer unresolved
+    - revenue_category unresolved (kept as warning, not drop)
+
+mapping:
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: "Y"
+- target: bo
+  source_column: INVOICE NUMBER
+  optional: true
+  note: >
+    Legacy GP Invoice Number (3+ flag: must reach the printed invoice via the EIB). If the
+    source extract does not yet contain an `INVOICE NUMBER` column this write is skipped;
+    when Finance adds it to the bulk template the value lands in EIB column BO unmodified.
+- target: j
+  derivation: fixed_company_code_via_mapping
+  source_value: FA
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+    on_fail_default: THE FA GROUP - FA
+- target: ai
+  default: GBP
+- target: aj
+  source_column: CUSTOMER ID
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Customer ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: br
+  source_column: DATE OF INVOICE
+  source_format: dd.mm.yy or Excel date serial
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: GROSS
+- target: co
+  default: Standard
+- target: db
+  source_column: DESCRIPTION LINE BOTTOM OF INVOICE
+- target: dv
+  default: "1"
+- target: ej
+  source_column: SALES ITEM CODE
+- target: em
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Revenue Category
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: en
+  source_column: INVOICE DESCRIPTION
+- target: fh
+  source_column: QUANTITY
+- target: fl
+  source_column: Net
+  note: >
+    Unit Cost FL = source Net. Bulk layout mirrors multi-line: Net → FL, GROSS → FO.
+- target: fo
+  source_column: GROSS
+- target: fb
+  default: GBR_200_VAT
+  note: >
+    Line Tax Code (FB) — default GBR_200_VAT for 20% standard-rate UK VAT.
+    If a zero-rated batch is issued (FINES, grant-funded, etc), override
+    per-row via a source Tax Code ID column when Finance adds it.
+- target: fp
+  source_column: Date
+  source_format: yyyy-mm-dd or Excel date serial
+  target_format: YYYY-MM-DD
+- target: fv
+  source_column: INVOICE DESCRIPTION
+- target: fx
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Cost Center
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: fy
+  derivation: seg2_first_char_reporting_type
+  input_column: derived_cost_code_final_code
+  function: resolve_reporting_type_via_map
+  note: Reporting Type FY = seg2 first char (same as multi_line / AP v2 flows).
+- target: fz
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Camps - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ga
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Events - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gb
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Commercial Partners - Custom Worktag
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gc
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: FA Learning - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gd
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Grant
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ge
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Program - Delivered Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gf
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Projects (Opex)
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: bn
+  derivation: mirror_project_gf_to_billable
+  source_column: gf
+  note: Bulk Invoice Billable Project (BN) mirrors line Project GF per-row (one row = one invoice).

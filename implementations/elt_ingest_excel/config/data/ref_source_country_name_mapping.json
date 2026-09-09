@@ -1,0 +1,462 @@
+[
+	{
+		"source_country_name" : "ABU DHABI",
+		"country_code" : "AE"
+	},
+	{
+		"source_country_name" : "ALBANIA",
+		"country_code" : "AL"
+	},
+	{
+		"source_country_name" : "ALGERIA",
+		"country_code" : "DZ"
+	},
+	{
+		"source_country_name" : "AMSTERDAM",
+		"country_code" : "NL"
+	},
+	{
+		"source_country_name" : "ARGENTINA",
+		"country_code" : "AR"
+	},
+	{
+		"source_country_name" : "AUSTRALIA",
+		"country_code" : "AU"
+	},
+	{
+		"source_country_name" : "AUSTRIA",
+		"country_code" : "AT"
+	},
+	{
+		"source_country_name" : "AUSTRIA,",
+		"country_code" : "AT"
+	},
+	{
+		"source_country_name" : "BELGIUM",
+		"country_code" : "BE"
+	},
+	{
+		"source_country_name" : "BERMUDA",
+		"country_code" : "BM"
+	},
+	{
+		"source_country_name" : "BOSNIA AND HERZEGOVINA",
+		"country_code" : "BA"
+	},
+	{
+		"source_country_name" : "BRAZIL",
+		"country_code" : "BR"
+	},
+	{
+		"source_country_name" : "BULGARIA",
+		"country_code" : "BG"
+	},
+	{
+		"source_country_name" : "CAMEROON",
+		"country_code" : "CM"
+	},
+	{
+		"source_country_name" : "CANADA",
+		"country_code" : "CA"
+	},
+	{
+		"source_country_name" : "CANANDA",
+		"country_code" : "CA"
+	},
+	{
+		"source_country_name" : "CAYMAN ISLANDS",
+		"country_code" : "KY"
+	},
+	{
+		"source_country_name" : "CHANNEL ISLANDS",
+		"country_code" : "JE"
+	},
+	{
+		"source_country_name" : "CHILE",
+		"country_code" : "CL"
+	},
+	{
+		"source_country_name" : "CHINA",
+		"country_code" : "CN"
+	},
+	{
+		"source_country_name" : "COSTA RICA",
+		"country_code" : "CR"
+	},
+	{
+		"source_country_name" : "COTE D'IVOIRE",
+		"country_code" : "CI"
+	},
+	{
+		"source_country_name" : "CROATIA",
+		"country_code" : "HR"
+	},
+	{
+		"source_country_name" : "CYPRUS",
+		"country_code" : "CY"
+	},
+	{
+		"source_country_name" : "CZECH REP",
+		"country_code" : "CZ"
+	},
+	{
+		"source_country_name" : "CZECH REPUBLIC",
+		"country_code" : "CZ"
+	},
+	{
+		"source_country_name" : "DENMARK",
+		"country_code" : "DK"
+	},
+	{
+		"source_country_name" : "DOMINICAN REPUBLIC",
+		"country_code" : "DO"
+	},
+	{
+		"source_country_name" : "ECUADOR",
+		"country_code" : "EC"
+	},
+	{
+		"source_country_name" : "ENGLAND",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "ESTONIA",
+		"country_code" : "EE"
+	},
+	{
+		"source_country_name" : "FINLAND",
+		"country_code" : "FI"
+	},
+	{
+		"source_country_name" : "FRANCE",
+		"country_code" : "FR"
+	},
+	{
+		"source_country_name" : "FRANCE,",
+		"country_code" : "FR"
+	},
+	{
+		"source_country_name" : "GEORGIA",
+		"country_code" : "GE"
+	},
+	{
+		"source_country_name" : "GERMANY",
+		"country_code" : "DE"
+	},
+	{
+		"source_country_name" : "GERMANY,",
+		"country_code" : "DE"
+	},
+	{
+		"source_country_name" : "GIBRALTAR",
+		"country_code" : "GI"
+	},
+	{
+		"source_country_name" : "GREAT BRITAIN",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "GREECE",
+		"country_code" : "GR"
+	},
+	{
+		"source_country_name" : "GUERNSEY",
+		"country_code" : "GG"
+	},
+	{
+		"source_country_name" : "HELSINKI",
+		"country_code" : "FI"
+	},
+	{
+		"source_country_name" : "HONG KONG",
+		"country_code" : "HK"
+	},
+	{
+		"source_country_name" : "HONG KONG (SAR)",
+		"country_code" : "HK"
+	},
+	{
+		"source_country_name" : "HONG KONG,",
+		"country_code" : "HK"
+	},
+	{
+		"source_country_name" : "HUNGARY",
+		"country_code" : "HU"
+	},
+	{
+		"source_country_name" : "ICELAND",
+		"country_code" : "IS"
+	},
+	{
+		"source_country_name" : "ILFOV",
+		"country_code" : "RO"
+	},
+	{
+		"source_country_name" : "INDIA",
+		"country_code" : "IN"
+	},
+	{
+		"source_country_name" : "INDONESIA",
+		"country_code" : "ID"
+	},
+	{
+		"source_country_name" : "IRELAND",
+		"country_code" : "IE"
+	},
+	{
+		"source_country_name" : "ISLE OF MAN",
+		"country_code" : "IM"
+	},
+	{
+		"source_country_name" : "ISRAEL",
+		"country_code" : "IL"
+	},
+	{
+		"source_country_name" : "ITALY",
+		"country_code" : "IT"
+	},
+	{
+		"source_country_name" : "IVORY COAST",
+		"country_code" : "CI"
+	},
+	{
+		"source_country_name" : "JAMAICA",
+		"country_code" : "JM"
+	},
+	{
+		"source_country_name" : "JAPAN",
+		"country_code" : "JP"
+	},
+	{
+		"source_country_name" : "JERSEY",
+		"country_code" : "JE"
+	},
+	{
+		"source_country_name" : "KAZAKHSTAN",
+		"country_code" : "KZ"
+	},
+	{
+		"source_country_name" : "KOREA",
+		"country_code" : "KR"
+	},
+	{
+		"source_country_name" : "LATVIA",
+		"country_code" : "LV"
+	},
+	{
+		"source_country_name" : "LESOTHO",
+		"country_code" : "LS"
+	},
+	{
+		"source_country_name" : "LITHUANIA",
+		"country_code" : "LT"
+	},
+	{
+		"source_country_name" : "LONDON",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "LUXEMBOURG",
+		"country_code" : "LU"
+	},
+	{
+		"source_country_name" : "MACEDONIA, FYRO",
+		"country_code" : "MK"
+	},
+	{
+		"source_country_name" : "MALAYSIA",
+		"country_code" : "MY"
+	},
+	{
+		"source_country_name" : "MALTA",
+		"country_code" : "MT"
+	},
+	{
+		"source_country_name" : "MEXICO",
+		"country_code" : "MX"
+	},
+	{
+		"source_country_name" : "MIDDX",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "MONACO",
+		"country_code" : "MC"
+	},
+	{
+		"source_country_name" : "MOROCCO",
+		"country_code" : "MA"
+	},
+	{
+		"source_country_name" : "NETHERLAND",
+		"country_code" : "NL"
+	},
+	{
+		"source_country_name" : "NETHERLANDS",
+		"country_code" : "NL"
+	},
+	{
+		"source_country_name" : "NEW ZEALAND",
+		"country_code" : "NZ"
+	},
+	{
+		"source_country_name" : "NIGERIA",
+		"country_code" : "NG"
+	},
+	{
+		"source_country_name" : "NORTHERN IRELAND",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "NORWAY",
+		"country_code" : "NO"
+	},
+	{
+		"source_country_name" : "NORWAY,",
+		"country_code" : "NO"
+	},
+	{
+		"source_country_name" : "OTHER 1",
+		"country_code" : null
+	},
+	{
+		"source_country_name" : "PARAGUAY",
+		"country_code" : "PY"
+	},
+	{
+		"source_country_name" : "PHILIPPINES",
+		"country_code" : "PH"
+	},
+	{
+		"source_country_name" : "POL;AND",
+		"country_code" : "PL"
+	},
+	{
+		"source_country_name" : "POLAND",
+		"country_code" : "PL"
+	},
+	{
+		"source_country_name" : "PORTUGAL",
+		"country_code" : "PT"
+	},
+	{
+		"source_country_name" : "PUERTO RICO",
+		"country_code" : "PR"
+	},
+	{
+		"source_country_name" : "QATAR",
+		"country_code" : "QA"
+	},
+	{
+		"source_country_name" : "ROMANIA",
+		"country_code" : "RO"
+	},
+	{
+		"source_country_name" : "SAUDI ARABIA",
+		"country_code" : "SA"
+	},
+	{
+		"source_country_name" : "SCOTLAND",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "SENEGAL",
+		"country_code" : "SN"
+	},
+	{
+		"source_country_name" : "SERBIA",
+		"country_code" : "RS"
+	},
+	{
+		"source_country_name" : "SINGAPORE",
+		"country_code" : "SG"
+	},
+	{
+		"source_country_name" : "SLOVAKIA",
+		"country_code" : "SK"
+	},
+	{
+		"source_country_name" : "SLOVENIA",
+		"country_code" : "SI"
+	},
+	{
+		"source_country_name" : "SOUTH AFRICA",
+		"country_code" : "ZA"
+	},
+	{
+		"source_country_name" : "SPAIN",
+		"country_code" : "ES"
+	},
+	{
+		"source_country_name" : "SWEDEN",
+		"country_code" : "SE"
+	},
+	{
+		"source_country_name" : "SWITZERLAND",
+		"country_code" : "CH"
+	},
+	{
+		"source_country_name" : "SWITZERLAND,",
+		"country_code" : "CH"
+	},
+	{
+		"source_country_name" : "THAILAND",
+		"country_code" : "TH"
+	},
+	{
+		"source_country_name" : "THE NETHERLANDS",
+		"country_code" : "NL"
+	},
+	{
+		"source_country_name" : "TRINIDAD AND TOBAGO",
+		"country_code" : "TT"
+	},
+	{
+		"source_country_name" : "TURKEY",
+		"country_code" : "TR"
+	},
+	{
+		"source_country_name" : "UAE",
+		"country_code" : "AE"
+	},
+	{
+		"source_country_name" : "UK",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "UKRAINE",
+		"country_code" : "UA"
+	},
+	{
+		"source_country_name" : "UNITED ARAB EMIRATES",
+		"country_code" : "AE"
+	},
+	{
+		"source_country_name" : "UNITED KINGDOM",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "UNITED KINGDON",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "UNITED STATES",
+		"country_code" : "US"
+	},
+	{
+		"source_country_name" : "UNITEDKINGDOM",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_name" : "URUGUAY",
+		"country_code" : "UY"
+	},
+	{
+		"source_country_name" : "USA",
+		"country_code" : "US"
+	},
+	{
+		"source_country_name" : "WALES",
+		"country_code" : "GB"
+	}
+]

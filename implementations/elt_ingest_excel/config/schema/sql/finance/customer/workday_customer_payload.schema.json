@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workday_customer_payload.schema.json",
+  "title": "Workday Customer EIB — Consolidated Payload (GP → Workday Customer Migration)",
+  "description": "Single consolidated payload for loading one Workday Customer record through the FIN Master Customer Workbook EIB. This schema is the CLOSED, VALIDATED contract for the completed GP-to-Workday customer migration. Only the 10 Workday tables that were actually populated and sent to Workday are represented here. Any Workday table outside this set is out of scope for this payload definition (they never passed validation nor were part of any EIB load for this migration). Root fields = Customer Name sheet; nested sections = the 9 subordinate sheets that were actually loaded.",
+  "x_valid_values_dict": "workday_customer_valid_values.json",
+  "x_valid_values_usage": "Every constrained attribute carries an x_valid_values_key annotation whose value is a dot-notation key into the companion valid-values dictionary (workday_customer_valid_values.json). Array-item paths use the '[]' component with no index, since valid values never depend on array position.",
+  "x_workbook_sheets_in_contract": [
+    "Customer Name (root)",
+    "Customer Groups",
+    "Customer Tax",
+    "Customer Payment",
+    "Customer Currencies",
+    "Customer Document Delivery",
+    "Customer Address",
+    "Customer Phone",
+    "Customer Email"
+  ],
+  "x_workbook_sheet_load_order": [
+    "root — Customer Name",
+    "customer_groups[] — Customer Groups",
+    "payment{} — Customer Payment",
+    "currencies{} — Customer Currencies",
+    "document_delivery{} — Customer Document Delivery",
+    "tax{} — Customer Tax",
+    "addresses[] — Customer Address",
+    "phones[] — Customer Phone",
+    "emails[] — Customer Email"
+  ],
+  "type": "object",
+  "required": [
+    "customer_id",
+    "customer_name"
+  ],
+  "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "Unique customer identifier. Primary key inherited by all nested subordinate sections.",
+      "minLength": 1
+    },
+    "customer_name": {
+      "type": "string",
+      "description": "Normalised customer legal/business name (Customer Name workbook sheet).",
+      "minLength": 1
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "Aggregate / legacy customer number carried across for reference purposes."
+    },
+    "customer_category": {
+      "type": "string",
+      "enum": [
+        "Miscellaneous",
+        "Football Clubs",
+        "Broadcasting",
+        "County FA's",
+        "Sponsorship",
+        "Experiences by Wembley",
+        "Intercompany",
+        "Licensing",
+        "Tours",
+        "Women's National League"
+      ],
+      "x_valid_values_key": "root.customer_category"
+    },
+    "business_entity_name":   { "type": "string" },
+    "external_entity_id":     { "type": "string" },
+    "preferred_locale":       { "type": "string" },
+    "preferred_language":     { "type": "string" },
+    "lockbox":                { "type": "string" },
+    "customer_security_segment": { "type": "string" },
+    "worktag_only": {
+      "type": "string",
+      "enum": ["Yes", "No"],
+      "x_valid_values_key": "root.worktag_only"
+    },
+    "submit": {
+      "type": "string",
+      "enum": ["Yes", "No"],
+      "x_valid_values_key": "root.submit"
+    },
+    "create_customer_from_financial_institution": { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "root.create_customer_from_financial_institution" },
+    "create_customer_from_supplier":               { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "root.create_customer_from_supplier" },
+    "create_customer_from_tax_authority":          { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "root.create_customer_from_tax_authority" },
+    "create_customer_from_investor":               { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "root.create_customer_from_investor" },
+
+    "customer_groups": {
+      "type": "array",
+      "description": "Customer Group assignments (Customer Groups workbook sheet). Exactly one alphabetical bucket (A-L / M-Z / 0-9) is required per customer; additional class-based groups are optional.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["customer_group"],
+        "additionalProperties": false,
+        "properties": {
+          "customer_group": {
+            "type": "string",
+            "anyOf": [
+              {
+                "description": "Alphabetical buckets — exactly one of these per customer.",
+                "enum": ["Customers A - L", "Customers M - Z", "Customers 0 - 9"]
+              },
+              {
+                "description": "Optional class-based additional groups that may be assigned alongside the alphabetical bucket.",
+                "enum": ["Disciplinary", "FA Learning", "Barclays Girls Football Schools Partnerships", "Referees"]
+              }
+            ],
+            "x_valid_values_key": "customer_groups[].customer_group"
+          }
+        }
+      }
+    },
+
+    "tax": {
+      "type": "object",
+      "description": "Transaction tax setup (Customer Tax workbook sheet) — one record per customer.",
+      "additionalProperties": false,
+      "required": ["tax_code", "tax_status_country", "transaction_tax_status"],
+      "properties": {
+        "tax_code": {
+          "type": "string",
+          "enum": ["GBR 20% VAT (20%)"],
+          "x_valid_values_key": "tax.tax_code"
+        },
+        "tax_id_country": {
+          "type": "string",
+          "description": "Required when tax_id is populated — ISO 3166-1 alpha-2 country code of the tax authority that issued the tax_id."
+        },
+        "tax_id": {
+          "type": "string",
+          "description": "Customer tax registration / identifier value (alphanumeric, pattern rules vary by country). GB VAT must be 9 numeric digits; GB Company Number must be 8 alphanumeric; GB UTR must be 10 numeric digits."
+        },
+        "tax_id_type": {
+          "type": "string",
+          "enum": [
+            "VAT Reg No",
+            "Company Number",
+            "UTR - Unique Taxpayer Reference",
+            "COTAX Reference",
+            "DUNS",
+            "Employer Accounts Office Reference Number",
+            "ECON",
+            "E-File VAT Registration Number",
+            "EORI Code - Economic Operator Registration and Identification code",
+            "HMRC Office Number",
+            "Legal form of the Company",
+            "NINO - National Insurance Number",
+            "Employer PAYE Reference",
+            "USt-IdNr (VAT)",
+            "SIRET",
+            "VAT No",
+            "UID-number",
+            "ABN",
+            "Employer ID Number",
+            "TIN"
+          ],
+          "x_valid_values_key": "tax.tax_id_type"
+        },
+        "primary_tax_id": {
+          "type": "string",
+          "enum": ["Yes", "No"],
+          "x_valid_values_key": "tax.primary_tax_id"
+        },
+        "transaction_tax_id": {
+          "type": "string",
+          "enum": ["Yes", "No"],
+          "x_valid_values_key": "tax.transaction_tax_id"
+        },
+        "tax_status_country": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-2 country code used to select the transaction_tax_status classification."
+        },
+        "transaction_tax_status": {
+          "type": "string",
+          "enum": [
+            "Customer of Services",
+            "Customer of Goods",
+            "VAT Registered in THIS EU country- Domestic Scenario",
+            "EU Company - Exempt in THIS country",
+            "EU Company - Not Registered in this country",
+            "VAT Registered in THIS NON EU country- Domestic Scenario",
+            "Non EU Company Not VAT registered in this country"
+          ],
+          "x_valid_values_key": "tax.transaction_tax_status"
+        },
+        "withholding_tax_status": {
+          "type": "string",
+          "description": "Free-text withholding-tax classification; no closed enum."
+        }
+      }
+    },
+
+    "payment": {
+      "type": "object",
+      "description": "Payment terms and default payment type (Customer Payment workbook sheet). One record per customer.",
+      "additionalProperties": false,
+      "required": ["payment_terms", "default_payment_type"],
+      "properties": {
+        "payment_terms": {
+          "type": "string",
+          "enum": ["Immediate","Net 7","Net 14","Net 21","Net 30","Net 60","Net 90","Net 120","EOM + 30 Days"],
+          "x_valid_values_key": "payment.payment_terms"
+        },
+        "default_payment_type": {
+          "type": "string",
+          "enum": ["Manual", "BACS", "EFT", "SEPA", "Wire"],
+          "x_valid_values_key": "payment.default_payment_type"
+        },
+        "interest_rule": { "type": "string" },
+        "late_fee_rule":  { "type": "string" }
+      }
+    },
+
+    "currencies": {
+      "type": "object",
+      "description": "Accepted and default transaction currencies (Customer Currencies workbook sheet). One record per customer.",
+      "additionalProperties": false,
+      "required": ["accepted_currencies_plus", "default_currency"],
+      "properties": {
+        "accepted_currencies_plus": {
+          "type": "string",
+          "enum": ["All Currencies", "Currency Specific"],
+          "x_valid_values_key": "currencies.accepted_currencies_plus"
+        },
+        "default_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "examples": ["GBP","EUR","USD","CHF","AUD","PLN","SEK","AED","QAR","DKK","NOK"],
+          "x_valid_values_key": "currencies.default_currency"
+        }
+      }
+    },
+
+    "document_delivery": {
+      "type": "object",
+      "description": "Invoice/statement delivery preferences (Customer Document Delivery workbook sheet). Omit the section entirely for a customer that has no email addresses (no email rows → no delivery preference rows sent to Workday).",
+      "additionalProperties": false,
+      "required": [
+        "invoice_delivery_method",
+        "invoice_notification_email_recipients",
+        "statement_delivery_method",
+        "statement_notification_email_recipients"
+      ],
+      "properties": {
+        "always_separate_payments": { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "document_delivery.always_separate_payments" },
+        "remit_from_customer": { "type": "string" },
+        "invoice_delivery_method": { "type": "string", "enum": ["Email","Print","Electronic Invoicing"], "x_valid_values_key": "document_delivery.invoice_delivery_method" },
+        "invoice_notification_email_recipients": { "type": "string", "enum": ["Bill-To Contact Emails on Invoice","Bill-To Primary Contact","Statement Contact Emails","Remit-To Contact Emails"], "x_valid_values_key": "document_delivery.invoice_notification_email_recipients" },
+        "statement_delivery_method": { "type": "string", "enum": ["Email","Print"], "x_valid_values_key": "document_delivery.statement_delivery_method" },
+        "statement_notification_email_recipients": { "type": "string", "enum": ["Statement Contact Emails","Bill-To Primary Contact","Bill-To Contact Emails on Invoice"], "x_valid_values_key": "document_delivery.statement_notification_email_recipients" },
+        "dunning_delivery_method": { "type": "string", "enum": ["Email","Print"], "x_valid_values_key": "document_delivery.dunning_delivery_method" },
+        "dunning_letter_notification_email_recipients": { "type": "string" },
+        "electronic_invoicing_start_date": { "type": "string", "format": "date" },
+        "electronic_invoicing_government_issued_customer_id": { "type": "string" },
+        "electronic_invoicing_intermediary_vendor_id": { "type": "string" },
+        "electronic_invoicing_vendor_issued_customer_id": { "type": "string" },
+        "mandate_required": { "type": "string", "enum": ["Yes", "No"], "x_valid_values_key": "document_delivery.mandate_required" },
+        "direct_debit_payment_type": { "type": "string", "examples": ["BACS Direct Debit", "SEPA Core Direct Debit", "ACH CCD"] },
+        "default_mandate": { "type": "string" }
+      }
+    },
+
+    "addresses": {
+      "type": "array",
+      "description": "Customer postal addresses (Customer Address workbook sheet). Property order in this schema matches exactly the column order used by the EIB sheet — do not reorder the fields.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address_id","country","country_code","address_line_1","is_public","is_primary"],
+        "properties": {
+          "formatted_address": { "type": "string" },
+          "address_format_type": { "type": "string" },
+          "defaulted_business_site_address": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "addresses[].defaulted_business_site_address" },
+          "delete_flag": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "addresses[].delete_flag" },
+          "do_not_replace_all": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "addresses[].do_not_replace_all" },
+          "last_modified": { "type": "string" },
+          "descriptor": { "type": "string" },
+          "address_id": { "type": "string", "minLength": 1 },
+          "country": { "type": "string", "x_valid_values_key": "addresses[].country" },
+          "country_code": { "type": "string", "pattern": "^[A-Z]{2}$", "x_valid_values_key": "addresses[].country_code" },
+          "region": { "type": "string" },
+          "subregion": { "type": "string" },
+          "city": { "type": "string" },
+          "submunicipality": { "type": "string" },
+          "address_line_1": { "type": "string", "maxLength": 35 },
+          "address_line_2": { "type": "string" },
+          "address_line_3": { "type": "string" },
+          "address_line_4": { "type": "string" },
+          "postal_code": { "type": "string" },
+          "is_public":  { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "addresses[].is_public" },
+          "is_primary": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "addresses[].is_primary" },
+          "address_type": { "type": "string" },
+          "effective_date": { "type": "string", "format": "date" },
+          "use_for": { "type": "string" },
+          "use_for_tenanted": { "type": "string" },
+          "customer_comment": { "type": "string" },
+          "number_of_days": { "type": "string" },
+          "municipality_local": { "type": "string" },
+          "optional_address": { "type": "string" }
+        }
+      }
+    },
+
+    "phones": {
+      "type": "array",
+      "description": "Customer phone contacts (Customer Phone workbook sheet).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phone_id","phone_country","country_code","international_phone_code","phone_number","is_public","primary_flag"],
+        "properties": {
+          "phone_id": { "type": "string", "minLength": 1 },
+          "phone_country": { "type": "string" },
+          "country_code": { "type": "string", "pattern": "^[A-Z]{2}$", "x_valid_values_key": "phones[].country_code" },
+          "international_phone_code": { "type": "string", "pattern": "^[0-9]{1,4}$", "x_valid_values_key": "phones[].international_phone_code" },
+          "area_code": { "type": "string" },
+          "phone_number": { "type": "string", "pattern": "^[0-9]{7,15}$", "x_valid_values_key": "phones[].phone_number" },
+          "formatted_phone_number": { "type": "string" },
+          "phone_number_extension": { "type": "string" },
+          "phone_device_type": { "type": "string", "enum": ["Landline","Mobile","VoIP","TollFree","Premium","Unknown"], "x_valid_values_key": "phones[].phone_device_type" },
+          "is_public":    { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "phones[].is_public" },
+          "primary_flag": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "phones[].primary_flag" },
+          "phone_type":   { "type": "string", "enum": ["primary","secondary","tertiary"], "x_valid_values_key": "phones[].phone_type" },
+          "use_for": { "type": "string", "enum": ["Business","Personal","Home","Work","Billing","Shipping","Remittance"], "x_valid_values_key": "phones[].use_for" },
+          "use_for_tenanted": { "type": "string" },
+          "tenant_formatted_phone": { "type": "string" },
+          "international_formatted_phone": { "type": "string" },
+          "delete_flag": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "phones[].delete_flag" },
+          "do_not_replace_all": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "phones[].do_not_replace_all" },
+          "phone_comment": { "type": "string" },
+          "phone": { "type": "string" }
+        }
+      }
+    },
+
+    "emails": {
+      "type": "array",
+      "description": "Customer email contacts (Customer Email workbook sheet).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email_id","email_address","is_public","primary_flag","email_type","use_for"],
+        "properties": {
+          "email_id": { "type": "string", "minLength": 1 },
+          "email_address": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            "x_valid_values_key": "emails[].email_address"
+          },
+          "email_comment": { "type": "string" },
+          "is_public":    { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "emails[].is_public" },
+          "primary_flag": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "emails[].primary_flag" },
+          "email_type":   { "type": "string", "enum": ["to","cc","bcc"], "x_valid_values_key": "emails[].email_type" },
+          "use_for": { "type": "string", "enum": ["Business","Personal","Home","Work","Billing","Shipping","Remittance"], "x_valid_values_key": "emails[].use_for" },
+          "use_for_tenanted": { "type": "string" },
+          "delete_flag": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "emails[].delete_flag" },
+          "do_not_replace_all": { "type": "string", "enum": ["Yes","No"], "x_valid_values_key": "emails[].do_not_replace_all" },
+          "additional_comment": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

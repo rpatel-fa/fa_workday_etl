@@ -1,0 +1,804 @@
+# Ingest spec - ar_customer
+#
+# Defines the AR-facing template workbook that Finance (AR) populate by hand to create new
+# customers directly in Workday. See docs/CONFIGURATION.md ("Ingest Specs").
+#
+# ============================================================================================
+# DERIVATION DIRECTION (reversed 2026-07-15 - read this before changing anything)
+#
+# This spec is derived from the OUTPUT, not the input. The column list is exactly the set of
+# Customer EIB columns that actually get populated. It is NOT a cleaned-up copy of the GP
+# debtor extract, and the GP extract is no longer its provenance.
+#
+# The rule: AR provide final Workday values. The transform performs NO derivation, mapping, or
+# lookup of AR's input. If a value needs a business decision, AR make it and type it.
+#
+# Why: the reference pipeline (elt_ingest_excel) derived these values because it was migrating
+# legacy GP data that did not contain them. That cost is only justified by the migration.
+# Measured on its 4,132 output rows:
+#   - tax_id is populated on 13 rows (0.3%). The tax_id_type derivation (9 digits -> VAT Reg No,
+#     8 alphanumeric -> Company Number, 10 digits -> UTR) plus fn_nvl2 gating four columns
+#     resolves to 'Company Number' 12 times and 'VAT Reg No' once.
+#   - payment_terms is 'Net 30' on 4,095 of 4,132. The whole source->Workday mapping table
+#     serves 5 distinct values.
+#   - transaction_tax_status is 'Customer of Goods' on 3,819. The SOS/SZ branching serves 33 rows.
+#   - phone_country is parsed out of the phone number by udf_parse_phone plus country-code
+#     prefix guessing.
+# None of that is reproduced here. AR type the value.
+#
+# What the transform still does (see transform_supplied: below): fixed IDs generated from
+# Customer ID, 1:1 restatements of a value AR already typed, and values implied by which column
+# a value was typed into. Those are not derivations of AR's judgement.
+# ============================================================================================
+
+meta:
+  key: ar_customer
+  label: AR Customer
+  requester: Finance (AR)
+  eib_population_type: Customer
+  purpose: >
+    A simple form for creating new customers directly in Workday. One row per customer. AR
+    supply final Workday values; the transform copies them to the EIB.
+  derived_from: >
+    The populated columns of elt_ingest_excel's workday_customer_*.sql outputs, measured against
+    the live DuckDB on 2026-07-15, cross-checked to the real EIB workbook.
+
+  # The strongest evidence available, and the tie-breaker when the SQL and the EIB's own
+  # Required markers disagree: the actual file uploaded to the E2E Workday test tenant.
+  # Independently reproduces the same 64 populated columns across the same 9 tabs that this
+  # spec accounts for - 0 gaps. Re-check against it, not against the SQL, when in doubt.
+  validated_against: >
+    ~/Downloads/workday_fin_debtor_customer_active_v1.xlsm - the output uploaded into the E2E
+    Workday test tenant (3,997 customers / 3,438 phone rows). Verified 2026-07-15: 64 populated
+    columns, all 64 covered by columns: + transform_supplied:, 0 uncovered.
+  not_derived_from: >
+    The GP debtor extract. That was the provenance of the previous version of this spec and is
+    no longer relevant - this template creates new customers, it does not mirror a GP record.
+  eib_workbook: FA E2E Customers V1.xlsm
+  eib_header_row: 3
+  eib_data_row: 4
+  eib_tab_map: elt_ingest_excel/config/publish/finance/publish_customer.json
+
+  # Of 124 columns across the 9 live EIB tabs, only 64 are ever populated; 60 are permanently
+  # empty and the template does not mention them. See excluded: for the per-tab breakdown.
+  eib_coverage:
+    Customer Name: 4 of 16
+    Customer Groups: 3 of 3
+    Customer Payment: 4 of 6
+    Customer Currencies: 4 of 4
+    Customer Tax: 10 of 11
+    Customer Address: 13 of 31
+    Customer Phone: 12 of 22
+    Customer Email: 8 of 14
+    Customer Document Delivery: 6 of 17
+
+template:
+  worksheet_name: Customer
+  header_row: 1
+  data_start_row: 2
+  grain: one row per customer, with exactly one address
+
+  instructions:
+    enabled: true
+    worksheet_name: Instructions
+
+  fan_out:
+    Customer Name: 1 row
+    Customer Groups: 1 band row (auto) + 1 row if Additional Customer Group is set
+    Customer Payment: 1 row
+    Customer Currencies: 1 row
+    Customer Tax: 1 row
+    Customer Address: 1 row (exactly one address per customer - see decisions)
+    Customer Phone: 1 row per populated Phone 1/2/3 slot
+    Customer Email: 1 row per ';' value across Email To/CC/BCC
+    Customer Document Delivery: 1 row
+
+# Shared reference datasets to materialise as tabs, named only - each one describes itself in
+# config/ingest_lookups/<name>.json (description, key_column, provenance, rows). They are shared
+# across ingest specs, so their documentation lives with the data rather than being restated by
+# every spec that uses them. Tab name = lookup name. Add a name to add a tab.
+lookups:
+- ref_country
+- ref_country_tax_id_type
+- ref_currency
+- ref_currency_default
+- ref_tax_code
+- ref_transaction_tax_status
+- ref_yes_no
+- ref_customer_category
+- ref_customer_group
+- ref_payment_term
+- ref_payment_type
+- ref_phone_device
+- ref_country_region
+- ref_document_delivery_method
+- ref_document_email_recipient_invoice
+- ref_document_email_recipient_statement
+
+decisions:
+- id: customer_group_band_auto_extras_selected
+  decided: >
+    The alphabetical band row (Customers A - L / M - Z / 0 - 9) is assigned automatically from
+    Customer Name's first character. AR pick only the ONE extra group, in Additional Customer
+    Group, from a drop-down backed by the ref_customer_group tab.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    The band is mechanically determined by a value AR already typed - asking for it would be
+    asking them to compute a substring. The extra groups are a genuine choice: the reference
+    pipeline derived them from the GP customer_class via ref_workday_group_additional, and that
+    column does not exist here.
+  consequence: >
+    The band boundaries are CONFIG (config/ingest_lookups/ref_customer_group.json first_char_from/to + is_fallback), not
+    code. workday_customer_groups.sql hard-codes them in a SQL CASE; the transform must read the
+    config instead. Adding a band, or moving the A-L/M-Z boundary, must be a config edit.
+- id: customer_group_values_from_eib_named_range
+  decided: >
+    ref_customer_group.json holds all 7 groups from the EIB's Default_Customer_Group named range,
+    not the 5 the migration used.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    The named range is the tenant's own list of valid values; the migration's output is only what
+    it happened to need. Building the dropdown from the migration's distinct values would silently
+    deny AR two legitimate groups - 'Experiences by Wembley Seats' and 'Experiences by Wembley
+    Boxes' appear in the named range but on zero migrated rows.
+  consequence: >
+    This is the general rule for allowed values: take them from the EIB's named ranges, not from
+    what the migration produced. Reference data lives in config/ingest_lookups/ and is snapshotted
+    there - never read live from elt_ingest_excel or from a workbook outside this module.
+- id: country_by_iso_code
+  decided: >
+    AR pick the ISO2 country CODE from a reference list; the transform writes the country NAME
+    (and the phone code) from ref_country. Coded country inputs in this template are Address
+    Country Code, Phone Country Code, Tax Status Country Code, and Tax ID Country Code when the
+    tax-identifier group is supplied.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    The country name is exactly the field the reference pipeline needed
+    ref_source_country_name_mapping to normalise (UK / United Kingdom / Great Britain); the code
+    has no such variance. The lookup is a true bijection - all 106 ref_country rows have a unique
+    code AND a unique name - so asking for the code loses nothing. Confirmed against the accepted
+    upload: Address!L and Phone!E are ISO2 (GB, SG, AE), Address!K / Phone!D / Tax!I are full
+    names, Phone!F is the dialling code with the '+' stripped (44, 65, 353).
+  consequence: >
+    Separate coded inputs, NOT one shared country. Measured on the reference output: phone country
+    differs from the address country on 75 of 3,432 rows, and tax status country differs on 3 of
+    4,120. Collapsing country concepts into a single field would silently miscode those rows.
+- id: generated_fields_populated
+  decided: >
+    The transform populates the three columns the EIB marks 'Generated Field' (Customer Address!L,
+    Customer Phone!E/F) rather than leaving them for the workbook's 'Update Generated Fields'
+    button.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    They fall out of the country-code lookup for free, and the reference pipeline populated them
+    on the upload Workday accepted. Closes the generated_field_columns question.
+  consequence: >
+    Address!L and Phone!E are written directly from the code AR picked; Phone!F is derived from it.
+- id: derivation_direction
+  decided: >
+    The template is the exact list of populated Customer EIB columns. AR provide final Workday
+    values; the transform derives nothing from them.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    Working from what we are trying to create rather than from what GP happened to hold. The
+    reference pipeline's derivations exist to reconstruct values absent from legacy data; a form
+    can simply ask for them. The measured cost/benefit is in the header comment.
+  consequence: >
+    Do not reintroduce a mapping table, a format-sniffing rule, or a reference lookup for any
+    column here. If AR cannot supply a value, that is a question for AR - not a cue to derive it.
+- id: constants_typed_by_ar
+  decided: AR type the fixed-constant columns too (Tax Code, Accepted Currencies, the Public
+    flags, Use For, Default Payment Type, the notification recipients).
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    Keeps the template honestly equal to the populated EIB column set, with nothing hidden in
+    the transform. Every column below appears in the EIB exactly as typed.
+  consequence: >
+    These columns hold the same value on every row. They are still recorded with their expected
+    value so the template can pre-fill and later validate them.
+- id: multiple_addresses_per_customer
+  decided: One address per customer. The template will not support more.
+  by: Finance (AR)
+  date: 2026-07-15
+  rationale: >
+    The reference pipeline's multi-address support exists because it merged the same customer
+    across three legal entities (FA, WNSL, NFC) during migration. This template creates one new
+    customer at a time directly in Workday, so there is no merge and no second address.
+  consequence: >
+    Address Line 1/2/3 are three lines of ONE address. No child Address tab, no address array,
+    no Address Code column. Address ID is always customer_id_MAIN_1, and Address Primary is
+    always Yes.
+- id: phone_slots_not_delimited
+  decided: >
+    Phones use numbered slots with a Device Type each (Phone 1 + Phone 1 Device Type, ...), NOT
+    a ';' list. Email keeps ';'.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    Each EIB phone row carries its own Device Type, so a ';' list cannot say "the first is a
+    Mobile, the second a Landline" without the transform guessing - which is the derivation
+    being removed. Email rows carry no such per-value attribute: every address in Email To
+    shares Type=to, so ';' is safe there. Measured: 3 slots covers all but 4 of 3,290 customers.
+  consequence: >
+    Supersedes the earlier multi_value_contact_fields decision FOR PHONES ONLY. Email To/CC/BCC
+    remain ';'-delimited.
+- id: area_code_not_required
+  decided: >
+    No Area Code column. The whole number, including the area code, goes in Phone 1/2/3 and lands
+    in Phone Number (Customer Phone!H). Area Code (Customer Phone!G) stays empty.
+  by: Implementation partner (confirmed to the operator), 2026-07-15
+  date: 2026-07-15
+  rationale: >
+    The EIB's own marker row (row 2) labels Customer Phone!G 'Required', which is the only
+    Workday-required column on a populated tab that this template does not supply - so it had to
+    be settled rather than assumed. The partner confirmed it is not required, and the file
+    uploaded to the E2E test tenant has Area Code empty on all 3,438 phone rows.
+  consequence: >
+    Do not add an Area Code column on the strength of the EIB's 'Required' marker alone. Note the
+    reference pipeline's validate_customer_phone.sql concatenates area_code || phone_number when
+    length-checking, which reads as though Area Code were expected to hold something - it is not.
+    Row 2 markers are advisory: 'Required' (no asterisk) is weaker than 'Required*', and the
+    workbook's legend lists both categories without defining either.
+
+- id: fax_dropped
+  decided: No Fax column.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    The reference pipeline has a fax branch (phone_type='fax', suffix '_FAX', Device Type='Fax')
+    that produces ZERO rows in the actual output - the only device types present are Mobile
+    (2,613) and Landline (825). We populate no fax data to the EIB, so by the derivation rule
+    above there is no column for it.
+  consequence: >
+    If AR ask for fax later it is a new slot plus Device Type='Fax' - not a revival of the
+    reference pipeline's _FAX branch.
+- id: company_dropped
+  decided: No Company / business unit column.
+  by: Operator
+  date: 2026-07-15
+  rationale: >
+    Its only EIB target is Customer Company Restrictions, whose transform is WHERE 1=2 - the tab
+    is never populated. The template lists only populated columns, so it has no place here. The
+    FA/WNSL/NFC split was a property of the legacy source, not of a new customer.
+  consequence: >
+    If company restrictions are enabled later, that is a new column plus a new EIB tab.
+
+# Every column below is typed by AR and copied to the EIB tab/column in `feeds` without
+# derivation. `default` marks a value pre-filled on the first data row that AR may change.
+# Drop-down/allowed-value enrichment is deliberately deferred - see open_questions.
+columns:
+
+# --- Identity: Customer Name tab (4 of 16 columns live) --------------------------------------
+- name: Customer ID
+  required: true
+  type: text
+  description: >
+    The Workday Customer ID. AR supply it. Unique across the workbook; must not collide with a
+    migrated ID. Repeated as the join key in column A of every other tab.
+  example: C-001234
+  feeds:
+  - {tab: Customer Name, column: A, field: Customer ID}
+  - {tab: ALL child tabs, column: A, field: Customer ID, note: join key, repeated on every tab}
+
+- name: Customer Name
+  required: true
+  type: text
+  description: >
+    Taken exactly as typed. The reference pipeline's name normalisation (uppercase, strip
+    accents, FOOTBALL CLUB -> FC, UNITED -> UTD, strip trailing LTD/PLC) existed to collapse
+    divergent legacy spellings when merging entities. Nothing is merged here.
+  example: Acme Sports Ltd
+  feeds:
+  - {tab: Customer Name, column: B, field: Customer Name}
+  - {tab: ALL child tabs, column: B, field: Customer Name, note: repeated on every tab}
+  drives:
+  - tab: Customer Groups
+    column: C
+    field: Customer Group
+    rule: >
+      The customer's alphabetical band row, assigned automatically - AR do not type it. The first
+      character of Customer Name is banded via config/ingest_lookups/ref_customer_group.json rows where
+      assignment = auto_band, matching first_char_from..first_char_to; the row with is_fallback = Y
+      applies when the first character falls in no band (i.e. is not A-Z). The band boundaries are
+      config, NOT code: the reference pipeline hard-codes them in a SQL CASE
+      (workday_customer_groups.sql) and that must not be reproduced in the transform. Additional
+      Customer Groups adds further rows on top of this one.
+
+- name: Reference ID
+  required: false
+  type: text
+  description: >
+    Optional secondary reference carrying the originating system's key - the CRM ID when the
+    customer originates from CRM. Single value.
+  example: CRM-98765
+  feeds:
+  - {tab: Customer Name, column: C, field: Reference ID}
+
+- name: Customer Category
+  required: true
+  type: text
+  description: >
+    Workday customer category. The EIB puts a list validation on this column (D4:D1048576 ->
+    named range Customer_Category), so it is a drop-down there and must be one here. 12 valid
+    values, from that named range - NOT the 10 the migration emitted: 'Football Agents' and
+    'Individual person (Customer)' are valid in the tenant but appear on zero migrated rows.
+  example: Football Clubs
+  picklist: {lookup: ref_customer_category, column: customer_category}
+  feeds:
+  - {tab: Customer Name, column: D, field: Customer Category}
+
+# --- Customer Groups tab (3 of 3 columns live) -----------------------------------------------
+# Every customer gets an alphabetical band row automatically (see Customer Name's drives entry).
+# AR only choose the EXTRA groups, if any. 402 of 4,132 reference customers carry a second group.
+- name: Additional Customer Group
+  required: false
+  type: text
+  description: >
+    One extra Workday customer group, over and above the alphabetical band row the transform
+    assigns from Customer Name. Leave blank for most customers. Single-valued, not a ';' list:
+    measured on the reference output, every one of the 4,132 customers has exactly one band row,
+    and all 402 customers with an extra group have exactly ONE - none has two. That is also what
+    makes a drop-down possible here, since a drop-down cannot produce a delimited list.
+    The band values are excluded from the list on purpose: the band row is assigned automatically,
+    so picking one here would duplicate it.
+  example: "FA Learning"
+  picklist: {lookup: ref_customer_group, column: customer_group, where: {assignment: selectable}}
+  feeds:
+  - {tab: Customer Groups, column: C, field: Customer Group, note: "one EXTRA row, in addition to the auto-assigned band row"}
+
+# --- Customer Payment tab (4 of 6 columns live) ----------------------------------------------
+- name: Payment Terms
+  required: true
+  type: text
+  description: >
+    The Workday payment term. 9 valid values, from the EIB's Payment_Term named range - NOT the 5
+    the migration emitted: Net 21, EOM + 30 Days, Net 14 and Immediate are valid but appear on zero
+    migrated rows. Pick the DISPLAY value ('Net 30'); the EIB also carries a Ref ID per term
+    ('NET_30') but the accepted upload writes the display value, so that is what this column takes.
+    The reference pipeline's 30 DAYS -> Net 30 source mapping is not reproduced.
+  example: Net 30
+  picklist: {lookup: ref_payment_term, column: payment_term}
+  feeds:
+  - {tab: Customer Payment, column: C, field: Payment Terms}
+
+- name: Default Payment Type
+  required: true
+  type: text
+  description: >
+    How the customer pays. 13 valid values, from the EIB's Payment_Type named range. The migration
+    wrote 'Manual' on every one of its 4,132 rows, but that is a property of a bulk legacy load,
+    not a house rule - a BAU customer paying by Direct Debit or BACS needs to say so. Offered as a
+    drop-down rather than fixed at 'Manual'; see open_questions: default_payment_type_default.
+  example: Manual
+  picklist: {lookup: ref_payment_type, column: payment_type}
+  feeds:
+  - {tab: Customer Payment, column: D, field: Default Payment Type}
+
+# --- Customer Currencies tab (4 of 4 columns live) -------------------------------------------
+- name: Accepted Currencies
+  required: true
+  type: text
+  default: All Currencies
+  picklist: {lookup: ref_currency, column: currency_code}
+  feeds:
+  - {tab: Customer Currencies, column: C, field: Accepted Currencies}
+
+- name: Default Currency
+  required: true
+  type: text
+  description: >
+    ISO 4217 code. AR supply it. The reference pipeline derived it from the country via
+    ref_country.currency_code; that lookup is not reproduced - a customer's billing currency is a
+    commercial decision, not a consequence of their address (118 EUR and 40 USD customers in the
+    reference output are not all outside GB).
+  default: GBP
+  picklist: {lookup: ref_currency_default, column: currency_code}
+  feeds:
+  - {tab: Customer Currencies, column: D, field: Default Currency}
+
+# --- Customer Tax tab (10 of 11 columns live) ------------------------------------------------
+- name: Tax Code
+  required: true
+  type: text
+  default: GBR 20% VAT (20%)
+  picklist: {lookup: ref_tax_code, column: tax_code}
+  feeds:
+  - {tab: Customer Tax, column: C, field: Tax Code}
+
+- name: Transaction Tax Status
+  required: true
+  type: text
+  default: Customer of Goods
+  description: >
+    AR supply it. The reference pipeline selected this from country + tax schedule (SOS/SZ) +
+    whether a tax number was present; that branching is not reproduced. 5 values in the
+    reference output, of which 'Customer of Goods' covers 3,819 of 4,132.
+  example: Customer of Goods
+  picklist: {lookup: ref_transaction_tax_status, column: transaction_tax_status}
+  feeds:
+  - {tab: Customer Tax, column: J, field: Transaction Tax Status}
+
+- name: Tax Status Country Code
+  required: true
+  type: text
+  default: GB
+  description: >
+    ISO 3166-1 alpha-2 code for the tax status country. A SEPARATE column from Address Country
+    Code rather than a copy of it: they agree on 4,117 of 4,120 reference rows but differ on 3, so
+    deriving it from the address would silently miscode those. Drives-only - the Customer Tax tab
+    has no country-code column, so nothing is written from this directly.
+  example: GB
+  picklist: {lookup: ref_country, column: country_code}
+  drives:
+  - {tab: Customer Tax, column: I, field: Tax Status Country, rule: "ref_country.country_name for this code"}
+
+# The five tax-identifier columns below are a group: populated on 13 of 4,132 reference rows.
+# Workday requires them together - supply all five or none.
+- name: Tax ID
+  required: false
+  type: text
+  description: "Populated on 13 of 4,132 reference rows. Supply with the other four tax-identifier columns or leave all blank."
+  feeds:
+  - {tab: Customer Tax, column: E, field: Tax ID}
+
+- name: Tax ID Type
+  required: false
+  type: text
+  description: >
+    AR supply it. The reference pipeline sniffed it from the number's format (9 digits -> VAT Reg
+    No, 8 alphanumeric -> Company Number, 10 digits -> UTR); that rule is not reproduced.
+    Instead, the allowed values cascade from Tax ID Country Code using the CCS workbook's
+    country-specific tax-type ranges, with `TIN` used only where the workbook exposes no
+    country-specific list.
+  example: Company Number
+  picklist:
+    lookup: ref_country_tax_id_type
+    column: tax_id_type
+    filtered_by: Tax ID Country Code
+    key: country_code
+  feeds:
+  - {tab: Customer Tax, column: F, field: Tax ID Type}
+
+- name: Tax ID Country Code
+  required: false
+  type: text
+  description: >
+    ISO 3166-1 alpha-2 code for the tax ID country when the tax-identifier group is supplied.
+    AR pick the code and the transform writes the country name into Customer Tax!D from
+    ref_country, matching the Workday field while avoiding free-text country names.
+  example: GB
+  picklist: {lookup: ref_country, column: country_code}
+  drives:
+  - {tab: Customer Tax, column: D, field: Tax ID Country, rule: "ref_country.country_name for this code"}
+
+- name: Primary Tax ID
+  required: false
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  description: Yes when the tax-identifier group is supplied; blank otherwise.
+  feeds:
+  - {tab: Customer Tax, column: G, field: "Primary Tax ID?"}
+
+- name: Transaction Tax ID
+  required: false
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  description: Yes when the tax-identifier group is supplied; blank otherwise.
+  feeds:
+  - {tab: Customer Tax, column: H, field: "Transaction Tax ID?"}
+
+# --- Customer Address tab (13 of 31 columns live) --------------------------------------------
+# Address Line 1/2/3 are three lines of ONE address. Not multi-value: a ';' here is just text.
+- name: Address Country Code
+  required: true
+  type: text
+  default: GB
+  description: >
+    ISO 3166-1 alpha-2 code for the address country. AR pick the CODE, not the name, and the
+    transform writes the name into Country (column K) from ref_country. Keying on the code is
+    deliberate: the country NAME is precisely the field the reference pipeline needed
+    ref_source_country_name_mapping to clean up (UK / United Kingdom / Great Britain all mean GB),
+    and the code has no such variance. Verified 1:1 both ways - all 106 ref_country rows have a
+    unique code and a unique name - so nothing is lost by asking for the code.
+  example: GB
+  picklist: {lookup: ref_country, column: country_code}
+  feeds:
+  - {tab: Customer Address, column: L, field: Country Code}
+  drives:
+  - {tab: Customer Address, column: K, field: Country, rule: "ref_country.country_name for this code"}
+
+- name: Address Line 1
+  required: true
+  type: text
+  feeds:
+  - {tab: Customer Address, column: Q, field: "Address Line #1"}
+
+- name: Address Line 2
+  required: false
+  type: text
+  feeds:
+  - {tab: Customer Address, column: R, field: "Address Line #2"}
+
+- name: Address Line 3
+  required: false
+  type: text
+  description: "Address Line #4 (column T) is never populated - the template stops at 3."
+  feeds:
+  - {tab: Customer Address, column: S, field: "Address Line #3"}
+
+- name: City
+  required: true
+  type: text
+  feeds:
+  - {tab: Customer Address, column: O, field: City}
+
+- name: Region
+  required: false
+  type: text
+  description: >
+    The Workday region for the selected Address Country Code. Offered as a country-filtered
+    drop-down backed by ref_country_region: AR pick only from the current regions for that
+    country, not from one global list. The reference pipeline resolved this from county/postcode
+    through several reference tables and left it blank when unresolved (162 of 4,596 rows); that
+    resolution is not reproduced. There is no County column - county was a GP input to that
+    lookup, not an EIB field.
+  picklist:
+    lookup: ref_country_region
+    column: region
+    filtered_by: Address Country Code
+    key: country_code
+  feeds:
+  - {tab: Customer Address, column: M, field: Region}
+
+- name: Postcode
+  required: false
+  type: text
+  description: >
+    Entered as printed. The reference pipeline's UK postcode normalisation and Royal Mail
+    district validation are not reproduced.
+  example: AL5 2LG
+  feeds:
+  - {tab: Customer Address, column: U, field: Postal Code}
+
+- name: Address Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Customer Address, column: V, field: Public}
+
+- name: Address Primary
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  description: Always Yes - one address per customer.
+  feeds:
+  - {tab: Customer Address, column: W, field: Primary}
+
+# --- Customer Phone tab (12 of 22 columns live) ----------------------------------------------
+# Numbered slots, not a ';' list: each EIB phone row carries its own Device Type. Slot position
+# supplies Type and Primary (see transform_supplied). 3 slots covers all but 4 of 3,290
+# reference customers. No Fax slot - the reference output has zero fax rows (see decisions).
+- name: Phone Country Code
+  required: false
+  type: text
+  default: GB
+  description: >
+    ISO 3166-1 alpha-2 code for this customer's phones. One code for all of them: per-customer,
+    not per-slot, since only 4 of 3,290 reference customers had phones spanning two countries.
+    A SEPARATE column from Address Country Code, not a copy - they differ on 75 of 3,432 reference
+    rows. Drives three EIB columns, including both of the phone tab's Generated Fields.
+  example: GB
+  picklist: {lookup: ref_country, column: country_code}
+  feeds:
+  - {tab: Customer Phone, column: E, field: Country Code, note: repeated on every phone row}
+  drives:
+  - {tab: Customer Phone, column: D, field: Phone Country, rule: "ref_country.country_name for this code"}
+  - {tab: Customer Phone, column: F, field: International Phone Code, rule: "ref_country.phone_code for this code, '+' stripped (+44 -> 44)"}
+
+- name: Phone 1
+  required: false
+  type: text
+  description: >
+    Include the area code - Area Code (column G) is never populated and the whole number goes in
+    Phone Number. The reference pipeline parsed, cleaned and country-code-stripped these numbers
+    and silently dropped anything under 7 digits; none of that is reproduced.
+  example: 01234 567890
+  feeds:
+  - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=primary, Primary=Yes}
+
+- name: Phone 1 Device Type
+  required: false
+  type: text
+  description: Required when Phone 1 is populated. Mobile or Landline.
+  example: Mobile
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 1 row}
+
+- name: Phone 2
+  required: false
+  type: text
+  feeds:
+  - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=secondary}
+
+- name: Phone 2 Device Type
+  required: false
+  type: text
+  description: Required when Phone 2 is populated.
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 2 row}
+
+- name: Phone 3
+  required: false
+  type: text
+  feeds:
+  - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=tertiary}
+
+- name: Phone 3 Device Type
+  required: false
+  type: text
+  description: Required when Phone 3 is populated.
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 3 row}
+
+- name: Phone Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Customer Phone, column: L, field: Public, note: repeated on every phone row}
+
+# --- Customer Email tab (8 of 14 columns live) -----------------------------------------------
+# ';'-delimited, unlike phones: every address in one column shares that column's Type, so there
+# is no per-value attribute for the transform to guess.
+- name: Email To Address
+  required: false
+  type: text
+  multi_value: "';'-delimited list"
+  description: >
+    The reference pipeline dropped an address already used by ANOTHER customer (a legacy-data
+    artifact). That de-duplication is not reproduced - see open_questions.
+  example: "ar@acme.com; billing@acme.com"
+  feeds:
+  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=to}
+
+- name: Email CC Address
+  required: false
+  type: text
+  multi_value: "';'-delimited list"
+  feeds:
+  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=cc}
+
+- name: Email BCC Address
+  required: false
+  type: text
+  multi_value: "';'-delimited list"
+  feeds:
+  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=bcc}
+
+- name: Email Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Customer Email, column: F, field: Public, note: repeated on every email row}
+
+- name: Email Use For
+  required: true
+  type: text
+  default: Business
+  feeds:
+  - {tab: Customer Email, column: I, field: Use For, note: repeated on every email row}
+
+# --- Customer Document Delivery tab (6 of 17 columns live) -----------------------------------
+- name: Invoice Delivery Method
+  required: true
+  type: text
+  default: Email
+  picklist: {lookup: ref_document_delivery_method, column: document_delivery_method}
+  feeds:
+  - {tab: Customer Document Delivery, column: E, field: Invoice Delivery Method}
+
+- name: Invoice Notification Email Recipients
+  required: true
+  type: text
+  default: Bill-To Contact Emails on Invoice
+  picklist: {lookup: ref_document_email_recipient_invoice, column: document_email_recipient_invoice}
+  feeds:
+  - {tab: Customer Document Delivery, column: F, field: Invoice Notification Email Recipients}
+
+- name: Statement Delivery Method
+  required: true
+  type: text
+  default: Email
+  picklist: {lookup: ref_document_delivery_method, column: document_delivery_method}
+  feeds:
+  - {tab: Customer Document Delivery, column: G, field: Statement Delivery Method}
+
+- name: Statement Notification Email Recipients
+  required: true
+  type: text
+  default: Statement Contact Emails
+  picklist: {lookup: ref_document_email_recipient_statement, column: document_email_recipient_statement}
+  feeds:
+  - {tab: Customer Document Delivery, column: H, field: Statement Notification Email Recipients}
+
+# Populated EIB columns that are NOT template columns, because they restate something AR already
+# typed, are generated from Customer ID, or are implied by which column a value was typed into.
+# None is a derivation of AR's judgement - that is the line. Anything requiring a decision is a
+# template column above.
+transform_supplied:
+- {tab: Customer Address, column: J, field: Address ID, rule: "customer_id || '_MAIN_1' - one address per customer"}
+- {tab: Customer Phone, column: C, field: Phone ID, rule: "customer_id || '_PH<slot>_1'"}
+- {tab: Customer Phone, column: I, field: Formatted Phone Number, rule: "copy of Phone Number - identical in every reference row"}
+- {tab: Customer Phone, column: M, field: Primary, rule: "Yes for the lowest populated phone slot, No for the others"}
+- {tab: Customer Phone, column: N, field: Type, rule: "slot position: 1=primary, 2=secondary, 3=tertiary"}
+- {tab: Customer Email, column: C, field: Email ID, rule: "customer_id || '_EM<1|2|3>_<n>' by column and position"}
+- {tab: Customer Email, column: G, field: Primary, rule: "Yes for the first address in Email To, No for the others"}
+- {tab: Customer Email, column: H, field: Type, rule: "which column it was typed into: to / cc / bcc"}
+
+# EIB columns that exist but are NEVER populated. The template does not mention them and the
+# transform leaves them empty. 60 of the 124 columns across these 9 tabs.
+excluded:
+- {tab: Customer Name, count: 12, columns: "Business Entity Name, External Entity ID, Preferred Locale, Preferred Language, Lockbox, Customer Security Segment, Worktag Only?, Submit?, Create Customer from Financial Institution / Supplier / Tax Authority / Investor"}
+- {tab: Customer Payment, count: 2, columns: "Interest Rule, Late Fee Rule"}
+- {tab: Customer Tax, count: 1, columns: "Withholding Tax Status"}
+- {tab: Customer Address, count: 18, columns: "Formatted Address, Address Format Type, Defaulted Business Site Address, Delete, Do Not Replace All, Last Modified, Descriptor, Subregion, Submunicipality, Address Line #4, Type, Effective Date, Use For, Use For Tenanted, Comments, Number of Days, Municipality Local, Address"}
+- {tab: Customer Phone, count: 10, columns: "Area Code, Phone Number Extension, Use For, Use For Tenated, Tenant Formatted Phone, International Formatted Phone, Delete, Do Not Replace All, Comments, Phone"}
+- {tab: Customer Email, count: 6, columns: "Email Comment, Use For Tenated, Delete, Do Not Replace All, Comments, Email"}
+- {tab: Customer Document Delivery, count: 11, columns: "Always Separate Payments?, Remit-from Customer, Dunning Delivery Method, Dunning Letter Notification Email Recipients, Electronic Invoicing Start Date / Government Issued Customer ID / Intermediary Vendor ID / Vendor Issued Customer ID, Mandate Required, Direct Debit Payment Type, Default Mandate"}
+
+# Whole EIB tabs never populated (transform is WHERE 1=2). Not template columns.
+excluded_tabs:
+- {tabs: "Customer Credit, Customer Company Restrictions, Customer Settlement Account, Customer Intermediary Account, Bank Account Address, Customer Credit Card, Customer Related Worktags", reason: "transform SQL is WHERE 1=2 - always empty. Dropping Company followed from this (see decisions)."}
+
+open_questions:
+- id: default_payment_type_default
+  question: >
+    Default Payment Type was a fixed constant ('Manual' on all 4,132 migrated rows); it is now a
+    13-value drop-down instead, on the reasoning that 'Manual' reflects a bulk legacy load rather
+    than a house rule. Confirm with AR: is 'Manual' still the right default for a new customer, and
+    do they in practice need Direct Debit / BACS / Faster Payments? If 'Manual' really is universal,
+    give it default: Manual and drop the ref_payment_type lookup. This narrows the
+    constants_typed_by_ar decision, which assumed every constant column stays constant.
+  blocking: false
+  owner: Finance (AR)
+- id: payment_terms_requiredness
+  question: >
+    Payment Terms is required: true here, but the EIB marks it Optional and the migration left it
+    blank on 3 of 4,132 rows. The requiredness is an assumption, not evidence - the reference
+    pipeline's own filter (src_fin_customer drops customers with no payment terms) is a migration
+    artifact and not a Workday rule. Confirm whether AR may leave it blank.
+  blocking: false
+  owner: Finance (AR)
+- id: allowed_values
+  question: >
+    Drop-down / allowed-value lists for the free-text columns (Customer Category, Customer Group,
+    Payment Terms, Default Currency, Transaction Tax Status, Tax ID Type, Device Type, the
+    delivery methods, Region, Country). Deferred by the operator 2026-07-15 - enrich later. The
+    column list is settled; this is presentation. Until then every such column is `type: text`,
+    and the reference output's distinct values are the starting evidence.
+  blocking: false
+  owner: Finance (AR)
+- id: cross_customer_email_dedup
+  question: >
+    The reference pipeline drops an email address already used by another customer. Should the
+    new transform? Under the no-derivation rule it should not - AR typed it, so it goes in. But
+    it is a real behaviour change from the reference, so confirm rather than assume.
+  blocking: false
+  owner: Finance (AR)

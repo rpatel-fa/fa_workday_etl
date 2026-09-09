@@ -1,0 +1,22 @@
+{
+  "description": "Workday customer Transaction Tax Status values for the AR customer template. Snapshot of the Customer EIB `TransactionTaxStatus` named range; `Customer of Goods` is surfaced first as the most common BAU value.",
+  "key_column": "transaction_tax_status",
+  "provenance": "Transcribed 2026-07-22 from the Customer EIB `TransactionTaxStatus` named range (Tenant Default Named Ranges!AY2, FA E2E Customers V1.xlsm). A snapshot, not a link.",
+  "rows": [
+    {
+      "transaction_tax_status": "Customer of Goods"
+    },
+    {
+      "transaction_tax_status": "Customer of Services"
+    },
+    {
+      "transaction_tax_status": "NI Customer of Triangulation"
+    },
+    {
+      "transaction_tax_status": "NI Customer of Goods"
+    },
+    {
+      "transaction_tax_status": "Customer of Triangulation"
+    }
+  ]
+}

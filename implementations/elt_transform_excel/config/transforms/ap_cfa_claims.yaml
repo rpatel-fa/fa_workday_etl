@@ -1,0 +1,164 @@
+version: 1
+
+transform:
+  key: ap_cfa_claims
+  label: AP CFA Claims
+  source_type: AP CFA Claims
+  eib_population_type: Supplier Invoice
+  description: >
+    *** CFA CLAIMS ONLY (not CFA Distributions — sibling transform ap_cfa_distributions handles the
+    grant-distribution workbook). ***
+    County FA (CFA) Claims workbook ("SC_1.0 CFA Claims - Finance Approval - August 2026_UPDATED CODES.xlsx")
+    transformed into the Workday Supplier Invoice EIB.  Sources the Finance-prepared
+    "1.0 CFA Claims - Finance Approv" tab (header row 1, data rows 2..N, cols A..L, 12 cols).
+    Workday Supplier ID is read DIRECTLY from Claims col L "Workday Supplier ID"
+    (AP-team-curated S-XXXXXX reference; Supplier Spreadsheet lookup RETIRED;
+    County FA GP ID (col C) retained for trace + skip gate only).
+    Source/target folders live under .../eib/ap/cfa_claims/ (not .../ap/cfa/).
+    Company = constant "FA" (CFA Claims always = THE FA GROUP - FA; the Claims tab has
+    no explicit legal-entity Company column — col B = County FA NAME e.g. "Bedfordshire FA" not "FA").
+    batchIdToken = "CFAC" + MMYY derived from FIRST VALID ROW's col H (Processed Date),
+    e.g. 2026-07-27 → "CFAC0726".  CFA Claims legitimately combine TWO payment run cycles
+    (e.g. 2026-07-27 + 2026-08-01) in a single month's file; mismatches on later rows are
+    counted in a mixedBatchRows warning and reported, NOT hard-failed.
+    InvoiceDate and ReceiptDate both = col H (per-row, varying by payment group within batch).
+    InvoiceNumber (G / EIB Col K) — CHANGED 2026-08-25 per Finance/CFA end-user request:
+    "{col J Budget Code Naming}_{col I Payment Run}_{4-digit YYYY from col H Processed Date}_{per-group increment}"
+    e.g. "DWF_PartnerAugust2026_August_2026_1", "CFA_COACHDEVWORKFUND_August_2026_1";
+    per-group counter resets 1 per unique (J, I, YYYY(H)) combo (source order).
+    SuppliersInvoiceNumber / Suppliers Invoice Number (EIB Col BG) — CHANGED 2026-08-25 per
+    Finance AP v2 hand-edit witness: 1:1 MIRROR of Col K / Invoice Number.  SAME VALUE is
+    written to BOTH K and BG simultaneously to guarantee K == BG for every row (bitwise
+    identical string instance; no separate recomputation / counter reset so no drift possible).
+    The CFA Workday system validates cross-column consistency between the two invoice-number
+    fields and rejects submissions where they diverge.  Legacy formula
+    "{colC GP ID}-{colA Sheet Name}-{dataRowIndex}" written to BG in v1 of the 2026-08-25 build
+    caused CFA rejection; Finance users hand-edited 271 BG cells of v2 output
+    (HOME/Downloads/Submit_Supplier_Invoice_ap_cfa_claims_output v2.xlsx) to equal their K
+    counterparts which succeeded, confirming the mirror requirement.  DEPRECATED: old
+    "EIB AU" label / target column (pre-shift template renumbered this field to Col BG
+    on Submit Supplier Invoice v46.2 — header row 5 label = "Suppliers Invoice Number").
+    Item Description (DI) = UPPER(TRIM(col J "Budget Code Naming")); Description is the Finance-
+    approved short label e.g. "DWF_PartnerAugust2026".
+    Budget Code (col E) = accounting string; TWO in-source formats (dash-separated and
+    no-separator) → dash-normalised via NormalizeAccountingSegmentSeparators helper before
+    lowest-hierarchy worktag lookup in Mapping MASTER v37.
+    Tax: CFA Claims source has NO Tax Amount / Tax Code columns; exemplar 272/272 rows
+    zero-rated.  Tax code (DS/DT/DY) is HARD-CODED to the Outside_of_Scope / Zero_Rated /
+    Nonrecoverable_Allocate branch.  (If Finance later add TaxAmount, copy the conditional
+    pattern from ap_cfa_distributions verbatim.)
+    Memo (EO) = "{C} | {A} | {J} | by {G}" — full per-row trace without re-opening source.
+    See config/transform_specs/ap_cfa_claims.yaml for the decision record, Claims → EIB
+    derived-field rules, and mapping.
+
+runtime:
+  step_list_macro: RunApCfaClaimsSupplierInvoice
+
+source_layout:
+  worksheet_name: "1.0 CFA Claims - Finance Approv"
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - "Sheet Name"            # A - claim category / payment-group key part #1
+    - "County FA"             # B - claimant entity (informational, NOT legal-entity company)
+    - "County FA GP ID"       # C - legacy GP creditor code, retained for trace + skip gate
+    - "Total Claim (£)|Total Claim ()|Total Claim"  # D - PurchasesAmount net line (Finance vary pound-symbol parentheses vs plain between months)
+    - "Budget Code"           # E - accounting string; dash-separated OR no-separator form → normalize
+    - "Head of Approval"      # F - informational (carried into Memo)
+    - "Processed By"          # G - informational (carried into Memo)
+    - "Processed Date"        # H - per-row InvoiceDate + ReceiptDate; bootstrap row = batch token date
+    - "Payment Run"           # I - informational (e.g. "August")
+    - "Budget Code Naming"    # J - Item Description / Description (DI) - Finance label
+    - "Supplier Name"         # K - informational, not used for resolution
+    - "Workday Supplier ID"   # L - DIRECT PASSTHROUGH (AP-team-curated S-XXXXXX Workday Supplier ref)
+
+target_eib:
+  template_name: Submit_Supplier_Invoice_v46.2
+  output_columns: 237
+  sheet_name: Sheet1
+
+transform_constants:
+  # CFA Claims source has NO Tax columns (12-col flat Claims layout carries no
+  # TaxAmount / Tax detail / Tax code).  Exemplar August 2026 = 272/272 rows zero-rated.
+  # Use uniform_tax archetype (single fixed triple for every row — = zero-rated branch).
+  # If Finance later add a TaxAmount column, switch this to
+  #   tax_mode: conditional_on_tax_amount
+  #   tax_zero_rated:  +  tax_standard_rated:  (mirror ap_cfa_distributions pattern verbatim).
+  uniform_tax:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Nonrecoverable_Allocate
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    cost_centre: "Cost Center"
+    spend_category: "Spend Category"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    # Standard 9-pack lowest-hierarchy worktag lookup column letters for v46.2
+    # Supplier Invoice EIB.  Identical to ap_cfa_distributions — all supplier-invoice
+    # transforms share the same v46.2 EIB schema, so letters are fixed:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+  # NEW 2026-08-24: constants for the CFA-Claims Finance-Approv tab layout.
+  # (Retained in YAML so a future change of pattern is a one-line literal edit,
+  # not a Private Const hunt in the .bas.)
+  claims_constants:
+    constant_company_code: FA
+    batch_id_token_prefix: CFAC
+    batch_id_token_format: prefix + two-digit-month + two-digit-year-last-2
+    document_type_literal: INVOICE
+    document_type_hard_coded: true   # no DocumentType column in Claims source
+
+  worktag_target_columns:
+    # Standard 9-pack lowest-hierarchy worktag lookup column letters for v46.2
+    # Supplier Invoice EIB.  (Mirrors ap_cfa_distributions — all supplier-invoice
+    # transforms share the same v46.2 EIB schema.)
+    spend_category: EW
+    cost_centre: GT
+    reporting_type: GR
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  # CFA CLAIMS ONLY (not CFA Distributions; sibling ap_cfa_distributions uses
+  # a separate /ap/cfa_distributions/ folder).
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/source/Copy of SC_1.0 CFA Claims - Finance Approval - August 2026_UPDATED CODES.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/target/Submit_Supplier_Invoice_ap_cfa_claims_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: "1.0 CFA Claims - Finance Approv"
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.
+  # NOTE (2026-08-24): supplier_spreadsheet path is STILL INHERITED but is NO LONGER LOADED
+  # at runtime. Supplier resolution is now pure passthrough from Claims col L
+  # ("Workday Supplier ID"), no lookup performed. The reference is retained for audit / possible
+  # future revert; it is harmless (but unused).

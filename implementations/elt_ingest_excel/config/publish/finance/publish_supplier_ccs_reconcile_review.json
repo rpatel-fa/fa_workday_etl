@@ -1,0 +1,64 @@
+[
+  {
+    "tgtWorkbookPathName": "~/Documents/__data/excel/workday/reconcile",
+    "tgtWorkbookFileName": "supplier_ccs_reconcile_review_pack",
+    "sheets": [
+      {
+        "sheetName": "finance_action_list",
+        "srcTableName": "reconcile_supplier_ccs_finance_action_list"
+      },
+      {
+        "sheetName": "board_summary",
+        "srcTableName": "reconcile_supplier_ccs_board_summary"
+      },
+      {
+        "sheetName": "ccs_report",
+        "srcTableName": "reconcile_supplier_ccs_report"
+      },
+      {
+        "sheetName": "closure_summary",
+        "srcTableName": "reconcile_supplier_ccs_closure_summary"
+      },
+      {
+        "sheetName": "manual_update",
+        "srcTableName": "reconcile_supplier_ccs_manual_update_status"
+      },
+      {
+        "sheetName": "manual_unmatched",
+        "srcTableName": "reconcile_supplier_ccs_manual_update_unmatched"
+      },
+      {
+        "sheetName": "attribute_gaps",
+        "srcTableName": "reconcile_supplier_ccs_attribute_gap"
+      },
+      {
+        "sheetName": "attribute_summary",
+        "srcTableName": "reconcile_supplier_ccs_attribute_summary"
+      },
+      {
+        "sheetName": "workday_dummy_rows",
+        "srcTableName": "reconcile_supplier_ccs_workday_dummy_row"
+      },
+      {
+        "sheetName": "multi_row_suppliers",
+        "srcTableName": "reconcile_supplier_ccs_multi_row_supplier"
+      },
+      {
+        "sheetName": "merge_group_diff",
+        "srcTableName": "reconcile_supplier_ccs_merge_group_diff"
+      },
+      {
+        "sheetName": "missing_in_workday",
+        "srcTableName": "reconcile_supplier_ccs_missing_in_workday"
+      },
+      {
+        "sheetName": "extra_in_workday",
+        "srcTableName": "reconcile_supplier_ccs_extra_in_workday"
+      },
+      {
+        "sheetName": "all_issues",
+        "srcTableName": "reconciliation_supplier_ccs_issues"
+      }
+    ]
+  }
+]

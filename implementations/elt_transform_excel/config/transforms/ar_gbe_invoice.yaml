@@ -1,0 +1,205 @@
+version: 1
+
+transform:
+  key: ar_gbe_invoice
+  label: AR Invoice GBE
+  source_type: AR Invoice GBE
+  eib_population_type: Customer Invoice
+  start_row: 6
+  description: >
+    Governing Body Endorsement (GBE) player-registration invoice extract transformed into the
+    Workday Customer Invoice EIB workbook v46.1. ONE transform, TWO variant sources: the same
+    workbook holds two tabs ("Mens GBE" and "Womens GBE") with an IDENTICAL column layout;
+    each tab is run as a separate Runner dropdown selection (AR Invoice GBE Mens / AR Invoice
+    GBE Womens) via shell_defaults.variants + a per-variant source_worksheet_name override -
+    the same one-transform-many-sources pattern used by ap_stationery. One source row = one
+    single-line Workday Customer Invoice. The customer is the billed CLUB (source col C
+    "Club"): unlike every other AR transform (which keys on a GP Reference ID), GBE carries
+    only the club NAME, so the customer is resolved by a TWO-LEVEL cascade match against the
+    Workday customer extract's "Customer" (name) column. L1 = exact normalised name match
+    (whitespace collapse, "WFC" -> "WOMEN FC", "WOMENS" -> "WOMEN"). L2 = source name run
+    through the SAME name transforms as the GP data-migration SQL pipeline first (dot-strip,
+    WOMEN'S/WOMENS -> WOMEN, FOOTBALL CLUB -> FC, parenthetical strip, UNITED -> UTD,
+    AND -> &, trailing legal-suffix strip of LIMITED/LTD/COMPANY/PLC/LLP/INC) then normalised.
+    Resolution is PRECISION-FIRST at every level: an L1 match wins immediately; a miss falls
+    through to L2; a miss OR an ambiguous name (same normalised name mapping to >1 Customer ID)
+    at EITHER level is rejected to the reject log rather than guessed. Amounts/tax mirror
+    ar_multi_line / ar_bulk: GROSS (col F) -> Amount Due (CM), Unit Cost (FL) and Extended
+    Amount (FO); VAT rate is derived per-row from (GROSS - NET) / NET (col F - col H) so the
+    Womens tab - whose header row omits the "VAT" label - is still handled; 20% ->
+    GBR_Standard_Rated. GBE has NO accounting-string / COST CODE column, so Revenue Category
+    (EM) and the 9-slot FX..GF worktags are left BLANK (Finance codes pre-upload). The worktag
+    pipeline scaffolding is retained inert for Customer-Invoice archetype parity and future
+    coding-column readiness. See config/transform_specs/ar_gbe_invoice.yaml for the full
+    decision record and per-column mapping.
+
+runtime:
+  step_list_macro: RunArGbeInvoiceCustomerInvoice
+
+source_layout:
+  # Named-worksheet resolution: each Runner variant overrides worksheet_name to its tab.
+  # The base worksheet_name below is the Mens tab (the manifest default variant); it is
+  # only used if a build ever references the base binding directly.
+  worksheet_resolution: named
+  worksheet_name: Mens GBE
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - Date
+    - Club
+    - Player
+    - Type
+    - Gross
+    - Net
+    - Reference
+
+transform_constants:
+  fixed_company_code: FA
+  fixed_currency: GBP
+  fixed_invoice_type: Standard
+  company_fallback: THE FA GROUP - FA
+  # GBE customer key is the club NAME, not a GP Reference ID. Resolved by a TWO-LEVEL
+  # cascade match against the Workday customer extract "Customer" (name) column via the
+  # SHARED HELPER customer_name_resolution.two_level_l1_l2_sql_migration registered in
+  # config/shared_helper_registry.yaml and implemented in VBA module modFinanceCommon.bas.
+  # Precision-first at every level: miss OR ambiguous -> reject (never guess a Customer ID).
+  # The full normalisation rule list lives in the SINGLE SOURCE OF TRUTH:
+  #   shared_helper_registry.yaml  -> customer_name_resolution.two_level_l1_l2_sql_migration.description
+  #   transform_specs/ar_gbe_invoice.yaml -> parties.customer.normalisation_level_1_exact / level_2
+  # The per-column details below (source_column / key_column / value_column) are GBE-specific
+  # wiring; the cascade algorithm is shared.
+  customer_resolution:
+    mode: name_match_two_level_via_shared_helper
+    shared_helper: customer_name_resolution.two_level_l1_l2_sql_migration
+    source_column: Club
+    resolved_via: Customer Spreadsheet
+    key_column: Customer           # the extract's NAME column header (post-migration display name)
+    value_column: Customer ID
+    cascade_order: L1_then_L2_on_miss
+    on_ambiguous: reject_at_level
+    on_unresolved: reject_after_both_levels
+  # GBE has no COST CODE column: the worktag pipeline below is DECLARED for Customer-Invoice
+  # archetype parity but is inert at runtime (costCodeColumn resolves to 0 -> the .bas guards
+  # skip every Mapping-MASTER lookup, so all worktags + Revenue Category stay blank).
+  unmapped_handling: silent_blank
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    revenue_category: "Revenue Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    programme: "Program - Delivered Org"
+    project: "Projects (Opex)"
+    sales_item: "Sales Item"
+  derived_worktags:
+    reporting_type:
+      derivation: no cost code driver in GBE source layout; left blank unless Finance overrides
+  customer_invoice_eib_columns:
+    # --- HEADER identifier columns (D, G, BO all populated with the GBE Reference) ---
+    customer_invoice_ref_id: D
+    customer_invoice_id: G
+    invoice_number: BO
+    # --- HEADER fields (Submit Customer Invoice v46.1) ---
+    spreadsheet_key: B
+    add_only: C
+    header_comment: E
+    submit: H
+    locked_in_workday: I
+    company: J
+    row_id_header_1: K
+    row_id_header_2: L
+    row_id_header_3: M
+    currency: AI
+    customer: AJ
+    sold_to_customer: AK
+    billable_project_header: BN
+    invoice_date: BR
+    payment_status: CK
+    document_status: CL
+    amount_due: CM
+    customer_invoice_type: CO
+    header_tax_code: CP
+    customer_po_number: CQ
+    include_customer_worktags: CY
+    header_worktags_plus: CZ
+    header_memo: DB
+    # --- LINE identifier and Row ID ---
+    row_id_line: DS
+    line_reference: DU
+    line_order: DV
+    # --- LINE fields ---
+    sales_item: EJ
+    revenue_category: EM
+    line_item_description: EN
+    line_tax_applicability: FA
+    line_tax_code: FB
+    line_quantity: FH
+    line_unit_of_measure: FI
+    line_unit_cost: FL
+    line_extended_amount: FO
+    line_transaction_date: FP
+    line_from_date: FQ
+    line_to_date: FR
+    deferred_revenue: FS
+    line_memo: FV
+    billable_project_line: GF
+    # --- Accounting-string / Worktag hierarchy FX..GF (9 slots, shared with AP) ---
+    cost_centre: FX
+    reporting_type: FY
+    camp: FZ
+    event: GA
+    commercial_partner: GB
+    fa_learning_course: GC
+    grant: GD
+    programme: GE
+    project_line_worktag: GF
+    # --- 9-pack write order for the account-string worktags (order of Array() in .bas) ---
+    worktags_plus_order:
+      sales_item: EJ
+      reporting_type: FY
+      event: GA
+      camp: FZ
+      fa_learning: GC
+      commercial_partner: GB
+      grant: GD
+      programme: GE
+      cost_centre: FX
+  final_code_derivation:
+    strip_chars: [" "]
+    segment_lengths: [4, 6, 8, 4]
+    output_joiner: "-"
+    seg2_first_char_map:
+      # Inert for GBE (no COST CODE driver). Retained for archetype parity with
+      # ar_bulk_invoice / ar_multi_line_invoice.
+    on_unmapped_seg2_char: SilentBlankUnlessOverridden
+    error_token: ""
+
+shell_defaults:
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
+  # Source layout defaults shared by both GBE tab variants below.
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / mapping_spreadsheet / mapping_sheet inherited from
+  # config/reference_paths.yaml.
+  #
+  # ONE DROPDOWN ROW PER VARIANT. Both variants share the SAME step-list macro
+  # (RunArGbeInvoiceCustomerInvoice), the SAME source_layout schema (headers row 1,
+  # data row 2, identical column set), and the SAME source workbook FILE. The only
+  # per-variant differences are: (1) profile_key / profile_label in the dropdown,
+  # (2) source_worksheet_name (the tab), (3) output_file_path.
+  variants:
+    - profile_key: ar_gbe_invoice_mens
+      profile_label: AR Invoice GBE Mens
+      source_worksheet_name: Mens GBE
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/22. GBE - August 26.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/Submit_Customer_Invoice_v46.1_ar_gbe_invoice_mens_output.xlsx
+    - profile_key: ar_gbe_invoice_womens
+      profile_label: AR Invoice GBE Womens
+      source_worksheet_name: Womens GBE
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/22. GBE - August 26.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/Submit_Customer_Invoice_v46.1_ar_gbe_invoice_womens_output.xlsx

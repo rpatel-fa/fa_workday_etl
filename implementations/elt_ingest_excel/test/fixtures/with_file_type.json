@@ -1,0 +1,22 @@
+[
+  {
+    "workbookFileName": "/path/to/workbook.xlsx",
+    "fileType": "EXCEL",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "targetTableName": "table1"
+      }
+    ]
+  },
+  {
+    "workbookFileName": "/path/to/data.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "sheetName": "*",
+        "targetTableName": "csv_table"
+      }
+    ]
+  }
+]

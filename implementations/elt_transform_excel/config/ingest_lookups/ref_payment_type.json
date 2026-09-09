@@ -1,0 +1,59 @@
+{
+  "description": "The 13 valid Workday payment types — the list the Customer EIB's own drop-down validates Customer Payment!D against.",
+  "key_column": "payment_type",
+  "provenance": "Transcribed 2026-07-15 from the Customer EIB's Payment_Type named range ('Customer Specific Named Ranges'!G3, FA E2E Customers V1.xlsm). A snapshot, not a link. The migration wrote 'Manual' on every row; the other 12 are valid and unused by it.",
+  "rows": [
+    {
+      "payment_type": "BACS",
+      "reference_id": "BACS"
+    },
+    {
+      "payment_type": "SEPA-Urgent",
+      "reference_id": "EFT_with_Reference"
+    },
+    {
+      "payment_type": "SWIFT",
+      "reference_id": "SWIFT"
+    },
+    {
+      "payment_type": "SEPA",
+      "reference_id": "SEPA"
+    },
+    {
+      "payment_type": "Credit Card",
+      "reference_id": "Credit_Card"
+    },
+    {
+      "payment_type": "SEPA-Payroll",
+      "reference_id": "EFT"
+    },
+    {
+      "payment_type": "Direct Debit",
+      "reference_id": "Direct_Debit"
+    },
+    {
+      "payment_type": "Manual",
+      "reference_id": "Manual"
+    },
+    {
+      "payment_type": "CHAPS",
+      "reference_id": "CHAPS"
+    },
+    {
+      "payment_type": "Faster Payments",
+      "reference_id": "FASTER_PAYMENTS"
+    },
+    {
+      "payment_type": "Direct Deposit",
+      "reference_id": "Direct_Deposit"
+    },
+    {
+      "payment_type": "Wire",
+      "reference_id": "Wire"
+    },
+    {
+      "payment_type": "BACS-Payroll",
+      "reference_id": "BACS_Payroll"
+    }
+  ]
+}

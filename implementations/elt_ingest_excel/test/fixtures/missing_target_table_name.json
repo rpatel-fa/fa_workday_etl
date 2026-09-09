@@ -1,0 +1,10 @@
+[
+  {
+    "workbookFileName": "/path/to/workbook.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1"
+      }
+    ]
+  }
+]

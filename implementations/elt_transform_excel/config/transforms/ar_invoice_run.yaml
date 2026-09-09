@@ -1,0 +1,98 @@
+version: 1
+
+transform:
+  key: ar_invoice_run
+  label: AR Invoice Run
+  source_type: AR Invoice Run
+  eib_population_type: Customer Invoice
+  description: >
+    Flat AR "invoice run" extract (one row per club affiliation/fee charge) transformed into
+    the Workday Customer Invoice EIB. Forked from ar_discipline_invoice: fixed company (WNSL)
+    and a single customer lookup on the source "Code" column, plus a per-row Cost Centre
+    worktag resolved through the runner mapping tab (entity=cost_center). The field mapping
+    (the source of truth the .bas mirrors) lives in the mapping: section of
+    config/transform_specs/ar_invoice_run.yaml. Company is fixed and Currency is GBP. Output VAT is
+    itemised (decided 2026-07-30): NET posts as the line Extended Amount, a per-row line Tax Code
+    (FINES -> zero-rated, else standard 20%) drives Workday's VAT calculation, and gross TOTAL posts
+    as Amount Due. The source VAT column is used only to reconcile Workday's calculated tax.
+
+runtime:
+  step_list_macro: RunArInvoiceRunCustomerInvoice
+
+source_layout:
+  worksheet_resolution: first_sheet
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  required_headers:
+    - Code
+    - Club Name
+    - Invoice type
+    - Cost Code
+    - FA WNL Code
+    - NET
+    - TOTAL
+
+transform_constants:
+  fixed_company_code: WNSL
+  fixed_currency: GBP
+  fixed_invoice_type: Standard
+  per_row_tax:
+    driver_invoice_type_value_fines: FINES
+    code_zero_rated: GBR_Zero_Rated
+    code_standard: GBR_200_VAT
+  company_fallback: THE FA GROUP - WNSL
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    revenue_category: "Revenue Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+    sales_item: "Sales Item"
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: silent_blank
+  customer_invoice_eib_columns:
+    revenue_category: EM
+    billable_project_header: BN
+    billable_project_line: BN
+    sales_item: EJ
+    worktags_plus_order:
+      sales_item: EJ
+      cost_centre: FX
+      reporting_type: FY
+      camp: FZ
+      event: GA
+      commercial_partner: GB
+      fa_learning: GC
+      grant: GD
+      program: GE
+  final_code_derivation:
+    # WNL invoice run Cost Code column (header "Cost Code") is a season label
+    # like "26/27 Season" — NOT a 4-6-8-4 accounting string. The confirmed
+    # decision (transform_specs cost_centre: derivation: none / note) is to
+    # leave cost-centre and worktags mechanically blank for this transform
+    # until Finance confirm WNL revenue must be coded; at that point upgrade
+    # this block to a proper final_code derivation with segment lengths.
+    # Kept keys here for gate parity with sibling AR profiles.
+    skip_driver: Cost Code is a season label, not an account string
+    segment_lengths: []
+    on_unmapped: silent_blank
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/21. WNL 26-27 Invoice Run 1 - July 1.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Submit_Customer_Invoice_v46.1_ar_invoice_run_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_resolution: first_sheet
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

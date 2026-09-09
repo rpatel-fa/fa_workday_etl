@@ -1,0 +1,618 @@
+# ==============================================================================
+# SHARED HELPER REGISTRY — single catalog of all helper variants
+# ==============================================================================
+# This file is the DECLARATIVE register of every shared helper that a
+# transform spec may select via its `shared_helpers:` block.
+#
+# Mechanical anti-drift guarantees (enforced by build_runner.py Step 6):
+#
+#   1. Every key declared in a transform spec's `shared_helpers:` block MUST
+#      resolve to a variant in this registry (typo / drift guard).
+#
+#   2. For each selected variant, the VBA transform module:
+#        (NEG) MUST NOT contain a local `Private Function` copy of the helper.
+#        (POS) MUST reference the hoisted `vba_public_fn` by bare-name call.
+#
+#   3. For WBO/tax constants the variant's `vba_public_consts_source` points
+#      to the single shared module (modFinanceCommon.bas) that holds the
+#      canonical `Public Const` declarations — value-synced 1:1 to the YAML
+#      transform_constants.worktag_business_objects / tax_* blocks.
+#
+#   4. `none` is a valid variant for concerns that genuinely do not apply
+#      (e.g. AMEX CC exports have no trailer-row pattern, so
+#      row_trailer_detection = "none" skips that call and its validation).
+#
+# ADDING A NEW VARIANT:
+#   - Declare the variant below under the correct concern key.
+#   - Implement the corresponding Public Function in the vba_module listed.
+#   - If the variant is hoisted, delete any remaining local `Private Function`
+#     copies in transform .bas files (build_runner.py will flag them).
+#   - Add explicit description and validation_notes so a new agent can wire it
+#     up without reading VBA internals.
+# ==============================================================================
+
+shared_helpers:
+
+  # --------------------------------------------------------------------------
+  # SUPPLIER RESOLUTION (Source → Workday Supplier Spreadsheet)
+  # --------------------------------------------------------------------------
+  supplier_resolution:
+
+    per_row_split_company_creditor:
+      description: >
+        Split the source SupplierID column on the FIRST hyphen into
+        (CreditorID, Company) segments. Resolve Supplier via 2-part precedence:
+          HIGH = Lookup collection key "{CreditorID}-{Company}" (company-bound)
+          LOW  = Lookup collection key "{CreditorID}" (fallback, any company)
+        Used by classic upload format exports (Taxi / Stationery / Travel /
+        CFA / Prize Funds / Referees) where the source system already encodes
+        company affinity inside the supplier ID string.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: ResolveSupplierWithCompanyPrecedence
+      companion_public_helpers:
+        - SplitSupplierIdRow
+      requires_columns:
+        - source SupplierID (hyphenated) column
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+        - ap_prize_funds
+
+    direct_workday_id_passthrough:
+      description: >
+        Supplier reference read DIRECTLY, per row, from an AP/Finance-curated
+        Workday Supplier ID column in the source file (S-XXXXXX value). NO
+        Supplier Spreadsheet lookup, NO hyphen split, NO company precedence.
+        Inline assignment (supplierId = Trim(source cell)) with a non-blank
+        gate: a blank cell rejects the row (unresolvedSupplierRows++). Used
+        where AP have pre-allocated the Workday Supplier reference in the
+        source and the legacy GP Creditor-ID derivation is retired. Because it
+        is inline (no shared helper fn), it has NO bare-helper hint in
+        build_runner.CONCERN_VARIANT_TO_BARE_HELPER_HINTS.
+      vba_module: null            # inline in the transform module; no shared helper fn
+      vba_public_fn: null
+      requires_columns:
+        - AP-curated Workday Supplier ID column
+                                       # (e.g. "Workday Supplier ID" / "Workday ID" / "NEW WORKDAY ID")
+      examples:
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_referees
+        - ap_referees_v2
+
+    fixed_reference_id:
+      description: >
+        Single literal source reference ID (e.g. "AME001") resolved via
+        exact Supplier Spreadsheet lookup. Used by AMEX transforms where the
+        supplier is always the same (American Express) regardless of the
+        per-row details. NO split, no company precedence — a single
+        canonical collection lookup call.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: BuildReferenceLookupFromWorkbook + LookupCollectionValue
+      requires_columns: []
+      example_profile_constants:
+        - SOURCE_SUPPLIER_REFERENCE_ID = "AME001"
+      examples:
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_amex_trains_v2
+
+    direct_gp_creditor_id_via_extract:
+      description: >
+        GP creditor code read directly from a source "CreditorID" column
+        (plain, non-hyphenated code like SAL002 / CHE043) and resolved via
+        the Supplier Spreadsheet using the SAME two-part key precedence as
+        per_row_split_company_creditor — HIGH = "{CreditorID}-FA",
+        LOW = bare "{CreditorID}" — but WITHOUT the prior hyphen-split
+        (because CreditorID is already a plain GP code, no embedded Company).
+        Used by GP Integration-tab exports (ap_prize_funds style) where
+        there is no hyphen to split. Resolution call itself is the same
+        shared helper: ResolveSupplierWithCompanyPrecedence (it performs
+        the key-precedence resolution and falls back to bare lookup when
+        the high-key fails).
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: >
+        BuildReferenceLookupFromWorkbook
+        + ResolveSupplierWithCompanyPrecedence
+        + LookupCollectionValue
+      companion_public_helpers:
+        - BuildDelimitedReferenceLookup
+      requires_columns:
+        - source CreditorID (GP creditor code, no hyphen) column
+      examples:
+        - ap_prize_funds
+        - ap_commercial_invoice
+        - ap_wnl_grants_invoice
+
+  # --------------------------------------------------------------------------
+  # COMPANY RESOLUTION
+  # --------------------------------------------------------------------------
+  company_resolution:
+
+    per_row_split_from_supplier_id:
+      description: >
+        Company segment derived from the same SupplierID first-hyphen split
+        used by supplier_resolution.per_row_split_company_creditor.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: ResolveSupplierWithCompanyPrecedence
+      companion_public_helpers:
+        - SplitSupplierIdRow                                  # Private helper inside modFinanceCommon that performs the actual split; exposed as a contract so future authors don't re-implement the hyphen-split rule differently
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+
+    per_row_integration_column_a:
+      deprecated: true
+      deprecation_note: >
+        No current transform declares this variant. Historically intended for
+        Integration-tab col-A company scans; current profiles use fixed_literal
+        instead. Retained for backwards-compat spec resolution only; new
+        authors MUST NOT select this variant.
+      description: >
+        Company resolved row-by-row from the Integration tab column A.
+        Enforced uniform across all non-skipped rows via bootstrap scan; if
+        mixed values are found the transform aborts with an explicit mixed-
+        company error. Used by CFA Distributions and Supplier Referees.
+      vba_module: local transform (bootstrap scan — one-off pattern per spec)
+      examples: []
+
+    fixed_literal:
+      description: >
+        Hardcoded single company code (e.g. "FA") applied to every row
+        uniformly. Used by AMEX transforms where the source is company-FA
+        only and the source file never contains cross-company data.
+      vba_module: local transform (Private Const SOURCE_COMPANY_CODE)
+      example_profile_constants:
+        - SOURCE_COMPANY_CODE = "FA"
+      examples:
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+
+    per_row_account_name_mapping:
+      description: >
+        Company resolved from source "Account name" column → entity=company
+        mapping-tab lookup. Used by AMEX Train V2 where different purchasing
+        accounts route to different company codes.
+      vba_module: local transform
+      examples:
+        - ap_amex_trains_v2
+
+  # --------------------------------------------------------------------------
+  # CUSTOMER NAME RESOLUTION (name -> Workday Customer ID)
+  # --------------------------------------------------------------------------
+  customer_name_resolution:
+
+    none:
+      description: >
+        Default for transforms that resolve customer by Workday Reference ID
+        / GP Customer ID / pipe-delimited reference column — not by name.
+        No lookup engine called; no GBE-style two-level cascade.
+      vba_module: null
+      vba_public_fn: null
+      examples:
+        - ar_bulk_invoice
+        - ar_discipline_invoice
+        - ar_invoice
+        - ar_invoice_run
+        - ar_multi_line_invoice
+        - ar_integration_invoice
+
+    two_level_l1_l2_sql_migration:
+      description: >
+        Two-level PRECISION-FIRST name cascade for sources that ship customer
+        NAME only (no GP Reference ID / no Workday Customer ID / no pipe ID).
+        Used by GBE where the club is billed by name.
+
+        L1 = exact normalized match against the Workday customer extract's
+        "Customer" display-name column (whitespace collapse, ASCII-only,
+        WFC -> WOMEN FC, WOMENS -> WOMEN). Ambiguous names = rejected, never
+        guessed.
+
+        L2 (only on L1 miss, NOT on L1 ambiguous): source name is passed
+        through the SAME name transforms as the GP data-migration SQL
+        pipeline (elt_ingest_excel/.../src_fin_customer_raw.sql lines 105-128)
+        BEFORE L1-style normalization:
+          1. STRIP dots (.)
+          2. WOMEN'S -> WOMEN  (also WOMENS -> WOMEN, redundant harmless)
+          3. FOOTBALL CLUB -> FC
+          4. STRIP any parenthesised content (...), including nested parens.
+          5. UNITED -> UTD  (word-boundary, token-level)
+          6. AND -> &  (word-boundary, token-level)
+          7. Peel trailing legal suffixes (repeatable):
+             LIMITED / LTD / COMPANY / PLC / LLP / INC
+
+        CASCADE ORDER: L1 wins immediately on hit -> else attempt L2 on miss
+        -> unresolved only after both levels miss.
+
+        AMBIGUOUS at any level = REJECT IMMEDIATELY at that level (no
+        fallback to lower level / no disambiguation guess).
+
+        IN-MEMORY LOOKUP: Public helper BuildCustomerNameLookupFromWorkbook
+        reads the customer extract's (Customer, Customer ID) columns into two
+        VBA Collections: (normKey -> customerId) and (ambiguous normKey).
+        Transforms call ResolveCustomerIdMultiLevel(sourceName) which returns
+        the resolved ID plus a match level (1/2) and an ambiguous flag that
+        the caller routes to AppendRejectRow.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn:
+        - BuildCustomerNameLookupFromWorkbook
+        - NormalizeClubName
+        - ApplySqlNameTransforms
+        - ResolveCustomerIdMultiLevel
+      companion_public_helpers:
+        - LookupCollectionValue                      # shared primitives in modHelpers.bas
+        - NormalizeToken                             # ASCII/whitespace/lowercase primitive in modSourceTable.bas
+      requires_columns:
+        - source NAME column (e.g. GBE col C "Club")
+        - customer extract NAME column ("Customer" — the transformed post-migration display name)
+        - customer extract VALUE column ("Customer ID")
+      examples:
+        - ar_gbe_invoice
+
+  # --------------------------------------------------------------------------
+  # ACCOUNTING STRING / FINAL CODE DERIVATION
+  # --------------------------------------------------------------------------
+  accounting_string_derivation:
+
+    direct_column_separator_normalized:
+      description: >
+        Accounting/cost-code string read directly from a source column. Callers pass
+        the RAW source value -- separator NORMALISATION IS CENTRALISED in the shared
+        resolvers (see normalization_owner), so any supported delimiter form resolves
+        identically at BOTH the reject gate and the write phase. Normalisation
+        collapses runs of these 10 separator chars to a single "-":
+          "-"  space  "."  "_"  "|"  ":"  "/"  "\"  ";"  ","
+        (so hyphen-, space- AND dot-delimited coding strings all work), then the code
+        is Split on "-" into segments (FinalCodeSegment 1..4) that drive the
+        lowest-hierarchy worktag lookup. A code with NO separators (dashCount = 0) is
+        auto-segmented to the canonical 4/6/8/x mask. Used by all non-AMEX
+        classic-format transforms.
+      normalization_owner: >
+        NormalizeCostCodeSeparators (modSourceTable.bas) is invoked INSIDE the shared
+        resolvers ResolveLowestHierarchyLookupAcrossFinalCodeSegments (9-pack worktags)
+        and FinalCodeSegment (reporting type + single-segment), both in
+        modFinanceCommon.bas. This makes accounting-string splitting delimiter-robust
+        for EVERY transform at both gate and write. Transforms MUST NOT re-implement
+        per-module normalisation (they still call NormalizeCostCodeSeparators only when
+        they need a normalised string for a NON-lookup purpose, e.g. the line Memo).
+      vba_module: modSourceTable.bas
+      vba_public_fn: NormalizeCostCodeSeparators
+      companion_public_helpers:
+        - FinalCodeSegment                                   # normalises + splits nth segment (shared)
+        - ResolveLowestHierarchyLookupAcrossFinalCodeSegments # normalises + 9-pack lowest-hierarchy lookup (shared)
+      requires_source_column: true
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+        - ap_cfa_claims
+
+    amex_padded_22char_pipeline:
+      description: >
+        Final code derived from a 22-character left-padded cost-center string
+        processed via a pipeline: Seg2 left-char accounting-code map +
+        reference override table + fallbacks. The pipeline contents are
+        declared in transform_specs YAML under derived_fields.derived_final_code
+        and regenerated per transform (NOT a single shared VBA helper).
+        Used by AMEX Hotel + AMEX Trains V2.
+      vba_module: local transform (per-module DeriveFinalCodeFromDefaultCostCode / DeriveFinalCodeFromRef2)
+      pipeline_declared_in_yaml: derived_fields.derived_final_code.pipeline
+      examples:
+        - ap_amex_hotel
+        - ap_amex_trains_v2
+
+    direct_final_code_column:
+      description: >
+        Final Code read directly from a source column with NO derivation.
+        Used by AMEX Trains V1 where the export already delivers a usable
+        4-segment final code.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: FinalCodeSegment
+      examples:
+        - ap_amex_trains
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+
+    direct_distribution_reference_code:
+      description: >
+        Final-code accounting string read directly from a source column named
+        "DistributionReferenceCode". The RAW source value is passed straight
+        into ResolveLowestHierarchyLookupAcrossFinalCodeSegments (which runs
+        NormalizeCostCodeSeparators internally). The mapping MASTER 9-pack
+        worktag pipeline is shared with the standard transforms.
+        Identical to direct_column_separator_normalized in behaviour, but
+        split into its own variant because the source column is NOT
+        "SupplierID"/"Account"-style — it's the canonical Integration tab
+        DistributionReferenceCode which is always a hyphenated code.
+      vba_module: modSourceTable.bas
+      vba_public_fn: NormalizeCostCodeSeparators
+      companion_public_helpers:
+        - FinalCodeSegment
+        - ResolveLowestHierarchyLookupAcrossFinalCodeSegments
+      requires_source_column: true
+      examples:
+        - ap_prize_funds
+        - ap_commercial_invoice
+        - ap_wnl_grants_invoice
+
+  # --------------------------------------------------------------------------
+  # WORKTAG HIERARCHY LOOKUP ENGINE
+  # --------------------------------------------------------------------------
+  worktag_hierarchy_lookup:
+
+    standard_9pack_lowest_specificity:
+      description: >
+        For every active worktag declared in worktag_business_objects, run
+        BuildBusinessObjectHierarchyLookup and resolve the lowest-specificity
+        match across all 4 Final Code segments via
+        ResolveLowestHierarchyLookupAcrossFinalCodeSegments. This is the
+        canonical 9-worktag engine used by every AP transform today (WBO keys
+        differ per profile — AMEX has 8, classic has 9 including spend_cat).
+      vba_module: modFinanceCommon.bas
+      vba_public_fn:
+        - BuildBusinessObjectHierarchyLookup
+        - ResolveLowestHierarchyLookupAcrossFinalCodeSegments
+      vba_public_consts_source: modFinanceCommon.bas (Public Const WBO_*)
+      notes: >
+        The Public Const WBO_* display-name strings in modFinanceCommon.bas
+        are mechanically synced 1:1 to the YAML worktag_business_objects
+        values; build_runner.py Step 6 errors on any mismatch.
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_amex_trains_v2
+
+      # ----------------------------------------------------------------------
+      # SHARED lookup-table skeleton + default policies (DECLARED ONCE HERE)
+      #
+      # Transform specs using this variant no longer inline the identical
+      # Mapping Master lookup_table block across every per-worktag derived_field.
+      # Instead they declare:
+      #   use_shared_lookup: standard_9pack_lowest_specificity
+      #   worktag_business_object_key: "Cost Center" (or other WBO display name)
+      #   key_source_column: <their-specific-source-column>
+      #   on_unresolved: <override if not matching shared default>
+      #
+      # build_runner.py hygiene step accepts this shorthand as equivalent to
+      # the previously inlined lookup_table skeleton (no VBA or runtime
+      # behaviour changes; pure YAML spec dedupe).
+      # ----------------------------------------------------------------------
+      shared_lookup_skeleton:
+        location: Mapping Spreadsheet
+        tab: MAPPING MASTER
+        base_filters:
+          - Core vs Prism = Core
+        key_column: OLD CODE
+        value_column: WORKDAY REF ID
+        # classic 3 (ap_stationery / ap_taxi / ap_travel_places) explicitly
+        # use lowest-hierarchy OLD SEGMENT matching; integration-style
+        # transforms accept the VBA-helper default of the same resolution,
+        # so only classic 3 pin this field explicitly.
+        classic_lowest_specificity_specificity_column: OLD SEGMENT
+
+      default_worktag_policies:
+        # Keys below match transform_constants.worktag_business_objects key
+        # names (the YAML-side keys synced 1:1 to .bas Public Const WBO_*).
+        mandatory_worktag_keys:
+          - cost_centre
+          - spend_category
+        optional_worktag_keys:
+          - event
+          - camp
+          - fa_learning_course
+          - commercial_partner
+          - grant
+          - programme
+          - project
+        # Classic 3 (stationery/taxi/travel_places) require a valid match on
+        # the two mandatory worktags (missing => reject row + report).
+        classic_mandatory_on_unresolved: reject_and_report
+        # Integration-style (CFA/PrizeFunds/Referees/WNL/Commercial) are
+        # permissive (finance enters a DistributionReferenceCode without
+        # promise of 100% Mapping MASTER coverage for mandatory tags).
+        integration_mandatory_on_unresolved: skip_and_report
+        # All 7 optional tags are always permissive (blank is always valid).
+        optional_on_unresolved: skip_ok
+
+  # --------------------------------------------------------------------------
+  # ROW NET AMOUNT RESOLUTION (for RowIsSkippable)
+  # --------------------------------------------------------------------------
+  row_net_resolution:
+
+    effective_net_gross_tax_fallback:
+      description: >
+        If the source Net column is blank/zero, compute an effective net as
+        Gross − Tax before running skip-rule amount predicates. Prevents a
+        malformed source export (blank Net) from being dropped as a zero-row
+        when it actually carries a value.
+      vba_module: modSourceTable.bas
+      vba_public_fn: ResolveEffectiveNet
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+
+    direct_amount:
+      description: >
+        Use the source amount column directly with NO fallback chain. Used by
+        AMEX transforms (no Net/Gross/Tax triple — single amount field) and
+        integration-style exports (CFA / Prize Funds / Referees) where the
+        single purchases-amount column is already complete.
+      vba_module: modSourceTable.bas
+      vba_public_fn: ResolveAmount
+      examples:
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_amex_trains_v2
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+
+  # --------------------------------------------------------------------------
+  # ROW TRAILER / EMPTY DETECTION
+  # --------------------------------------------------------------------------
+  row_trailer_detection:
+
+    text_cols_and_amount_cols_parameterized:
+      description: >
+        RowIsEmptyOrTrailer = RowIsTrulyEmpty (AND of blank-text + zero-amount
+        predicates across caller-supplied column arrays) OR (all text cols
+        are blank AND a summation keyword scan on label columns matches
+        TOTAL / GRAND / SUBTOTAL / SUB-TOTAL / SUM-OF / SUM:). The call site
+        passes column-index arrays; detection logic lives 100% in modSourceTable.
+      vba_module: modSourceTable.bas
+      vba_public_fn:
+        - RowIsTrulyEmpty(table, row, textCheckCols(), amountCheckCols())
+        - RowIsEmptyOrTrailer(table, row, textCheckCols(), amountCheckCols(), labelCheckCols())
+      companion_public_helpers:
+        - NormaliseToWordBoundaries   # keyword → word-boundary normaliser
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+
+    none:
+      description: >
+        No trailer/empty-row detection at the outer loop. Used by AMEX
+        transforms where the source is a processor export (no human-added
+        trailer rows, no subtotal lines) and RowIsSkippable covers any
+        per-row filtering needed.
+      examples:
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_amex_trains_v2
+
+  # --------------------------------------------------------------------------
+  # SOURCE DATE NORMALIZATION (Excel value -> YYYY-MM-DD)
+  # --------------------------------------------------------------------------
+  source_date_normalization:
+
+    excel_serial_and_dmy_text:
+      description: >
+        Canonical 4-branch normalization for source date cells that arrive
+        as a MIX of Excel date subtypes, General-formatted numeric serials,
+        and human-readable DMY text. This is the declared engine contract
+        for NormalizeSourceDate in modSourceTable.bas; transforms use it by
+        bare-name call (no per-profile overrides).
+
+        EXECUTION ORDER — branches are tried in exactly this order; a cold-
+        start author MUST mirror this precedence when implementing or
+        reviewing the VBA:
+
+          1. NUMERIC EXCEL SERIAL (BY VALUETYPE, runs BEFORE any delimiter
+             char rewriting)
+             - If the source Variant's VarType is a numeric subtype
+               (vbDouble / vbCurrency / vbInteger / vbLong) AND the value is
+               in the range [1, 100000] (≈1900-01-01 to ≈2173-12-30, i.e.
+               bounded to 2-digit-year safe horizon + plausible historical
+               data): treat it as an Excel 1900-system date serial.
+             - If the value is pure TEXT but every character is 0..9 plus at
+               most ONE decimal separator (resolved from
+               Application.International(xlDecimalSeparator), so dot-decimal
+               and comma-decimal locales behave identically): same numeric
+               range check → same serial treatment.
+             - ACTION: strip the time-of-day fraction via Fix(serial) BEFORE
+               CDate (so 46223.64707 → 46223, never 46224 from banker's
+               rounding), then Format$(CDate(Fix(...)), "yyyy-mm-dd") and
+               return → EXIT FUNCTION.
+             - RATIONALE: IsDate(sourceValue) returns False when the cell
+               is stored as General format (Variant/Double subtype) even
+               though the numeric value IS a valid date serial; relying on
+               IsDate alone leaks the raw decimal into the EIB output.
+               Running this branch BEFORE any dot→slash rewrite also avoids
+               the classic false-delimiter bug: "46223.64707" →
+               "46223/64707" via unconditional Replace(".", "/").
+
+          2. EXPLICIT DMY TEXT WITH NUMERIC PARTS (hyphen/slash/dot
+             separated, day/month/year ALL purely numeric)
+             - Rewrite hyphen "-" → "/" unconditionally (dash is never a
+               decimal separator in any Excel locale).
+             - Rewrite dot "." → "/" ONLY IF the rewritten string splits
+               into EXACTLY 3 parts AND all 3 parts pass IsNumeric()
+               individually (so "22.07.26" promotes; "46223.64707" does
+               NOT, because it splits into 2 parts even if we hypothetically
+               rewrote it — guarded by the earlier serial branch anyway).
+             - Split on "/" → parts = [dayText, monthText, yearText].
+             - Validate day in [1..31], month in [1..12] (purely numeric
+               guards: month="Aug" fails IsNumeric here and skips this
+               branch on purpose).
+             - 2-digit year → prefix "20".
+             - Format as "YYYY-MM-DD" and return → EXIT FUNCTION.
+             - RATIONALE: pure-numeric DMY parsing runs BEFORE IsDate/CDate
+               so a US-locale host machine cannot silently swap day/month
+               on "07/08/26" (reads as 07-Aug-2026 on US; reads as
+               08-Jul-2026 on UK without this explicit order).
+
+          3. IsDate(sourceValue) + CDate (Variant/Date subtype OR any
+             non-pure-numeric text form that VBA still recognizes as a
+             date, e.g. "14-Aug-26", "14 August 2026", "2026-08-14")
+             - Call Format$(CDate(sourceValue), "yyyy-mm-dd") and return.
+             - RATIONALE: catches Date-typed cells, month-abbreviation
+               forms ("14-Aug-26" — unambiguous across locales because the
+               month is alpha, not numeric), and any future ISO-formatted
+               text that isn't covered by branch 2's DMY-only split.
+
+          4. LAST-RESORT PASSTHROUGH (never hits for valid inputs; kept as
+             a forward-compat escape hatch)
+             - If branch 2's parts split was 3-way (pure numeric DMY),
+               reassemble from the day/month/year captures from branch 2
+               as "YYYY-MM-DD".
+             - Otherwise return the Trim'd CStr of the source value
+               unchanged.
+
+        INVARIANTS A NEW AGENT MUST HOLD AGAINST THE VBA:
+          * The serial-branch VarType check must test vbDouble, vbCurrency,
+            vbInteger, vbLong. The Variant subtype is what determines
+            IsDate() behavior, NOT the numeric value itself.
+          * Time truncation MUST use Fix(), not CLng() or Round(), to avoid
+            off-by-one day drift on values with a fractional time >= 0.5
+            (VBA's CInt/CLng use banker's rounding to even on .5).
+          * Decimal separator for the text-serial scan is resolved from
+            Application.International(xlDecimalSeparator) at CALL time,
+            not hardcoded to "." or ",".
+          * The dot→slash rewrite is conditional on all-3-parts-numeric.
+            Unconditionally rewriting "." is the #1 historical cause of
+            numeric-serial false-delimiter leakage.
+      vba_module: modSourceTable.bas
+      vba_public_fn: NormalizeSourceDate
+      examples:
+        - ap_taxi
+        - ap_stationery
+        - ap_travel_places
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+        - ap_amex_hotel
+        - ap_amex_trains
+        - ap_amex_trains_v2
+        - ar_bulk_invoice
+        - ar_discipline_invoice
+        - ar_invoice
+        - ar_invoice_run
+        - ar_multi_line_invoice

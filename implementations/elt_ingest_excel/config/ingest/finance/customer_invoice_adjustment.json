@@ -1,0 +1,26 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer_invoice/20260821_FW_ AR Invoice Adjustments",
+    "workbookFileName": "Adjustment Docs - file for Rakesh.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Adjustment Invoices",
+        "headerRow": "2",
+        "dataRow": "3",
+        "targetTableName": "fin_customer_invoice_adjustment"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookFileName": "Extract_Customers_20260810_1615.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "11",
+        "dataRow": "12",
+        "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  }
+]

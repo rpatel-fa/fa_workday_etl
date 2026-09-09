@@ -1,0 +1,242 @@
+[
+	{
+		"source_country_code" : "AD",
+		"country_code" : "AD"
+	},
+	{
+		"source_country_code" : "AE",
+		"country_code" : "AE"
+	},
+	{
+		"source_country_code" : "AL",
+		"country_code" : "AL"
+	},
+	{
+		"source_country_code" : "AR",
+		"country_code" : "AR"
+	},
+	{
+		"source_country_code" : "AT",
+		"country_code" : "AT"
+	},
+	{
+		"source_country_code" : "AU",
+		"country_code" : "AU"
+	},
+	{
+		"source_country_code" : "BA",
+		"country_code" : "BA"
+	},
+	{
+		"source_country_code" : "BE",
+		"country_code" : "BE"
+	},
+	{
+		"source_country_code" : "BG",
+		"country_code" : "BG"
+	},
+	{
+		"source_country_code" : "BM",
+		"country_code" : "BM"
+	},
+	{
+		"source_country_code" : "BR",
+		"country_code" : "BR"
+	},
+	{
+		"source_country_code" : "CA",
+		"country_code" : "CA"
+	},
+	{
+		"source_country_code" : "CH",
+		"country_code" : "CH"
+	},
+	{
+		"source_country_code" : "CI",
+		"country_code" : "CI"
+	},
+	{
+		"source_country_code" : "CL",
+		"country_code" : "CL"
+	},
+	{
+		"source_country_code" : "CM",
+		"country_code" : "CM"
+	},
+	{
+		"source_country_code" : "CN",
+		"country_code" : "CN"
+	},
+	{
+		"source_country_code" : "CR",
+		"country_code" : "CR"
+	},
+	{
+		"source_country_code" : "DE",
+		"country_code" : "DE"
+	},
+	{
+		"source_country_code" : "DK",
+		"country_code" : "DK"
+	},
+	{
+		"source_country_code" : "DZ",
+		"country_code" : "DZ"
+	},
+	{
+		"source_country_code" : "EC",
+		"country_code" : "EC"
+	},
+	{
+		"source_country_code" : "EE",
+		"country_code" : "EE"
+	},
+	{
+		"source_country_code" : "ES",
+		"country_code" : "ES"
+	},
+	{
+		"source_country_code" : "FI",
+		"country_code" : "FI"
+	},
+	{
+		"source_country_code" : "FR",
+		"country_code" : "FR"
+	},
+	{
+		"source_country_code" : "GB",
+		"country_code" : "GB"
+	},
+	{
+		"source_country_code" : "GR",
+		"country_code" : "GR"
+	},
+	{
+		"source_country_code" : "HK",
+		"country_code" : "HK"
+	},
+	{
+		"source_country_code" : "HR",
+		"country_code" : "HR"
+	},
+	{
+		"source_country_code" : "IE",
+		"country_code" : "IE"
+	},
+	{
+		"source_country_code" : "IL",
+		"country_code" : "IL"
+	},
+	{
+		"source_country_code" : "IM",
+		"country_code" : "IM"
+	},
+	{
+		"source_country_code" : "IS",
+		"country_code" : "IS"
+	},
+	{
+		"source_country_code" : "IT",
+		"country_code" : "IT"
+	},
+	{
+		"source_country_code" : "JE",
+		"country_code" : "JE"
+	},
+	{
+		"source_country_code" : "JP",
+		"country_code" : "JP"
+	},
+	{
+		"source_country_code" : "KR",
+		"country_code" : "KR"
+	},
+	{
+		"source_country_code" : "LB",
+		"country_code" : "LB"
+	},
+	{
+		"source_country_code" : "LV",
+		"country_code" : "LV"
+	},
+	{
+		"source_country_code" : "MA",
+		"country_code" : "MA"
+	},
+	{
+		"source_country_code" : "MC",
+		"country_code" : "MC"
+	},
+	{
+		"source_country_code" : "MK",
+		"country_code" : "MK"
+	},
+	{
+		"source_country_code" : "MU",
+		"country_code" : "MU"
+	},
+	{
+		"source_country_code" : "NG",
+		"country_code" : "NG"
+	},
+	{
+		"source_country_code" : "NL",
+		"country_code" : "NL"
+	},
+	{
+		"source_country_code" : "NO",
+		"country_code" : "NO"
+	},
+	{
+		"source_country_code" : "NZ",
+		"country_code" : "NZ"
+	},
+	{
+		"source_country_code" : "PL",
+		"country_code" : "PL"
+	},
+	{
+		"source_country_code" : "PT",
+		"country_code" : "PT"
+	},
+	{
+		"source_country_code" : "PY",
+		"country_code" : "PY"
+	},
+	{
+		"source_country_code" : "RO",
+		"country_code" : "RO"
+	},
+	{
+		"source_country_code" : "RS",
+		"country_code" : "RS"
+	},
+	{
+		"source_country_code" : "SE",
+		"country_code" : "SE"
+	},
+	{
+		"source_country_code" : "SK",
+		"country_code" : "SK"
+	},
+	{
+		"source_country_code" : "SN",
+		"country_code" : "SN"
+	},
+	{
+		"source_country_code" : "SZ",
+		"country_code" : "CH"
+	},
+	{
+		"source_country_code" : "TT",
+		"country_code" : "TT"
+	},
+	{
+		"source_country_code" : "US",
+		"country_code" : "US"
+	},
+	{
+		"source_country_code" : "ZA",
+		"country_code" : "ZA"
+	}
+]

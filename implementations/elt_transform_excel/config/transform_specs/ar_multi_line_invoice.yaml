@@ -1,0 +1,309 @@
+# Transform spec - ar_multi_line_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts live in config/transforms/ar_multi_line_invoice.yaml. Not restated here.
+
+meta:
+  key: ar_multi_line_invoice
+  label: AR Multi Line Invoice
+  requester: Finance (AR)
+  date_confirmed: 2026-08-12
+  exemplar_to_fork: ap_amex_trains_v2   # account-string / COST CODE driven + header-level aggregation
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  customer: {source_column: CUSTOMER ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  company:  {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}
+
+notes: >
+  Multi-Line Customer Invoice extract - ALL source rows = ONE Workday Customer Invoice with
+  multiple invoice lines. Header-level fields (Customer, Invoice Date, DESCRIPTION LINE BOTTOM
+  OF INVOICE, Amount Due) are uniform across every source row; the transform takes the first
+  data row's values for header fields, sums GROSS across all rows for the invoice-level
+  Amount Due (CM), and writes each source row as one invoice line with incrementing line IDs
+  (DV), line-level memos (EN=INVOICE LINE DESCRIPTION, FV=INVOICE LINE DESCRIPTION), per-line
+  QUANTITY/Net/GROSS, per-line Tax Code (FB=GBR_200_VAT default), and per-line COST-CODE-driven
+  Revenue Category (EM) + 9 worktags FX..GF (Cost Centre/Reporting Type/Camp/Event/Commercial
+  Partner/FA Learning/Grant/Programme/Project line). Billable Project header (BN) mirrors line
+  Project (GF).
+  Reference Wembley Park layout confirmed: Row 1 = headers, DATE OF INVOICE col A, CUSTOMER ID
+  col B, CUSTOMER NAME col C, INVOICE  LINE DESCRIPTION col D (double-space in source - alias
+  tolerates both single-space and double-space variants), Date col E, QUANTITY col F,
+  NET col G, VAT col H, GROSS col I, DESCRIPTION LINE BOTTOM OF INVOICE col J, COST CODE col K.
+
+derived_fields:
+  derived_cost_code_final_code:
+    input_column: COST CODE
+    pipeline:
+      - strip: [" "]
+      - split_fixed: {seg1: 4, seg2: 6, seg3: 8, seg4: 4}
+      - join: ["{seg1}", "{seg2}", "{seg3}", "{seg4}"]
+        separator: "-"
+  derived_invoice_total_gross:
+    aggregation: sum
+    source_column: GROSS
+    rule: Sum of every source row's GROSS amount (column I). Written to CM (Amount Due) on
+          every output line so Workday sees a consistent invoice total regardless of line count.
+
+worktag_business_objects:
+  revenue_category: "Revenue Category"
+  cost_centre: "Cost Center"
+  event: "Events - Custom Org"
+  camp: "Camps - Custom Org"
+  fa_learning: "FA Learning - Custom Org"
+  commercial_partner: "Commercial Partners - Custom Worktag"
+  grant: "Grant"
+  program: "Program - Delivered Org"
+  project_opex: "Projects (Opex)"
+  project_capex: "Projects (Capex)"
+  sales_item: "Sales Item"
+
+eib_house_defaults:
+  submit_flag: "Y"
+  auto_complete: "Y"
+  default_currency: GBP
+  payment_status: Unpaid
+  document_status: Approved
+  invoice_type: Standard
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet_name: MAPPING MASTER
+
+accounting_string:
+  driver: COST CODE
+  final_code_key: derived_cost_code_final_code
+  resolution: lowest_hierarchy_segment_via_Mapping_Master
+  note: >
+    v46.1 Customer Invoice EIB layout — 9 accounting hierarchy slots starting at FX
+    (see eib_population_defaults.yaml customer_invoice_eib_columns for canonical order).
+    The final 4-6-8-4 code is resolved per WBO using the standard Mapping MASTER
+    lowest-segment match pattern shared with ap_amex_trains_v2. Reporting Type (FY) is
+    derived from seg2 first char via ResolveReportingTypeCode; 8 remaining objects
+    (incl Cost Centre FX, Programme GE, Project GF) come from the mapping lookup.
+    Billable Project (BN header) = Project (GF) line-level if a match exists; else blank.
+
+skip_rule:
+  drop_when:
+    - CUSTOMER ID blank (reject run if first-row customer is blank - invoice header is invalid)
+    - DATE OF INVOICE blank on first data row
+    - GROSS == 0 on a line (skip line but continue invoice)
+    - COST CODE blank on a line (flag as warning, still write line)
+    - customer unresolved (reject run if first-row customer lookup fails)
+
+mapping:
+- target: b
+  function: sequence
+- target: h
+  default: "Y"
+- target: i
+  default: "Y"
+- target: bo
+  source_column: INVOICE NUMBER
+  optional: true
+  note: >
+    Legacy GP Invoice Number (3+ flag: must reach the printed invoice header via the EIB).
+    Multi-line invoice takes the first data row's value and writes it to BO on every output
+    line. If the source extract has no `INVOICE NUMBER` column, the write is skipped; add
+    the column to the template when Finance issues the batch ref.
+- target: j
+  derivation: fixed_company_code_via_mapping
+  source_value: FA
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+    on_fail_default: THE FA GROUP - FA
+- target: ai
+  default: GBP
+- target: aj
+  source_column: CUSTOMER ID
+  lookup:
+    file: Customer Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Customer ID
+    equality: exact
+    nested: "|"
+    on_fail: reject
+- target: br
+  source_column: DATE OF INVOICE
+  source_format: dd.mm.yy or Excel date serial
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  derivation: header_level_sum_of_gross
+  source_column: GROSS
+- target: co
+  default: Standard
+- target: db
+  source_column: DESCRIPTION LINE BOTTOM OF INVOICE
+- target: dv
+  function: line_sequence_per_invoice
+- target: ej
+  source_column: SALES ITEM CODE
+  optional: true
+  note: >
+    Sales Item (EJ). Set when source extract carries a SALES ITEM CODE column
+    (bulk/multi-line reference layouts). If the column is absent, the write
+    is skipped and Revenue Category (EM) is the authoritative line driver per
+    the EIB's own R6 hint: "Revenue Category - if no Sales Item selected".
+- target: em
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Revenue Category
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: en
+  source_column: INVOICE  LINE DESCRIPTION|INVOICE LINE DESCRIPTION
+- target: fh
+  source_column: QUANTITY
+- target: fl
+  source_column: NET
+  note: >
+    Unit Cost (FL) = source NET when no Qty/Unit-of-Measure model is used (the
+    standard Reference Wembley Park layout uses one source row = one line without
+    explicit UoM). Workday EIB R6 hint: "Unit Cost if Qty and Unit of measure is
+    selected"; for the Reference layout, NET → FL, GROSS → FO (Extended Amount).
+- target: fo
+  source_column: GROSS
+- target: fb
+  default: GBR_200_VAT
+  note: >
+    Line Tax Code (FB) — default GBR_200_VAT for 20% standard-rate UK VAT.
+    If Finance issues a zero-rated batch (FINES / grant-funded items etc),
+    override per-row via source VAT-code column when it's added to the template.
+- target: fp
+  source_column: Date
+  source_format: yyyy-mm-dd or Excel date serial
+  target_format: YYYY-MM-DD
+  optional: true
+  note: >
+    Line-level Date (FP). Multi-line Reference Wembley Park template writes
+    a season range label (e.g. "JUNE-JULY 26") in the Date column, which is
+    not a YYYY-MM-DD parseable value. If present as a real date, it lands in
+    FP; if not, write is skipped and the invoice-level Invoice Date (BR) is
+    the authoritative date for the line per Workday default behaviour.
+- target: fv
+  source_column: INVOICE  LINE DESCRIPTION|INVOICE LINE DESCRIPTION
+  note: Line-level Memo (FV) for traceability on the line audit trail.
+- target: fx
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Cost Center
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: fy
+  derivation: seg2_first_char_reporting_type
+  input_column: derived_cost_code_final_code
+  function: resolve_reporting_type_via_map
+  note: Reporting Type (FY) — seg2 first char.
+- target: fz
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Camps - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ga
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Events - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gb
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Commercial Partners - Custom Worktag
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gc
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: FA Learning - Custom Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gd
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Grant
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: ge
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Program - Delivered Org
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: gf
+  derivation: derived_cost_code_final_code
+  function: lookup_worktag_from_final_code
+  lookup:
+    file: Mapping Spreadsheet
+    tab: MAPPING MASTER
+    filter_column: WORKDAY BUSINESS OBJECT
+    filter_value: Projects (Opex)
+    filter_include_column: Core vs Prism
+    filter_include_value: Core
+    input_column: OLD CODE
+    output_column: WORKDAY REF ID
+- target: bn
+  derivation: mirror_project_gf_to_billable
+  source_column: gf
+  note: Header Billable Project (BN) mirrors the line Project (GF) per the confirmed
+        multi-line Reference Wembley Park contract.

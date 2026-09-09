@@ -1,0 +1,344 @@
+# Transform spec — ap_referees_v2 (August 2026 refresh — analysis tab, NEW WORKDAY ID direct passthrough)
+#
+# Human decision record + the authoritative target-column mapping.
+# Lives in config/transform_specs/ (not config/transforms/, which the build globs as runnable profiles).
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) — live in the build profile
+# config/transforms/ap_referees_v2.yaml.
+#
+# Source workbook: Copy of Approved 18_08_26_V2_LIVE_V2.xlsx
+# Data sheet: analysis (header row 1, 39 cols A..AM in August 2026 refresh; was 59 cols A..BG in April 2026 v2)
+#
+#   Col 1  A = INV number                  (e.g. NOV17056 — unique per row)
+#   Col 2  B = Submission Date             (form submission timestamp, 100% populated)
+#   Col 3  C = Reference Number            (form ref)
+#   Col 4  D = Invoice Date                (per-row actual match date)
+#   Col 5  E = Full Name As it appears on your bank account
+#   Col 6  F = Details of Invoice          (RAW form description; NO separate JY Details cleaned col in August 2026)
+#   Col 7  G = Invoice Total               (net line amount; was I 9 in April v2)
+#   Col 8  H = VENDOR ID                   (CreditorID e.g. ANT020 / "#NO MATCH" — TRACE ONLY, NOT used for resolution)
+#   Col 9  I = Address
+#   Col 10 J = Postcode
+#   Col 11 K = Category                    (e.g. Womens Game - excess mileage, FA CORE, England Friendlies)
+#   Col 12 L = Cost Code                   (accounting string: 1040-407001-PGRW0015-0000; was N 14 in April v2)
+#   Col 13 M = HH Final Approval           ("Approved" = gate; was Q 17 in April v2)
+#   Col 14 N = PE Approval
+#   Col 15 O = PE Approval Date
+#   Col 16 P = Telephone No
+#   Col 17 Q = Email Address
+#   Col 18 R = Bank Name
+#   Col 19 S = Sort Code
+#   Col 20 T = Account Number
+#   Col 21 U = NEW WORKDAY ID              (AP/Finance curated S-XXXXXX ref — DIRECT supplier passthrough, MANDATORY)
+#   Cols 22..39 V..AM = Account number, A N check, Sort code, S C check, Finance Processed Date, Approver name cols
+#
+# Key changes from the April 2026 ap_referees_v2 (which consumed the "Referee Expenses - Analysis" tab with 59 cols):
+#   • The April 2026 v2 carried both "Details of Invoice" (col 6/F, raw) AND "JY Details"
+#     (col 7/G, Finance-cleaned description); August 2026 drops the "JY Details" column
+#     entirely so description now reads DIRECTLY from "Details of Invoice" (col 6/F) passed
+#     through UPPER(TRIM()).  The 30-length column (April col 8/H) is also removed.
+#   • April 2026 v2 read "Invoice Total" from col 9/I; August 2026 moves it to col 7/G
+#     (because JY Details + 30 length are removed).
+#   • April 2026 v2 read VENDOR ID from col 10/J; August 2026 moves it to col 8/H (same
+#     shift left because 3 rows of cleaned-description columns were removed).
+#   • April 2026 v2 read Cost Code from col 14/N; August 2026 moves it to col 12/L.
+#   • April 2026 v2 read HH Final Approval from col 17/Q; August 2026 moves it to col 13/M.
+#   • April 2026 v2 carried GP ID Match (col 26/Z), Account number match (col 28/AB),
+#     Sort code Match (col 30/AD) — the "bank validation" triple — plus GP ID (col 25/Y),
+#     Account number GP (col 27/AA), Sort code Check (col 29/AC).  ALL of these columns
+#     are REMOVED in the August 2026 refresh.  Instead, AP/Finance now curate the Workday
+#     S-XXXXXX Supplier reference DIRECTLY in the source file as "NEW WORKDAY ID"
+#     (col 21/U).  Supplier resolution is now a simple DIRECT PASSTHROUGH of that column;
+#     the old "GP ID Match == 'match'" pass gate + "VENDOR ID == 'NO MATCH'" skip gate +
+#     Creditor-ID → Supplier Spreadsheet two-part lookup are ALL RETIRED.
+#   • April 2026 v2 skipped rows where VENDOR ID == "NO MATCH" (literal sentinel for
+#     referees not in the GP vendor register).  August 2026 NO LONGER skips these rows:
+#     if NEW WORKDAY ID is populated (S-XXXXXX), the row is ACCEPTED regardless of
+#     VENDOR ID's value.  There are 4 such rows in the August 2026 exemplar: newly
+#     onboarded referees whose GP Creditor provisioning is not yet finished but whose
+#     Workday Supplier ID has already been created.  VENDOR ID is retained for audit
+#     trace only.
+#   • April 2026 v2 used the Supplier Spreadsheet two-part resolution ({VENDOR_ID}-FA
+#     precedence, then bare VENDOR_ID).  August 2026 replaces the entire lookup with
+#     "NEW WORKDAY ID blank → reject as New Supplier onboarding queue".
+#   • The analysis tab has NO Grand Total trailer row (Summary/PIVOT sheets hold totals);
+#     trailer detection fires on fully-blank trailing rows only.
+#
+# The Cost Code (analysis L / col 12) already carries the canonical 4-6-8-4 accounting
+# string in the EXACT same format as the old Integration DistributionReferenceCode —
+# no derivation needed.  All 9 worktags (Cost Centre / Spend Category / ER..EX) resolve
+# from Cost Code via the exact same lowest-hierarchy MAPPING MASTER lookup as before.
+#
+# Reuses the standard Supplier Invoice EIB field block; house defaults inherited unchanged:
+# f=Y, dd=1, dv=INVOICE/ADJUSTMENT_DATE, dz=CALC_TAX_DUE.
+
+meta:
+  key: ap_referees_v2
+  label: AP Referees V2 (Analysis tab, August 2026 refresh)
+  requester: Finance (AP)
+  date_confirmed: 2026-08-24
+  exemplar_to_fork: ap_referees
+  note: >
+    August 2026 refresh of Referees V2: the "analysis" tab continues as the input (no
+    Integration tab needed, identical to V1 refresh pipeline).  Columns REMOVED from
+    April v2: JY Details (cleaned description), 30-length, GP ID, GP ID Match, Account
+    number GP, Account number match, Sort code Check, Sort code Match — total 8 columns,
+    hence 59 cols → 39 cols, Cost Code + HH Final Approval + VENDOR ID + Invoice Total
+    all shift left by 2 positions.  Column ADDED: NEW WORKDAY ID (col 21/U) = AP-curated
+    Workday S-XXXXXX Supplier reference, DIRECT passthrough.  This REPLACES the old
+    triple of (VENDOR ID "#NO MATCH" skip) + (GP ID Match == "match" pass) + (Supplier
+    Spreadsheet Creditor-ID resolution).  "#NO MATCH" VENDOR ID rows are now accepted
+    when NEW WORKDAY ID is populated (4 rows in August 2026 exemplar).  Remaining
+    derivation logic unchanged from April v2: constant FA company, batch token from
+    MAX(Submission Date), constant INVOICE DocumentType, Details of Invoice description
+    (now col 6/F raw, no JY Details), MAX(Submission Date) as ReceiptDate batch-constant,
+    Invoice Total as PurchasesAmount, Cost Code (col 12/L) as accounting string,
+    hardcoded TaxAmount=0 / TaxDetailID=POS.  New skip gates: HH Final Approval =
+    "Approved" (M/13), NEW WORKDAY ID blank (Supplier onboarding queue).  Secondary
+    bank-detail columns are GONE; only the AP-curated NEW WORKDAY ID column is
+    authoritative for Supplier.
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_passthrough
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_final_code_column
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: per_row
+    source_column: NEW WORKDAY ID        # analysis col 21/U (August 2026 new column)
+    resolved_via: direct_passthrough
+    note: >
+      DIRECT PASSTHROUGH of NEW WORKDAY ID (analysis col 21/U).  August 2026 refresh
+      RETIRES the old April-v2 triple: (1) VENDOR ID == "NO MATCH" → skip (new-supplier
+      flow), (2) GP ID Match != "match" → skip (bank validation), (3) Supplier Spreadsheet
+      two-part Creditor-ID lookup with company precedence.  AP/Finance now curate the
+      Workday S-XXXXXX supplier reference directly in the source file for every claim
+      row.  NEW WORKDAY ID being blank → the row is rejected (AP has not yet allocated
+      a Supplier reference; New Supplier onboarding queue).  VENDOR ID (col 8/H) is
+      retained for audit trace but is NEVER used for resolution.  Rows with
+      VENDOR ID = "#NO MATCH" are accepted as long as NEW WORKDAY ID is populated
+      (4 such rows in the August 2026 exemplar = newly-onboarded referees with valid
+      Workday Supplier refs but GP Creditor provisioning not yet complete).
+  company:
+    source_code: constant
+    value: FA
+    resolved_via: constant literal FA, mapped via runner entity=company to Workday entity name
+    note: >
+      The analysis tab has no explicit Company column.  Cost Code first segment and
+      Category confirm all referee expenses are FA-entity only.  A single constant
+      literal is the canonical authority for Referees V2 company resolution.
+
+fields:
+  invoice_number:
+    rule: "REFS{MMYY}ME-{INV_number}"      # e.g. REFS0826ME-NOV17056 for August 2026 batch
+    derivation: batch_token_from_max_submission_date_plus_inv_number
+    note: >
+      Per-INVOICE uniqueness (same rationale as v1 / April v2): multi-row suppliers exist
+      so a bare batch token is insufficient.  Batch token = REFS + {MM MAX(Submission Date)}
+      + {YY MAX(Submission Date)} + ME.  For August 2026 MAX(Submission Date)=2026-08-18
+      yields REFS0826ME.  Appended with INV number (analysis col 1/A — NOV17056 etc.)
+      which is 1:1 unique per row.
+  invoice_date:
+    source_column: Invoice Date             # analysis col 4/D — per-row actual match date
+    format: Excel serial date coerced to YYYY-MM-DD text at write time
+    note: Per-row actual match / claim date.
+  receipt_date:
+    derivation: batch_max_of_submission_date
+    source_column: Submission Date          # analysis col 2/B
+    note: >
+      Canonical system-receipt date for the batch — computed as MAX(Submission Date)
+      across all rows in the batch (most-recent-form-submission date within the
+      approved batch file).  Mirrors April v2 logic (formulaically identical).
+  suppliers_invoice_number:                # EIB BG = voucher / source-system ref
+    source_column: INV number              # analysis col 1/A = NOV17056..etc.
+    note: >
+      GP voucher number series.  1:1 unique per row = the natural per-row key.
+  item_description:
+    rule: "UPPER(TRIM(Details of Invoice))"   # analysis col 6/F (CHANGED from April v2: JY Details col 7/G)
+    note: >
+      August 2026 CHANGED from "JY Details" (April v2 col 7/G, Finance-cleaned) to
+      "Details of Invoice" (col 6/F, raw form description) because the JY Details
+      column was REMOVED from the source file.  Upper-cased for EIB readability.
+  memo:
+    rule: "INV number + ' ' + Cost Code"  # EIB GQ — downstream traceability
+    note: >
+      Mirrors v1 / April v2 pattern (voucher ref + accounting string) with
+      analysis-tab column names: INV number + Cost Code.
+  line_amount:
+    source_column: Invoice Total           # analysis col 7/G (CHANGED from April v2: col 9/I)
+    basis: net
+    note: Net line amount.  Column shift left because JY Details + 30-length cols were removed.  TaxAmount hardcoded 0 so CALC_TAX_DUE no-op.
+  spend_category:
+    derivation: per_row_lookup
+    key_source_column: Cost Code           # analysis col 12/L (CHANGED from April v2: col 14/N)
+    key_rule: lowest-hierarchy matching accounting-string segment
+    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Spend Category
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  reporting_type:
+    source_column: Cost Code
+    rule: second accounting-string segment first character via reporting_type_from_final_code helper
+    note: Same reporting_type_from_final_code helper; splits on "-".
+  cost_centre:
+    derivation: per_row_lookup
+    key_source_column: Cost Code
+    key_rule: lowest-hierarchy matching accounting-string segment
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: integration_default
+    on_unresolved: skip_and_report
+  related_worktags:
+    event:
+      target: er
+      source_column: Cost Code
+      worktag_business_object_key: Events - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    camp:
+      target: es
+      source_column: Cost Code
+      worktag_business_object_key: Camps - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    fa_learning_course:
+      target: et
+      source_column: Cost Code
+      worktag_business_object_key: FA Learning - Custom Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    commercial_partner:
+      target: eu
+      source_column: Cost Code
+      worktag_business_object_key: Commercial Partners - Custom Worktag
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    grant:
+      target: ev
+      source_column: Cost Code
+      worktag_business_object_key: Grant
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    programme:
+      target: ew
+      source_column: Cost Code
+      worktag_business_object_key: Program - Delivered Org
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+    project:
+      target: ex
+      source_column: Cost Code
+      worktag_business_object_key: Projects (Opex)
+      use_shared_lookup: standard_9pack_lowest_specificity
+      specificity_standard: integration_default
+      on_unresolved: skip_ok
+
+derived_fields:
+  batch_token_from_max_submission_date:
+    input_column: Submission Date
+    rule: >-
+      Take MAX(Submission Date) across the batch.  Format as REFS + MM + YY + "ME".
+      Example: 2026-08-18 -> "REFS0826ME".
+      Used as the prefix for invoice_number construction.
+      Submission Date is 100% populated on every row by the form system (verified).
+      Finance Processed Date (col 26/Z) is NOT used because it is not populated on
+      the Approved workbook Finance shares with the agent.
+
+tax:
+  mode: uniform
+  applicability: GBR_Outside_of_Scope
+  code: GBR_Zero_Rated
+  recoverability: Nonrecoverable_Allocate
+  note: >
+    Analysis tab has NO TaxAmount or TaxDetailID columns.  Hardcoded in VBA:
+    TaxAmount = 0, TaxDetailID = "POS".  Uniform zero-tax treatment (referee match fees
+    and expense claims are zero-rated outside-scope disbursements).
+
+eib_house_defaults:
+  fixed_company_code: FA
+  submit_flag: "Y"
+  default_currency: GBP
+  tax_applicability: GBR_Outside_of_Scope
+  tax_code: GBR_Zero_Rated
+  tax_recoverability: Nonrecoverable_Allocate
+  tax_point_date_type: INVOICE/ADJUSTMENT_DATE
+  tax_option: CALC_TAX_DUE
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet_name: MAPPING MASTER
+  fixed_tax_amount: 0
+  fixed_tax_detail_id: POS
+
+worktag_business_objects:
+  cost_centre: "Cost Center"
+  spend_category: "Spend Category"
+  event: "Events - Custom Org"
+  camp: "Camps - Custom Org"
+  fa_learning: "FA Learning - Custom Org"
+  commercial_partner: "Commercial Partners - Custom Worktag"
+  grant: "Grant"
+  program: "Program - Delivered Org"
+  project: "Projects (Opex)"
+
+skip_rule:
+  drop_when:
+    # 0. Silent trailer (NOT counted in skip counters).  Disposition: skip_silently_not_counted_as_reject.
+    #    RowIsSilentTrailerAdminReferees pre-flight gate fires BEFORE RowIsSkippableV2:
+    #      INV number blank AND Cost Code blank AND NEW WORKDAY ID blank → row is a Finance-
+    #      appended SUM footer / admin summary line (exemplar row 291: only col G Invoice Total
+    #      = 26232.98, every other column blank).  These are admin housekeeping, not real claims.
+    # 1. Truly-empty / trailing blank rows (counted in empty-trailer scan, not reject bucket).
+    - INV number blank
+    # 2. Approval gate (must be HH Approved).
+    - HH Final Approval != "Approved"
+    # 3. Mandatory analysis-tab fields (August 2026).
+    #    CHANGED from April v2:
+    #      • VENDOR ID == "NO MATCH" is NO LONGER a skip trigger (rows accepted when NEW WORKDAY ID populated)
+    #      • GP ID Match != "match" is GONE (column removed from source)
+    #      • NEW WORKDAY ID blank is the NEW authority gate for Supplier onboarding
+    - INV number blank / VENDOR ID blank / Details of Invoice blank / Invoice Date blank / Submission Date blank / Cost Code blank / NEW WORKDAY ID blank / Invoice Total <= 0
+    # 4. Worktag / supplier resolution
+    - cost_centre unresolved
+    - spend_category unresolved
+    - NEW WORKDAY ID blank → supplier unresolved (New Supplier onboarding queue)
+
+trailer_row_handling:
+  pattern: >-
+    Two-tier trailer detection (August 2026 refresh, row 291 SUM footer discovered in production
+    file):
+      (a) RowIsSilentTrailerAdminReferees PRE-FLIGHT (checked first, dispositon: skip_silently):
+          AND(INV number blank, Cost Code blank, NEW WORKDAY ID blank) → silently skip.
+          Captures Finance-appended summaries where only G (Invoice Total) is non-blank.
+      (b) RowIsEmptyOrTrailer (after silent pre-flight): fully-blank trailing rows (all
+          text + amount cols blank).  Consecutive-3-empty early-exit guard.
+
+open_questions:
+  # RESOLVED (August 2026 refresh): Description column = Details of Invoice (col 6/F).
+  #   JY Details (col 7/G Finance-cleaned) + 30-length (col 8/H) were REMOVED from the
+  #   source file entirely.  Details of Invoice is the only description source.
+  # RESOLVED (August 2026 refresh): Bank detail pass gates are GONE entirely.
+  #   GP ID Match / Account number match / Sort code Match columns removed.  Supplier
+  #   authority = NEW WORKDAY ID (col 21/U) direct passthrough.  VENDOR ID "#NO MATCH"
+  #   rows accepted when NEW WORKDAY ID populated (4 rows August 2026).
+  # RESOLVED: ReceiptDate = batch MAX(Submission Date).  Submission Date (col B / 2) is
+  #   100% populated.  Finance Processed Date (Z 26) NOT used.
+  - >-
+    Batch token naming: REFS{MM}{YY}ME for Referees + Match Expenses is correct for August
+    2026.  If Finance ever runs a "Referees Non-Match-Expenses" batch the "ME" suffix may
+    be inaccurate.  Consider extracting from filename or leaving "ME" permanent.
+    Keeping "ME" for backward compatibility with April 2026 tokens.
+  - >-
+    Currency: GBP default (no currency column; referee expenses are UK domestic only).
+    UEFA/FIFA EUR batches would need a currency column addition.  Not today.

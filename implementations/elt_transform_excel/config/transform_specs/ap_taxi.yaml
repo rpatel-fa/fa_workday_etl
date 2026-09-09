@@ -1,0 +1,514 @@
+# Transform spec - ap_taxi
+#
+# GENERIC archetype transform (ONE set of VBA steps / ONE mapping set) deployed as
+# MANY Runner dropdown variants — one per taxi company. Follows the exact
+# ap_stationery "one transform, many supplier variants" pattern:
+#   - Build profile:     config/transforms/ap_taxi.yaml  (shell_defaults.variants = 1 row per supplier)
+#   - Current suppliers: FIRST CLASS (ap_taxi_first_class, variant #1)
+#   - Future suppliers: copy the ap_taxi_first_class variant block (no VBA changes needed)
+#
+# Human decision record + authoritative target-column mapping for:
+# FIRST CLASS (FIRST CLASS - Full Format -JUL 26 Template_FA_V2.xlsx) today,
+# plus any future supplier who drops a *Template* / *TEMPLATE*.xlsx file under
+# /ap/taxi/ with an "Upload Format" tab matching this 16-column A–P layout.
+# The mapping: section is the source of truth the .bas module mirrors. Lives in
+# config/transform_specs/ (NOT config/transforms/, which is the build-globbed runnable set).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and
+# source layout (worksheet, header row, required headers) - live in the build profile
+# config/transforms/ap_taxi.yaml (the build-consumed source of truth). Not restated here.
+#
+# Source workbooks = any *Template* / *TEMPLATE*.xlsx under /ap/taxi/{SupplierFolder}/source/.
+# Data sheet = "Upload Format". The FIRST CLASS exemplar is the only TEMPLATE-suffixed
+# taxi file confirmed as of Aug 14 2026.
+# Header row 1, data rows 2..33 (32 rows in FIRST CLASS Jul 26; 16 columns A–P).
+#
+# Schema relationship to stationery Proactis Upload: SAME 16-column A–P layout.
+# Every column is in the SAME A–P position as the stationery convention. Only 2
+# header names differ (col K and col O); VBA alias chains handle these transparently:
+#   Col K (11): "Account"                       (FIRST CLASS taxi; primary alias for taxi)
+#               "New Cost Code" / "Final Cost Code" (stationery fallbacks if future taxi
+#                                                     suppliers use stationery-style naming)
+#   Col O (14): "Description/BOOKED BY"         (FIRST CLASS taxi; primary alias for taxi)
+#               "Description"                   (stationery fallback if future taxi simplify)
+#   All other 14 columns are IDENTICAL in name AND exact position as stationery:
+#     A Template, B SupplierID, C InvoiceNumber, D InvoiceDate, E ReceivedDate,
+#     F Currency, G Tray, H CreatedBy, I PONumber, J ItemCode,
+#     L Net, M Tax, N Gross, P TaxCode.
+#
+# Data shape = ONE taxi workbook = MULTIPLE invoices (different from stationery, where
+#   one file = one invoice). Verified in FIRST CLASS exemplar: InvoiceNumber col C
+#   contains 1SE28308, 1SE28313, 1SE28314, 1SE28319, 1SE28320, 1SE28321 across the 32
+#   rows — each distinct invoice is 1–8 rows. All invoice numbers within a file share
+#   the same ReceivedDate (03/08/2026 in Jul 26 exemplar) but have per-row InvoiceDates.
+#
+# Canonical 2-part key decomposition from B "SupplierID" column:
+#   Source cell is formatted as "{CompanyPrefix}-{CreditorID}", e.g.
+#     "FA-1ST002" → company_prefix="FA", bare_creditor="1ST002"  (FIRST CLASS — IN SCOPE)
+#   Split on the FIRST hyphen ONLY (CreditorID portion never contains hyphens).
+#
+# CHANGE 2026-08-25 (witness: Finance user upload rejection of FIRST CLASS Jul 26
+#   built output that had 32 rows with 32 DIFFERENT Spreadsheet Key B values but
+#   21 shared Invoice Numbers K -> Workday saw 11 duplicate-invoice refs and
+#   rejected the EIB). Root cause: ONE real supplier invoice split across N rows
+#   (e.g. 1SE28324 appears on 5 rows because 5 different cost strings were
+#   allocated from the same creditor document). VBA was writing B Spreadsheet Key
+#   as per-source-row sequential counter; 5 rows same K = 5 DIFFERENT B keys ->
+#   Workday reads 5 separate headers = 5 duplicate external invoice numbers.
+#   Resolution pattern: copy AR multiline customer-invoice + SQL supplier_purchase_order
+#   migration multi-position pattern -> (1) Spreadsheet Key B = SAME value across all
+#   rows of one invoice group (group key = source Col C InvoiceNumber); (2) Line
+#   Order col 143 = 1..N counter per group; (3) Control Amount Total col 45 =
+#   SUM(Line Net) across the ENTIRE group, written to EVERY row of the group.
+#   Header fields (Company/Currency/Supplier/InvoiceDate/ReceivedDate) ARE
+#   REPEATED IDENTICALLY on every row — do NOT blank "continuation" rows.
+#   Workday uses B+143, not blank headers, to group lines. VBA also enforces
+#   header-consistency guard WITHIN each Col C group: all rows sharing an
+#   InvoiceNumber MUST have identical Supplier/Company/Currency/InvoiceDate/
+#   ReceivedDate; if any diverge the Runner errors before writing the EIB.
+#
+# Derived-field rules (Upload Format -> EIB mapping):
+#
+#   Rule 1 - Company (EIB R, col L label): split SupplierID (B) on first "-", LEFT segment.
+#            Resolves the Workday company ref-id via the Runner mapping sheet
+#            (entity=company JSON table). Falls back to "THE FA GROUP - FA" if lookup no-hit.
+#            The transform_constants.fixed_company_code "FA" in the build profile is a
+#            schema-parity sentinel only — VBA OVERRIDES it per-row from this rule.
+#   Rule 2 - Supplier (EIB U, col O label): 2-part standard precedence on RIGHT segment
+#            (bare_creditor) from Rule 1 split:
+#              1: "{bare_creditor}-{company_prefix}"  (exact per-company match, HIGHER)
+#              2: "{bare_creditor}"                    (bare supplier fallback, LOWER)
+#            Two-part precedence: exact per-company match, then bare fallback.
+#   Rule 3 - Invoice Number (EIB G, col C): source col C "InvoiceNumber" RAW DIRECT.
+#            One file = MULTIPLE invoices (distinct value per invoice group within the
+#            workbook). VBA reads per-row; no file-level batching needed.
+#            CHANGED 2026-08-25: group membership key for Rule 15/16/17/18.
+#   Rule 4 - Invoice Date (EIB u): source col D "InvoiceDate" per-row.
+#            In FIRST CLASS exemplar: dates are 08/07, 10/07, 14/07, 31/07 2026 — per-row.
+#   Rule 5 - Receipt Date (EIB AG): CHANGED 2026-09-09. LEAVE BLANK (Empty).
+#            Do NOT read source ReceivedDate col E; do NOT fall back to InvoiceDate when
+#            source is blank. Rule "same for all of them" from AP after confirming
+#            Will's hand-edited Aug Ambassador Taxi EIB has 14/14 AG=None.
+#            AG is not required when B Spreadsheet Key multi-line grouping is in effect.
+#   Rule 6 - Suppliers Invoice Number (EIB AU): EQUAL to Rule 3 Invoice Number.
+#            Taxi suppliers don't use a separate GP voucher ref — same number for
+#            internal Workday (G) and supplier-facing (AU) refs.
+#            CHANGED 2026-08-25: mirror Rule 3 explicitly (mirror_invoice_number_from_rule_3)
+#            same value as K; cross_column_guarantee bitwise identical per row.
+#   Rule 7 - Cost Code / accounting string (EIB worktags DP-EX): source col K
+#            ("Account") RAW then VBA-normalize separators:
+#              (a) Trim leading/trailing whitespace.
+#              (b) Collapse any run of space/dash/dot/underscore to a single dash "-".
+#              (c) Split on "-" → 4 canonical segments: Seg1=Cost Centre, Seg2=Spend Cat,
+#                  Seg3=Project/CommPartners/Grant/named codes, Seg4=Program.
+#              Examples: "1121-208103-CMSN2606-0000" → 4-6-8-4 (FIRST CLASS canonical)
+#                        "1168-208111-CW202602-0000" → Seg3 named commission code
+#                        "1169-302101-00000000-0000" → Seg3 zero, Seg4 generic
+#            Verified FIRST CLASS Jul 26 exemplar rows: 100% match canonical (4,6,8,4).
+#            Lowest-hierarchy Mapping MASTER lookup against all 9 worktag BO types.
+#   Rule 8 - Item Description (EIB DI): source col O "Description/BOOKED BY" DIRECT,
+#            upper-case for Workday consistency. In FIRST CLASS exemplar this column
+#            contains the END-CUSTOMER BOOKED BY name (e.g. "Grace Wilburn",
+#            "Jessica Bird", "Ben Sawbridge"). Use as line description because
+#            "Description" header in other AP transforms carries the same semantic.
+#   Rule 9 - Memo (EIB EO): concatenate InvoiceNumber (C) + ' ' + SupplierID (B) + ' ' +
+#            CostCode (K) — traceability triple = which invoice / which supplier / which coding.
+#   Rule 10 - Line Amount (EIB ED line net, EE line gross): source col L Net + col M Tax.
+#             VBA: if col L is zero/blank → fall back to (col N Gross - col M Tax) as net;
+#             EIB line amount ED = Net; CALC_TAX_DUE (dz default) leaves Workday to re-derive
+#             VAT from the tax triple (Rule 11), so we do NOT pre-add VAT into the line.
+#   Rule 11 - Tax classification: per-row via col P TaxCode string.
+#             CHANGED 2026-09-09 — P20 applicability/code/recoverability now:
+#             GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard / Fully_Recoverable
+#             (shared constants previously targeted GBR_Standard_Rated / Recoverable_Allocate
+#             which AP confirmed incorrect vs Will's hand-edited Aug Ambassador Taxi EIB).
+#             Zero-rated branches P0 / PZ remain GBR_Outside_of_Scope / GBR_Zero_Rated / Nonrecoverable_Allocate.
+#   Rule 12 - Currency (EIB N): source col F DIRECT. FIRST CLASS exemplar = GBP;
+#             keep as per-row read for robustness in case of non-UK suppliers later.
+#   Rule 13 - PO Number (EIB AP): source col I "PONumber" if non-blank, else leave empty
+#             (not mandatory for non-PO invoices; all FIRST CLASS rows are blank today).
+#   Rule 14 - Reporting Type (EIB EP, column EP): LEFT(Seg2, 1) of Rule 7 cost code
+#             second accounting-string segment first character via ResolveReportingTypeCode.
+#   Rule 15 - Spreadsheet Key (EIB B, col 2 "Spreadsheet Key*"): GROUP-LEVEL assignment
+#             NOT per-row. Group key = source Col C InvoiceNumber (same value as Rule 3).
+#             Sequential 1-based counter increments ONCE per NEW Col C value; rows of the
+#             same invoice group WRITE THE SAME integer to B. VBA prepass Phase 1 (before
+#             any row writes) assigns group keys in source-file order: 1, 2, 3, … .
+#             CHANGED 2026-08-25 from per-source-row sequential (which created 32 B
+#             values for 21 invoices and caused Workday duplicate-ref rejections).
+#             Mirrors AR multiline customer-invoice built output where Spreadsheet Key
+#             = fixed integer across all 23 lines of the one shared group header.
+#   Rule 16 - Line Order (EIB col 143 "Line Order"): per-group 1..N sequential counter
+#             1-based reset on every NEW Col C InvoiceNumber group. First row of group
+#             = 1, second = 2, ... Nth = N. No gaps, no reuse across groups.
+#             CORRECT for mixed single + multi-line batches (Sept). Workday uses B+EM
+#             tuple = authoritative line position. Mirrors AR multiline DV Line Order.
+#             Single-line groups trivially produce 1 (no drift vs single-group Aug).
+#   Rule 17 - Control Amount Total (EIB col 45 "Control Amount Total"): LEAVE BLANK.
+#             AP confirmed (2026-09-09: same Stationery fix applies to all AP transforms)
+#             that no value is required in this column. Previously populated with per-group
+#             SUM(Net) but this caused reconciliation mismatches against AP's manual file.
+#   Rule 18 - Header Consistency Guard WITHIN each Col C InvoiceNumber group (VBA
+#             runtime precondition, no mapping target): all rows sharing the same
+#             InvoiceNumber MUST have identical values for:
+#               Rule 1 Company (EIB R), Rule 2 Supplier (EIB U), Rule 12 Currency (EIB T),
+#               Rule 4 InvoiceDate (EIB AF).
+#             ReceivedDate (EIB AG) is deliberately EXCLUDED from the guard because
+#             a single Workday invoice (same InvoiceNumber, same B+EM group) can
+#             legitimately span multiple receipt months when split across cost codes
+#             at line level — B+EM grouping is the authoritative Workday header
+#             collapse key. If any row within the same group differs on ANY of the 4
+#             strict fields the Runner raises a build ERROR with the exact group
+#             InvoiceNumber key and the list of diverged values (per the per-group
+#             compare in modApTaxiSupplierInvoice.bas Phase 1). FIRST CLASS Jul 26
+#             batch: all 8 split-invoice groups pass this guard 100% (no header drift
+#             within a group).
+#   Rule 19 - Invoice Line Row ID (EIB col 141 "Row ID*", EK): EXACT MIRROR of Rule 16
+#             Line Order (EM col 143). Per-group 1..N sequential counter reset on every NEW
+#             Col C InvoiceNumber group. First row of a group = 1, second = 2, … Nth = N.
+#             CORRECT for mixed single + multi-line batches (Sept). Written from same
+#             lineOrderNext VBA local to guarantee byte-level identity within each row
+#             (EK == EM per-row invariant). Single-line groups trivially produce 1
+#             (matches legacy Great Plains 1:1 house default column_ek='1').
+#
+# Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md);
+# house defaults inherited unchanged: f=add_only=Y, dd=1, dv=INVOICE/ADJUSTMENT_DATE,
+# dz=CALC_TAX_DUE (Workday adds VAT from applicability/code/recoverability triple).
+
+meta:
+  key: ap_taxi
+  label: AP Taxi
+  requester: Finance (AP)
+  date_confirmed: 2026-08-14
+  exemplar_to_fork: ap_stationery  (which itself was Archetype B fork from ap_amex_trains)
+  note: >
+    Upload Format tab IS the Integration-quality input (confirmed by Finance for FIRST CLASS).
+    Shares the EXACT 16-column A–P layout with stationery Proactis Upload. Only col K
+    header "Account" vs "New Cost Code" / "Final Cost Code" and col O header
+    "Description/BOOKED BY" vs "Description" differ — 2 alias chains in VBA handle both.
+    Structural difference vs stationery: one file = MULTIPLE invoices (not one), handled
+    naturally by per-row read (no file-level batching).
+
+shared_helpers:
+  supplier_resolution: per_row_split_company_creditor
+  company_resolution: per_row_split_from_supplier_id
+  accounting_string_derivation: direct_column_separator_normalized
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: effective_net_gross_tax_fallback
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+
+parties:
+  supplier:
+    source_code: per_row_split
+    source_column: SupplierID                 # Upload Format col B: "{Company}-{Creditor}"
+    split_on_first_hyphen: true
+    right_segment: CreditorID                 # Rule 2 right-hand segment of split result
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    key_precedence:
+      1: "{CreditorID}-{Company}"             # exact per-company match (HIGHER, matches SQL s_exact)
+      2: "{CreditorID}"                       # bare fallback (matches SQL s_bare)
+    reference_id_delimiter: pipe
+    note: >
+      SupplierID cell is a compound "{Company}-{CreditorID}" token, e.g. "FA-1ST002" for
+      FIRST CLASS today. VBA splits on the FIRST hyphen only — CreditorID segment never
+      contains hyphens, so safe. Two-part resolution precedence identical to
+      Referees/CFA/stationery but with Company segment also extracted per-row.
+  company:
+    source_code: per_row_split
+    source_column: SupplierID                 # Rule 1 — same col B as supplier, LEFT segment
+    split_on_first_hyphen: true
+    left_segment: Company
+    resolved_via: mapping tab entity=company
+    fallback: THE FA GROUP - FA                # same string as company_fallback in build profile
+    note: >
+      Rule 1 — split SupplierID on first hyphen, LEFT segment is Company (FA today).
+
+fields:
+  invoice_number:                             # EIB G
+    source_column: InvoiceNumber              # Rule 3 = Upload Format col C, DIRECT
+    note: >
+      One workbook = MULTIPLE invoices (verified FIRST CLASS: 1SE28308, 1SE28313,
+      1SE28314, 1SE28319, 1SE28320, 1SE28321 across 32 rows). Per-row read handles this
+      naturally; no file-level batching needed.
+  invoice_date:                               # EIB u
+    source_column: InvoiceDate                # Rule 4 = col D, per-row Excel serial date
+    format: Excel serial date coerced to YYYY-MM-DD text at VBA write time
+    note: "Per-row values. FIRST CLASS exemplar: 08/07, 10/07, 14/07, 31/07 2026."
+  receipt_date:                               # EIB AG
+    function: leave_blank                     # CHANGED 2026-09-09: Will's Aug EIB has AG=None all rows
+    group_key_source_column: InvoiceNumber
+    note: >
+      Rule 5 CHANGED 2026-09-09. NO source-col read; NO InvoiceDate fallback. Write Empty.
+      Will's Aug Ambassador Taxi reference: 14/14 rows AG blank. AP confirmed "same for all
+      of them" — matches Stationery. Workday accepts blank ReceiptDate when B Spreadsheet Key
+      multi-line grouping is in effect. Previously: source_column=ReceivedDate, fallback=InvoiceDate
+      (FIRST CLASS exemplar showed ReceivedDate constant across rows).
+  line_order_within_group:                    # EIB col 143 Line Order; Rule 16
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: InvoiceNumber
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Rule 16: First row of each InvoiceNumber group = 1, second row = 2, … Nth row = N.
+      No gaps; no reuse across groups. CORRECT for mixed single/multi-line batches (Sept)
+      — Workday B+EM tuple = authoritative line position within group; enables CALC_TAX_DUE.
+      Single-line groups trivially produce 1 (matches Aug single-group).
+  invoice_line_row_id:                        # EIB col 141 Row ID* (EK); Rule 19; MIRROR EM
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: InvoiceNumber
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    cross_column_guarantee: bitwise_equal_to_target_column_em_line_order
+    note: >
+      Rule 19: Exact same 1..N per-group counter as Rule 16 (EM Line Order) — written from
+      the SAME `lineOrderNext` VBA local to guarantee byte-level identity on every row.
+      CORRECT for mixed single/multi-line batches (Sept); EK == EM per-row invariant.
+      Single-line groups trivially produce 1 (legacy Great Plains 1:1 default).
+  control_amount_total_per_group:             # EIB col 45 Control Amount Total; Rule 17
+    function: leave_blank
+    group_key_source_column: InvoiceNumber
+    note: >
+      Rule 17 CHANGED 2026-09-09 after AP confirmed (same Stationery Ambassador Taxi
+      fix applies to all AP transforms): this column MUST remain EMPTY.
+  header_consistency_guard_within_group:      # Rule 18; runtime error guard (no mapping target)
+    guard_type: runtime_error_before_eib_write
+    group_key_source_column: InvoiceNumber
+    must_be_equal_across_group:
+      - Rule 1 Company (EIB R)                 # parties.company split LEFT resolve
+      - Rule 2 Supplier (EIB U)                # parties.supplier split RIGHT resolve
+      - Rule 12 Currency (EIB T)
+      - Rule 4 InvoiceDate (EIB AF)
+    # NOTE: Rule 5 ReceivedDate (EIB AG) deliberately EXCLUDED — a single Workday
+    # invoice (B+EM group, same InvoiceNumber) can legitimately span multiple
+    # receipt months when split across cost codes at line level. Authoritative
+    # Workday grouping key is B+EM, not AG.
+    on_mismatch: reject_build_with_error_message
+    message_template: "Header field {field} diverges within same InvoiceNumber group {group_key}. Values seen: {value_list}. VBA cannot emit a valid multi-line EIB. Fix source data FIRST before re-running."
+    note: >
+      Rule 18. FIRST CLASS Jul 26 exemplar: all 8 split-invoice groups pass 100%.
+      Catches upstream source corruption before EIB reaches Workday validator.
+  item_description:                           # EIB DI (line description)
+    source_column: Description/BOOKED BY      # Rule 8 = col O, upper-case on write
+    source_column_fallback: Description       # if future taxi files use stationery naming
+    post_process: UCase(Trim(value))
+    note: >
+      In FIRST CLASS exemplar col O = end-customer name who booked (Grace Wilburn,
+      Jessica Bird, Ben Sawbridge, etc.). Use as line description consistent with
+      other AP transforms where Description column carries line-level context.
+  memo:                                       # EIB EO (traceability)
+    rule: InvoiceNumber + ' ' + SupplierID + ' ' + CostCodeString   # Rule 9
+    concat_with_space: [InvoiceNumber, SupplierID, CostCodeString]
+    note: >
+      Downstream traceability: which invoice / which supplier / which coding string.
+      CostCodeString is the VBA-normalized Rule-7 value after separator collapsing.
+  line_amount:                                # EIB ED line net, EE line gross
+    source_column_net_alias_primary: Net
+    source_column_net_alias_secondary: Net Amount
+    source_column_tax: Tax
+    source_column_gross: Gross
+    basis: net
+    fallback_net_from_gross_minus_tax: true  # if Net is blank → compute Gross - Tax
+    note: >
+      FIRST CLASS taxi uses "Net" (col L); Net Amount fallback exists if future taxi
+      files mirror E-Courier stationery naming. Net = EIB ED. CALC_TAX_DUE = dz means
+      Workday re-derives VAT from tax triple; we do NOT pre-add VAT in EE.
+  currency:
+    source_column: Currency                   # Rule 12 = col F (FIRST CLASS = GBP)
+    fallback: GBP
+    note: Per-row for robustness; default fallback keeps EIB validator happy if blank.
+  purchase_order_reference:
+    source_column: PONumber                   # Rule 13 = col I (all FIRST CLASS rows blank today)
+    on_blank: leave_empty                     # not mandatory for non-PO invoices
+  spend_category:                             # EIB DP = Seg2 of CostCode via Mapping Master
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 2 (Seg2) of accounting string, lowest-hierarchy match via Mapping MASTER
+    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Spend Category
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  cost_centre:                                # EIB EQ = Seg1 of CostCode via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 1 (Seg1) of accounting string, lowest-hierarchy match
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  event:                                      # EIB ER = Seg1 via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 1 (Seg1) matched against Events - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Events - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  camp:                                       # EIB ES = Seg1 via MA
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 1 (Seg1) matched against Camps - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Camps - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  fa_learning:                                # EIB ET
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 1 (Seg1) matched against FA Learning - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: FA Learning - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  commercial_partner:                         # EIB EU = Seg3 via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 3 (Seg3) matched against Commercial Partners - Custom Worktag
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Commercial Partners - Custom Worktag
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  grant:                                      # EIB EV = Seg3 via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 3 (Seg3) matched against Grant
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Grant
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  program:                                    # EIB EW = Seg4 via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 4 (Seg4) matched against Program - Delivered Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Program - Delivered Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  project:                                    # EIB EX = Seg3 via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: CostCodeNormalized
+    key_rule: segment 3 (Seg3) matched against Projects (Opex)
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Projects (Opex)
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+
+tax:
+  driver_column: TaxCode                      # col P, per-row STRING (not percentage)
+  sets:
+    - driver_value_match: { when_value_eq: P20 }
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+      note: CHANGED 2026-09-09 — shared constants previously targeted GBR_Standard_Rated/GBR_Standard_Rated/Recoverable_Allocate which AP confirmed wrong vs Will's hand-edited Aug Ambassador Taxi EIB. Supplier Invoice (Purchase) domain uses Domestic Purchase Of Goods And Services / GBR_Standard / Fully_Recoverable.
+    - driver_value_match: { when_value_eq: P0 }
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    - driver_value_match: { when_value_eq: PZ }
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+  on_unknown_when_value: reject_and_report
+
+skip_rule:
+  drop_when:
+    - Net amount is blank/zero AND (Gross - Tax) is also blank/zero   # empty line guard
+    - InvoiceNumber is blank                                            # no invoice ref
+    - SupplierID is blank OR does not contain at least one "-"         # split guard
+    - Account / Cost Code is blank                                     # no coding
+    - InvoiceDate is blank                                             # EIB req'd field
+    - TaxCode is blank                                                 # can't classify tax triple
+    - Item J / ItemCode = "ItemCode" (literal header bleed if file has extra title rows above true header row)
+
+unused_source_columns:
+  # Cols present on Upload Format but intentionally NOT mapped into EIB — these are
+  # Proactis/FBP-internal metadata, not part of Workday Supplier Invoice submission:
+  - Template         (col A: Proactis template tag = "DINV" in FIRST CLASS; GP system code)
+  - Tray             (col G: Proactis internal tray label = "1st Class Events")
+  - CreatedBy        (col H: Windows logon who created the export = "FA\Jpatel")
+  - ItemCode         (col J: internal GP line-type code = "VAL" value item)
+
+mapping:
+  # Standard Supplier Invoice EIB v46.2 columns (sheet = Submit Supplier Invoice):
+  #   EIB data starts row 6; clear-range ends col HH.
+  #   House defaults applied by runner (constants, not per-line): I=add_only=Y,
+  #   FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+  #
+  #   CHANGED 2026-08-25 (FIRST CLASS Jul 26 duplicate-ref rejection):
+  #     B Spreadsheet Key (col 2): was per-source-row sequential → per Col C
+  #     InvoiceNumber GROUP key. BG Suppliers Invoice Number (col 59): now mirror K local.
+  #     Added column 143 "Line Order" (per-group 1..N reset counter). Control Amount Total
+  #     (col 45 AS) CHANGED 2026-09-09: LEAVE BLANK. GE/GF both = net (identical values).
+  "B":  { source: spreadsheet_key_group_id (fields.spreadsheet_key_group_id), rule: Rule 15
+          (per Col C InvoiceNumber group, sequential ID starting at 1; all rows of
+          same group WRITE THE SAME integer to B. Source-file appearance order.
+          Group key = source Col C InvoiceNumber; 1 group per distinct InvoiceNumber.) }
+  "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
+  "K":  { source: InvoiceNumber, rule: Rule 3 (col C DIRECT; ALSO group key source for
+          Rule 15/16/17 and Rule 6 mirror source for BG) }
+  "R":  { source: company_resolved_reference_id, rule: col R = company (parties.company
+          Rule 1 split LEFT, mapping sheet entity=company; fallback THE FA GROUP - FA.
+          ALSO part of Rule 18 header consistency guard WITHIN same K group.) }
+  "T":  { source: Currency, rule: Rule 12 (col F DIRECT; fallback = GBP.
+          ALSO part of Rule 18 header consistency guard.) }
+  "U":  { source: supplier_resolved_supplier_id, rule: parties.supplier Rule 2 (split
+          RIGHT, 2-part precedence CreditorID-Company then Creditor; resolved via
+          Supplier Spreadsheet. ALSO part of Rule 18 header consistency guard.) }
+  "AF": { source: InvoiceDate, rule: Rule 4 (col D, per-row; coerced to YYYY-MM-DD at
+          write. ALSO part of Rule 18 header consistency guard.) }
+  "AG": { source: receipt_date (fields.receipt_date),
+          rule: "Rule 5 (CHANGED 2026-09-09 — LEAVE BLANK / EMPTY per Will's hand-edited Aug
+                 EIB — 14/14 rows AG=None. Do NOT read from ReceivedDate col E; do NOT fall back
+                 to InvoiceDate when source is blank. AG can legitimately vary per line when split
+                 across cost codes at line level; AP rule same for all of them overrides.)" }
+  "AS": { source: control_amount_total_per_group (fields.control_amount_total_per_group),
+          rule: Rule 17 (CHANGED 2026-09-09 — LEAVE BLANK / EMPTY per AP confirmation —
+          same Stationery Ambassador Taxi fix applies to ALL AP transforms; no AS value required.) }
+  "BG": { source: suppliers_invoice_number (fields.suppliers_invoice_number,
+          function=mirror_invoice_number_value_from_target_column_k),
+          rule: Rule 6 (1:1 bitwise mirror of K; reuse SAME invoiceNumberValue local
+          already produced for Rule 3 → write to ColumnIndex('K') and ColumnIndex('BG')
+          in same WriteOutputRow. No separate recompute. cross_column_guarantee enforced.
+          Legacy AU label renamed to BG per v46.2 row 5 header.) }
+  "BH": { source: PONumber, rule: Rule 13 (col I DIRECT; blank if empty, non-mandatory) }
+  "EK": { source: invoice_line_row_id (fields.invoice_line_row_id),
+          rule: "Rule 19 (EXACT MIRROR of EM Line Order col 143; same 1..N per-group counter.
+                 Written from the SAME lineOrderNext VBA local as EM to guarantee byte-level
+                 identity within each row. CORRECT for mixed single + multi-line Sept batches;
+                 EK == EM per-row invariant. Single-line groups trivially produce 1 (legacy
+                 Great Plains 1:1 house default column_ek=1)." }
+  "EP": { source: "Description/BOOKED BY (fallback Description)", rule: "Rule 8 (UCase(Trim…)) -- LINE description, line-level vary allowed" }
+  "FE": { source: per_row_tax.*.applicability, rule: "Rule 11 via TaxCode switch (P20→GBR_Domestic_Purchase_Of_Goods_And_Services; P0/PZ→GBR_Outside_of_Scope -- CHANGED 2026-09-09 per AP Ambassador Taxi)" }
+  "FF": { source: per_row_tax.*.code,            rule: Rule 11 via TaxCode switch (P20→GBR_Standard; P0/PZ→GBR_Zero_Rated — CHANGED 2026-09-09 was Standard_Rated/Zero_Rated per AP) }
+  "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
+  "FK": { source: per_row_tax.*.recoverability,  rule: Rule 11 via TaxCode switch (P20→Fully_Recoverable; P0/PZ→Nonrecoverable_Allocate — CHANGED 2026-09-09 was Recoverable_Allocate per AP) }
+  "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
+  "GE": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Unit Cost; net amount
+          only (no VAT). Same as GF — both columns MUST be identical per AP 2026-09-09. }
+  "GF": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Extended Amount;
+          CHANGED 2026-09-09 to match GE exactly (net only = no VAT pre-add). AP confirmed
+          Unit Cost (GE) MUST equal Extended Amount (GF). CALC_TAX_DUE re-derives VAT
+          from FE/FF/FK triple. }
+  "GQ": { source: Memo, rule: "Rule 9 concat: InvoiceNumber + ' ' + SupplierID + ' ' + CostCodeString" }
+  "EW": { source: Spend Category, rule: Rule 7 Seg2, fields.spend_category Mapping MASTER lookup (HIGHEST specificity wins; reject if no-hit) }
+  "GR": { source: Reporting Type, rule: Rule 14 = LEFT(Seg2, 1) via ResolveReportingTypeCode }
+  "GT": { source: Cost Center, rule: Rule 7 Seg1, fields.cost_centre Mapping MASTER lookup (reject no-hit) }
+  "GV": { source: Event, rule: Rule 7 Seg1 — fields.event MAPPING MASTER (optional, skip if no-hit) }
+  "GX": { source: Camp, rule: Rule 7 Seg1 — fields.camp (optional, skip) }
+  "GZ": { source: FA Learning, rule: Rule 7 Seg1 — fields.fa_learning (optional, skip) }
+  "HB": { source: Commercial Partner, rule: Rule 7 Seg3 — fields.commercial_partner (optional, skip) }
+  "HD": { source: Grant, rule: Rule 7 Seg3 — fields.grant (optional, skip) }
+  "HF": { source: Program, rule: Rule 7 Seg4 — fields.program (optional, skip) }
+  "HH": { source: Project (Opex), rule: Rule 7 Seg3 — fields.project (optional, skip) }
+  "EL": { source: "Supplier Invoice Line ID (col 142 = Row ID grouping stub for line; Workday auto-assigns when blank)", rule: "Leave EMPTY (do not write a value). Workday auto-allocates Supplier Invoice Line ID internal refs from Line Order col EM; no preallocation in source taxi data." }
+  "EM": { source: line_order_within_group (fields.line_order_within_group),
+          rule: "Rule 16 (1-based reset counter PER Col C InvoiceNumber group. First row of
+                 group=1; second row=2; Nth=N. No gaps; no reuse across groups. CORRECT for
+                 mixed single/multi-line batches (Sept). Workday B+EM = authoritative
+                 line-position tuple. Single-line groups trivially write 1 (matches Aug).)" }

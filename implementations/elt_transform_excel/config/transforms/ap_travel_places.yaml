@@ -1,0 +1,176 @@
+version: 1
+
+transform:
+  key: ap_travel_places
+  label: AP Travel Places
+  source_type: AP Travel Places Upload
+  eib_population_type: Supplier Invoice
+  description: >
+    Travel Places (travel-agent) weekly supplier-invoice workbook transformed into the Workday
+    Supplier Invoice EIB. Sources the Finance-prepared "DATA" tab directly
+    ("Travel places upload - DD.MM.YY.xlsx"; all other tabs on that workbook
+    are the agency's own aged-debt / sales reporting views and are ignored). Same core A-P
+    "Upload Format" layout as ap_taxi / ap_stationery, so this is a straight fork of ap_taxi with
+    three deltas:
+      (1) worksheet name "DATA" (not "Upload Format");
+      (2) three header-name differences vs taxi -- col D "SL Date" (= InvoiceDate),
+          col E "Date sent" (= ReceivedDate), col O "Description" (no "/BOOKED BY" suffix);
+      (3) THE STRUCTURAL DELTA: the accounting/coding string is in col Q "String Reformatted"
+          (e.g. "1099-208102-CM152606-0000") -- the finance-cleaned coding column that supersedes
+          col I "PONumber" (which carries formulas + hardcoded corrections + a "*GH"/"*BG"/"*JBD"
+          booker suffix and can no longer be derived from). All 9 worktags + Reporting Type key off
+          col Q. cols R-AJ (Cost Centre / Spend Category / worktag columns) are the finance user's
+          OWN derived/test columns and are deliberately NOT read here -- we re-derive via Mapping
+          MASTER. (Future: revert to PONumber once the business can populate it cleanly.)
+    Source col B "SupplierID" is the compound "{CompanyPrefix}-{CreditorID}" token -- for this feed
+    100% "FA-TRA009". VBA splits on the FIRST hyphen: company = "FA" (-> THE FA GROUP - FA), bare
+    creditor = "TRA009". Standard 2-part supplier precedence ({CreditorID}-{Company} then bare
+    {CreditorID}) resolves TRA009 -> Workday Supplier ID S-007201 via the pipe-delimited Reference ID
+    "TRA002-NFC|TRA009" on the Supplier extract (i.e. the bare "TRA009" alternate matches; the
+    literal "FA-TRA009" is NOT a Reference ID and would never match directly).
+    Tax is per-row from col P "Taxcode": this feed is 100% "PZ" (Tax=0, Net==Gross on every row),
+    routed through rate_0 (Outside of Scope / Zero Rated / Nonrecoverable). P20 branch retained
+    for future mixed batches — CHANGED 2026-09-09: P20 = GBR_Domestic_Purchase_Of_Goods_And_Services /
+    GBR_Standard / Fully_Recoverable (same Stationery Ambassador Taxi fix — AP confirmed
+    GBR_Standard_Rated/GBR_Standard_Rated/Recoverable_Allocate incorrect for Purchasing domain).
+    Per-row dates: InvoiceDate (EIB u) = SL Date (col D). Invoice Number (EIB g) and
+    Suppliers Invoice Number (EIB au) = col C "InvoiceNumber" direct (19/19 distinct this batch).
+    Line Net (EIB ed) and Gross (EIB ee) from cols L + N. Item Description (EIB di) = col O.
+
+    CHANGED 2026-09-09 (5-point structural update from AP "same for all of them" against Will's
+    hand-edited Aug Ambassador Taxi EIB):
+      (1) Rule 5 AG (ReceivedDate) → LEAVE BLANK. Do NOT read source "Date sent" col E; do NOT
+          fall back to SL Date when blank. Will's Aug file 14/14 AG=None.
+      (2) Rule 16 EM (Line Order col 143) → BLANK (not explicitly written; default empty).
+          Will's Aug file 14/14 EM=None; Workday derives from B Spreadsheet Key + row position.
+      (3) Rule 19 EK (Row ID col 141) → HARDCODED literal '1' every row (already was constant 1
+          in travel_places; 2026-09-09 explicitly aligns with Stationery + Taxi — Will's Aug file
+          14/14 EK=1; no counter; EM blank so mirror-logic inapplicable).
+      (4) Rule 17 AS (Control Amount Total col 45) → BLANK (not explicitly written; no per-group
+          SUM). AP confirmed — matches Stationery.
+      (5) Rule 10 GE (Unit Cost) = GF (Extended Amount) = NET-only (no VAT pre-add in GF).
+          Previously written already; kept aligned with Stationery + Taxi triple check.
+    See config/transform_specs/ap_travel_places.yaml for the full decision record, the
+    Upload->EIB derived-field rules, open questions (credit-note rows), and the per-column mapping.
+
+runtime:
+  step_list_macro: RunApTravelPlacesSupplierInvoice
+
+source_layout:
+  worksheet_name: DATA
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  # Actual Travel Places header names (single-source profile; no alias chains needed).
+  # col K "Account" is present in the header row but BLANK on every data row and unused
+  # (the coding string lives in col I "PONumber"), so it is intentionally omitted here.
+  required_headers:
+    - Template
+    - SupplierID
+    - InvoiceNumber
+    - SL Date          # col D = InvoiceDate equivalent
+    - Date sent        # col E = ReceivedDate equivalent
+    - Currency
+    - Tray
+    - Createdby
+    - PONumber            # col I = legacy coding string (formulas + hardcoded fixes; NO LONGER used as the worktag key)
+    - String Reformatted  # col Q = the accounting/coding string (worktag key) -- finance-cleaned; supersedes col I
+    - Itemcode
+    - Net
+    - Tax
+    - Gross
+    - Description
+    - Taxcode
+
+transform_constants:
+  # Supplier resolution contract -- identical shape to ap_taxi / ap_stationery.
+  # Company code is NEVER hardcoded: derived PER ROW from SupplierID col B
+  # "{CompanyPrefix}-{CreditorID}" split (left = company, right = bare creditor).
+  # This feed is uniform "FA-TRA009" but the per-row split keeps NFCL/WNSL weeks working
+  # without config edits (Travel Places has one Workday supplier record shared across
+  # companies via the pipe-delimited Reference ID "TRA002-NFC|TRA009").
+  supplier_resolution:
+    mode: per_row_split
+    source_column: SupplierID
+    split_delimiter: "-"
+    split_count: 2
+    segments:
+      - index: 1
+        name: Company
+        note: Resolves Workday company ref-id via mapping sheet entity=company
+      - index: 2
+        name: CreditorID
+        note: Bare creditor prefix -- combined with Company for 2-part supplier match
+    key_precedence:
+      1: "{CreditorID}-{Company}"
+      2: "{CreditorID}"
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    reference_id_delimiter: pipe
+  # Per-row tax classification driven by col P "Taxcode" (STRING values). This feed is 100% PZ
+  # (Tax=0, Net==Gross), routed through rate_0. P20 branch retained for future mixed batches.
+  per_row_tax:
+    driver_column: Taxcode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+  company_fallback: THE FA GROUP - FA
+  # Zero-value line policy: a row with Net = 0 AND (Gross - Tax) = 0 is a benign empty line
+  # (nothing to post to Workday), NOT a data error. Such rows are SILENTLY skipped and surfaced
+  # as an informational count -- they MUST NOT appear in the reject file (they are false negatives
+  # there). A NEGATIVE Net (credit note) is NOT zero-value and still posts (see transform_specs
+  # ap_travel_places.yaml open_questions #1). Mirrored in modApTravelPlacesSupInv.bas:
+  # the zero-amount test was removed from RowIsSkippable and moved to a silent-skip branch.
+  zero_value_line_handling: skip_silently
+  mapping_sheet: MAPPING MASTER
+  # All 9 worktags resolved from the col Q "String Reformatted" accounting string (finance-cleaned;
+  # supersedes col I "PONumber" which carried formulas + hardcoded fixes) via Mapping MASTER
+  # lowest-hierarchy match. col Q is the sole worktag key; cols R-AJ are the finance user's own
+  # derived/test columns (Cost Centre/Spend Category/worktags) and are NOT read by this transform.
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  # No fixed literal worktags -- spend_category (DP) resolved per-row from the PONumber coding
+  # string, not hardcoded like AMEX transforms.
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/travel_places/source/Travel places upload - 24.08.26.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/travel_places/target/Submit_Supplier_Invoice_ap_travel_places_output.xlsx
+  # source_layout defaults -- override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: DATA
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

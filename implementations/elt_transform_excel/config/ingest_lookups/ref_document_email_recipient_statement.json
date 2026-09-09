@@ -1,0 +1,28 @@
+{
+  "description": "Customer statement notification email recipient values for the AR customer template. The migration SQL default `Statement Contact Emails` is surfaced first. Additional allowed values are snapshotted from the CCS `FA E2E Customers V1.xlsm` workbook to cover the broader Workday validation set.",
+  "key_column": "document_email_recipient_statement",
+  "provenance": "Default confirmed from `elt_ingest_excel/config/transform/sql/finance/customer/workday_customer_document_delivery.sql` (`Statement Contact Emails`). Supplemental allowed values transcribed 2026-07-22 from the CCS workbook `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm`, Customer EIB `Document_Email_Recipient_Statement` named range (Tenant Default Named Ranges!BJ2:BJ8). Snapshot only, not a live link.",
+  "rows": [
+    {
+      "document_email_recipient_statement": "Statement Contact Emails"
+    },
+    {
+      "document_email_recipient_statement": "Customer Primary Email"
+    },
+    {
+      "document_email_recipient_statement": "All Customer Contact Emails"
+    },
+    {
+      "document_email_recipient_statement": "Parent Customer Primary Email"
+    },
+    {
+      "document_email_recipient_statement": "All Parent Customer Contact Emails"
+    },
+    {
+      "document_email_recipient_statement": "Remit-from Customer Primary Email"
+    },
+    {
+      "document_email_recipient_statement": "All Remit-from Customer Contact Emails"
+    }
+  ]
+}

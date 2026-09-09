@@ -1,0 +1,23 @@
+{
+  "description": "Source company code -> Workday company name. The Runner resolves each source row's company code to the owning Workday company through this lookup (materialised into the Runner's 'mapping' sheet at build time, entity='company').",
+  "key_column": "source",
+  "provenance": "Transcribed 2026-07-28 from the retired runner_shell/RunnerShellMapping.xlsx 'mapping' tab (company rows). A snapshot, not a link. Three FA Group companies in scope for the GP->Workday migration.",
+  "rows": [
+    {
+      "source": "FA",
+      "target": "THE FA GROUP - FA"
+    },
+    {
+      "source": "NFC",
+      "target": "THE FA GROUP - NFC"
+    },
+    {
+      "source": "WNSL",
+      "target": "THE FA GROUP - WNSL"
+    },
+    {
+      "source": "FOOTBALL ASSOCIATION",
+      "target": "THE FA GROUP - FA"
+    }
+  ]
+}

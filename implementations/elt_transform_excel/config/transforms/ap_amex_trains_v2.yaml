@@ -1,0 +1,149 @@
+version: 1
+
+transform:
+  key: ap_amex_trains_v2
+  label: AP AMEX Trains V2 (Raw Ref 2 → Final Code)
+  source_type: AP AMEX Trains V2
+  eib_population_type: Supplier Invoice
+  description: >
+    American Express rail (trains) invoice workbook transformed into the Workday
+    Supplier Invoice EIB.  This is the V2 RAW pipeline that ELIMINATES the Finance
+    pre-work required by ap_amex_trains v1: instead of reading a pre-massaged
+    Final Code / INVOICE NUMBER2 / INVOICE DATE / SUPPLIER INVOICE NUMBER /
+    VAT Percentage / Journal Name? from the source, all of those are derived in
+    VBA from the raw Amex export.  The only Finance manual step still required is
+    entering the BJ..BO travel-context values (Departure date, Destination airport
+    and friends) on the first data row; the transform fills them down automatically
+    before building the per-row memo (EO).  Company resolution uses the raw Account
+    name column (e.g. "FOOTBALL ASSOCIATION") via the entity='company' ingest lookup
+    rather than a hardcoded "FA".
+    The authoritative per-row cost-centre / related-worktag lookups from the mapping
+    master, per-row VAT selection (0% vs 20% from derived VAT Percentage), and the
+    AME001 supplier resolution are shared with ap_amex_trains v1.
+
+runtime:
+  step_list_macro: RunApAmexTrainsV2SupplierInvoice
+
+source_layout:
+  worksheet_name: CC Updated New
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - Account name
+    - Ref 2
+    - Statement ID
+    - Statement date
+    - Currency
+    - Net amount
+    - VAT
+    - Traveller name
+  optional_headers:
+    - Seg1
+    - Seg2
+    - Seg3
+    - Seg4
+    - Seg1 Overwrite
+    - Seg2 Overwrite
+    - Seg3 Overwrite
+    - Seg3 Overwrite3
+    - Seg4 Overwrite
+    - Departure date
+    - Destination airport
+
+transform_constants:
+  # NOTE: company is NOT a constant in this V2 raw-data pipeline — resolved
+  # per-row from "Account name" via entity=company ingest lookup (see description
+  # lines 17-19). Kept for parity with the other 5 AP profiles + cold-start audit
+  # contracts that expect this key to exist in every Supplier Invoice profile.
+  # The value below is the canonical constant used by sibling profiles; VBA
+  # overrides it with the per-row resolved value.
+  fixed_company_code: FA
+  fixed_supplier_reference_id: AME001
+  fixed_spend_category: Staff_Travel_Trains
+  per_row_tax:
+    driver_column: derived_vat_percentage
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Standard_Rated
+      code: GBR_Standard_Rated
+      recoverability: Recoverable_Allocate
+  company_fallback: THE FA GROUP - FA
+  mapping_sheet: MAPPING MASTER
+  worktag_business_objects:
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  fixed_literal_worktags:
+    spend_category:
+      value: Staff_Travel_Trains
+      target_eib_column: EW
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+  final_code_derivation:
+    padded_length: 22
+    pad_char: "0"
+    strip_chars: ["-", " ", "."]
+    segment_lengths: [4, 6, 8, 4]
+    seg2_first_char_map:
+      "3": "302101"
+      "4": "402201"
+      "5": "502201"
+      "6": "602201"
+    on_unmapped_seg2_char: ErrorStringAndRejectUnlessOverridden
+    error_token: "Error"
+    output_joiner: "-"
+    optional_v1_helper_headers:
+      seg1: "Seg1"
+      seg2: "Seg2"
+      seg3: "Seg3"
+      seg4: "Seg4"
+      seg2_format: raw_6char_placeholder_recompute_seg2_map
+    optional_override_headers:
+      seg1: "Seg1 Overwrite"
+      seg2: "Seg2 Overwrite"
+      seg3_aliases: ["Seg3 Overwrite", "Seg3 Overwrite3"]
+      seg4: "Seg4 Overwrite"
+      seg2_format: final_accounting_code_6digit
+  fill_down_context_columns:
+    - Travel ref 4
+    - Departure airport
+    - Departure date
+    - Destination airport
+    - Traveller first name
+    - Booking Source
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/source/AMEX TRAINS APR 26_UPDATED.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/target/Submit_Supplier_Invoice_ap_amex_trains_v2_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: CC Updated New
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.
