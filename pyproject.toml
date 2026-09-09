@@ -1,0 +1,16 @@
+[project]
+name = "fa-workday-etl"
+version = "0.1.0"
+description = "ETL implementations for migrating Football Association finance data into Workday"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Root is a workspace shell only, not a package.
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "implementations/elt_ingest_excel",
+    "implementations/elt_transform_excel",
+]

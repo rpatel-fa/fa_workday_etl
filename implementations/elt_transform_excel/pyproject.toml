@@ -1,0 +1,17 @@
+[project]
+name = "elt-transform-excel"
+version = "0.1.0"
+description = "Build/inspection tooling for the native-VBA Workday EIB transform Runner"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pyyaml>=6.0.3",
+]
+
+# Scripts-only project: the shipped solution is native-VBA (see README). There is no importable
+# package to build — this pyproject exists so `uv sync` provides a pinned environment for the
+# Python build/inspection scripts under scripts/. The documented
+# `uv run --with openpyxl --with pyyaml --no-project ...` invocations remain valid.
+[tool.uv]
+package = false

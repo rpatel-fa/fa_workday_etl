@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# uv / virtualenvs
+.venv/
+.venv_inspect/
+venv/
+
+# Packaging / build artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Transform runner outputs (derived)
+_reports/
+implementations/elt_transform_excel/dist/
+RunnerLog.csv
+RunnerStatus.txt
+
+# DuckDB / data outputs
+*.duckdb
+*.duckdb.wal
+.output/
+.tmp/
+
+# Excel lock files
+~$*.xls*
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store

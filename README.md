@@ -40,6 +40,32 @@ into a populated Workday EIB workbook. No Python/DuckDB in the shipped solution;
   and [docs/ADDING_A_TRANSFORM.md](implementations/elt_transform_excel/docs/ADDING_A_TRANSFORM.md)
   (the end-to-end authoring playbook).
 
+## Setup
+
+The repo is a **`uv` workspace** (root `pyproject.toml`); both implementations are members and
+share one lockfile at the root (`uv.lock`). `uv` is the only Python tooling used (no pip/poetry/conda).
+
+```bash
+# from repo root — sync the whole workspace
+uv sync
+
+# or sync a single member
+uv sync --package elt-ingest-excel
+uv sync --package elt-transform-excel
+```
+
+- **`elt_ingest_excel`** — the pipeline runners:
+  ```bash
+  uv run python implementations/elt_ingest_excel/examples/fin_supplier_creditor.py   # see its docs/CLI.md
+  ```
+- **`elt_transform_excel`** — Python only builds/inspects the native-VBA Runner (the shipped
+  solution is VBA). Either use the workspace env, or the docs' standalone form:
+  ```bash
+  uv run --package elt-transform-excel python implementations/elt_transform_excel/scripts/manifest_summary.py
+  # equivalently, no env needed:
+  uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/manifest_summary.py
+  ```
+
 ## Path caveat (post-extraction)
 
 These implementations were extracted from a repo where each module sat at the repo root. Some

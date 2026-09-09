@@ -24,4 +24,4 @@ overridden under pressure. The authoritative per-task playbooks are the module c
 - Any code/config change updates the affected module docs in the same change (README, ARCHITECTURE, CONFIGURATION, the relevant `finance-*.md`/transform doc, TODO). *Consequence:* stale docs are a bug in the change — the next cold-start agent trusts them and acts on wrong facts.
 
 ## Tooling
-- Python: `uv` only (`uv sync`, `uv run`). Ingest is a uv project; transform scripts run via `uv run --with <deps> --no-project`. No pip/poetry/conda.
+- Python: `uv` only, no pip/poetry/conda. The repo is a `uv` workspace (root `pyproject.toml`, both implementations are members, one root `uv.lock`). `uv sync` at root; `uv sync --package <name>` for one member. Transform's `uv run --with ... --no-project` form still works standalone. See [README.md](README.md) → Setup.
