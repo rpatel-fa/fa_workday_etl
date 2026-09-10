@@ -84,6 +84,24 @@ cells it needs (AP → supplier + mapping, AR → customer + mapping).
 **Consequence if this drifts:** every transform resolves suppliers/customers/cost-centres against a
 stale file and silently rejects valid rows — the exact multi-file-edit drift this file removes.
 
+### Build-time path substitutions (`config/path_substitutions.yaml`)
+
+`scripts/build_runner.py` applies a named path-rewrite profile from `config/path_substitutions.yaml`
+to filesystem paths it writes into `dist/Runner.xlsm`. Build-time only — the VBA runtime never reads
+this file.
+
+The profile is auto-selected from `platform.system()` via the file's `os_default_profile` map
+(`--path-profile <name>` overrides; `none` disables). On **Windows** it selects
+`windows_forward_slash`, which rewrites the **Bootstrap Source Folder** value (the absolute `vba_src`
+path `BootstrapImporter` reads) from `C:\...\vba_src` to `C:/.../vba_src` — required because
+`BootstrapImporter.DetectSeparator` mis-parses a drive-letter path's `C:` colon as the path
+separator. On macOS/Linux it selects `none` (paths written verbatim). Rules are ordered literal
+string replacements; `apply_to` lists which build-written values a profile touches (currently only
+`bootstrap_source_folder`). See `docs/BUILD_WIN.md` and the file's own header comment.
+
+**Consequence if this drifts:** a Windows build silently writes an unusable `vba_src` path and the
+manual `BootstrapImporter` step fails with *"No .bas or .cls files found"*.
+
 ## Source Layout Metadata
 
 The source workbook's structure is declared in the transform profile under a top-level `source_layout`

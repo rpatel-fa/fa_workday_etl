@@ -74,6 +74,9 @@ To add a further transform, follow `docs/ADDING_A_TRANSFORM.md` — the end-to-e
 - `config/transform_specs/` - per-transform decision record + the `mapping:` section the `.bas`
   mirrors (the field-mapping source of truth). Start here when authoring a transform.
 - `config/transforms/` - YAML build profiles used by the build tooling to seed shell defaults.
+- `config/path_substitutions.yaml` - build-time filesystem-path rewrites `build_runner.py` applies
+  to paths it writes into the workbook (auto-selected per OS; the Windows profile forward-slashes
+  the `vba_src` path so `BootstrapImporter` can read it). See `docs/BUILD_WIN.md`.
 - `vba_src/` - text-source VBA modules and classes.
 - `build/` - build tooling that assembles the shipped Runner workbook.
 - `runner_shell/` - generated Runner Shell workbook (`RunnerShell.xlsm`, the build input). The runtime

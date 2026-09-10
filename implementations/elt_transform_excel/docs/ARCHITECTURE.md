@@ -312,7 +312,11 @@ one.
    single visible control sheet and results area with profile-driven defaults.
 2. `scripts/build_runner.py` (no flag) copies the Runner Shell to `dist/Runner.xlsm`, writes the build
    status cells' source-folder input, and writes a visible transform-registry block sourced from
-   `config/transforms/*.yaml`. It does **not** import any transform module itself.
+   `config/transforms/*.yaml`. It does **not** import any transform module itself. Paths it writes
+   into the workbook pass through the OS-selected path-rewrite profile in
+   `config/path_substitutions.yaml` — a no-op on the macOS build host, but on a Windows build host it
+   forward-slashes the `vba_src` source-folder path so `BootstrapImporter.DetectSeparator` parses it
+   (see `docs/BUILD_WIN.md`). This is build-host tooling config; the VBA runtime never reads it.
 3. **Manual step:** a developer opens `dist/Runner.xlsm` in Excel and runs
    `BootstrapImporter.BootstrapImportFromConfiguredSource` (Tools > Macro > Macros). This calls the same
    `VBComponents.Import` mechanism a developer would use by hand, reading the source folder from the cell

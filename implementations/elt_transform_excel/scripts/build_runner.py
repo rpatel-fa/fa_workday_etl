@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import platform
 import re
 import shutil
 import sys
@@ -21,6 +22,7 @@ DEFAULT_VBA_SOURCE = MODULE_ROOT / "vba_src"
 DEFAULT_PROFILE_DIR = MODULE_ROOT / "config" / "transforms"
 DEFAULT_BUILD_MANIFEST = MODULE_ROOT / "config" / "build_manifest.yaml"
 DEFAULT_REFERENCE_PATHS = MODULE_ROOT / "config" / "reference_paths.yaml"
+DEFAULT_PATH_SUBSTITUTIONS = MODULE_ROOT / "config" / "path_substitutions.yaml"
 DEFAULT_OUTPUT = MODULE_ROOT / "dist" / "Runner.xlsm"
 CONFIG_SHEET_NAME = "config"
 RUNNER_SHEET_NAME = "Runner"
@@ -158,6 +160,24 @@ def create_parser() -> argparse.ArgumentParser:
             "rule violation so bad edits never reach the manual Bootstrap Import step."
         ),
     )
+    parser.add_argument(
+        "--path-substitutions",
+        default=str(DEFAULT_PATH_SUBSTITUTIONS),
+        help=(
+            "Path to path_substitutions.yaml — build-time filesystem-path rewrites "
+            f"applied to paths written into the workbook (default: {DEFAULT_PATH_SUBSTITUTIONS})"
+        ),
+    )
+    parser.add_argument(
+        "--path-profile",
+        default=None,
+        help=(
+            "Named profile from path_substitutions.yaml to apply to build-written "
+            "paths. Default: auto-selected from the OS via that file's "
+            "os_default_profile (Windows -> forward-slash rewrite so "
+            "BootstrapImporter can read the vba_src path; macOS/Linux -> none)."
+        ),
+    )
     return parser
 
 
@@ -169,6 +189,9 @@ def main() -> int:
     profile_dir = Path(args.profile_dir).expanduser().resolve()
     build_manifest_path = Path(args.build_manifest).expanduser().resolve()
     output_path = Path(args.output).expanduser().resolve()
+    path_substitution = _load_path_substitution(
+        Path(args.path_substitutions).expanduser().resolve(), args.path_profile
+    )
 
     module_names = _discover_importable_modules(vba_source)
     if not module_names:
@@ -273,9 +296,18 @@ def main() -> int:
     print(f"Output:       {output_path}")
     print(f"Modules:      {len(module_names)}")
     print(f"Bindings:     {len(transform_bindings)}")
+    print(f"Path profile: {path_substitution.profile_name}")
     print()
 
-    _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, str(vba_source))
+    source_folder_value = path_substitution.rewrite(
+        "bootstrap_source_folder", str(vba_source)
+    )
+    if source_folder_value != str(vba_source):
+        print(
+            f"Path substitution [{path_substitution.profile_name}] on bootstrap "
+            f"source folder: {vba_source} -> {source_folder_value}"
+        )
+    _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, source_folder_value)
     _clear_runner_tab_technical_columns(output_path)
     _write_transform_registry_block(output_path, transform_bindings)
     _write_shell_defaults_config_block(output_path, transform_bindings)
@@ -2319,6 +2351,77 @@ def _load_reference_paths(reference_path: Path) -> dict:
     if not isinstance(paths, dict):
         raise RuntimeError(f"'{reference_path}' must contain a 'reference_paths' mapping.")
     return {key: str(value or "") for key, value in paths.items()}
+
+
+@dataclass(frozen=True)
+class PathSubstitution:
+    """The build-time path-rewrite profile selected for this run.
+
+    Build-time only: the VBA runtime never reads path_substitutions.yaml (same
+    status as config/transforms/*.yaml). It exists so a Windows build can write
+    a vba_src path that BootstrapImporter.DetectSeparator can parse — see the
+    header of config/path_substitutions.yaml for the full rationale.
+    """
+
+    profile_name: str
+    rules: tuple[tuple[str, str], ...]
+    apply_to: frozenset[str]
+
+    def rewrite(self, target: str, value: str) -> str:
+        """Return `value` rewritten if `target` is in this profile's apply_to set."""
+        if target not in self.apply_to:
+            return value
+        result = value
+        for old, new in self.rules:
+            result = result.replace(old, new)
+        return result
+
+
+def _load_path_substitution(substitutions_path: Path, profile_override: str | None) -> PathSubstitution:
+    """Resolve the active path-substitution profile from path_substitutions.yaml.
+
+    Selection order: --path-profile if given, else os_default_profile for the
+    current platform.system(), else the file's fallback_profile.
+    """
+    yaml = _import_yaml()
+    if not substitutions_path.is_file():
+        raise RuntimeError(
+            f"Path-substitutions config not found: {substitutions_path}. "
+            "It selects the build-time filesystem-path rewrites (e.g. the "
+            "Windows forward-slash rewrite for the bootstrap source folder)."
+        )
+    with substitutions_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+
+    profiles = data.get("profiles")
+    if not isinstance(profiles, dict) or not profiles:
+        raise RuntimeError(f"'{substitutions_path}' must contain a non-empty 'profiles' mapping.")
+
+    fallback = str(data.get("fallback_profile") or "none")
+    if profile_override:
+        profile_name = profile_override
+    else:
+        os_defaults = data.get("os_default_profile") or {}
+        profile_name = str(os_defaults.get(platform.system(), fallback))
+
+    if profile_name not in profiles:
+        raise RuntimeError(
+            f"Path-substitution profile {profile_name!r} is not defined in "
+            f"{substitutions_path} (available: {sorted(profiles)})."
+        )
+
+    raw_rules = (profiles[profile_name] or {}).get("rules") or []
+    rules: list[tuple[str, str]] = []
+    for index, rule in enumerate(raw_rules, start=1):
+        if not isinstance(rule, dict) or "replace" not in rule or "with" not in rule:
+            raise RuntimeError(
+                f"{substitutions_path}: profile {profile_name!r} rule #{index} must be a "
+                "mapping with 'replace' and 'with' keys."
+            )
+        rules.append((str(rule["replace"]), str(rule["with"])))
+
+    apply_to = frozenset(str(item) for item in (data.get("apply_to") or []))
+    return PathSubstitution(profile_name, tuple(rules), apply_to)
 
 
 VALID_WORKSHEET_RESOLUTIONS = {"named", "first_sheet"}

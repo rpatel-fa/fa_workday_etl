@@ -1,5 +1,10 @@
 This module has two independent build outputs. Both are built from the repo root.
 
+> This file assumes the project owner's **macOS** build host. To build `dist/Runner.xlsm` on
+> **Windows** instead, see `docs/BUILD_WIN.md` — same rules and same manual import step, with the
+> host-specific mechanics (Trust Center setting, a `BootstrapImporter` path-separator quirk)
+> spelled out.
+
 > **COLD-START PRE-READ NOTICE (read before editing ANY code/VBA/config).**
 > Before this file, read `docs/AGENT_COLD_START_PROMPT_CONTRACT.md` in full, especially:
 > - §0.4 MANDATORY CANONICAL READ ORDER (config-first timeline — what to read in what order before writing VBA)
