@@ -796,13 +796,18 @@ End Function
 Private Function BaseName(ByVal filePath As String) As String
     Dim slashPosition As Long
     Dim colonPosition As Long
+    Dim backslashPosition As Long
     Dim splitPosition As Long
 
     slashPosition = InStrRev(filePath, "/")
     colonPosition = InStrRev(filePath, ":")
+    backslashPosition = InStrRev(filePath, "\")
     splitPosition = slashPosition
     If colonPosition > splitPosition Then
         splitPosition = colonPosition
+    End If
+    If backslashPosition > splitPosition Then
+        splitPosition = backslashPosition
     End If
 
     If splitPosition = 0 Then
@@ -857,6 +862,17 @@ Private Function JoinPath(ByVal parentFolder As String, ByVal childName As Strin
 End Function
 
 Private Function DetectPathSeparator(ByVal filePath As String) As String
+    ' Windows drive-letter path (e.g. "C:\Users\...") shape: single letter, then
+    ' ":", then "\". Recognise it before the generic ":" check below, which would
+    ' otherwise misread the drive prefix's colon as a classic-Mac "HD:Folder:File"
+    ' separator (see BootstrapImporter.bas DetectSeparator for the full history).
+    If Len(filePath) >= 3 Then
+        If (Left$(filePath, 1) Like "[A-Za-z]") And (Mid$(filePath, 2, 2) = ":\") Then
+            DetectPathSeparator = "\"
+            Exit Function
+        End If
+    End If
+
     If InStr(filePath, "/") > 0 Then
         DetectPathSeparator = "/"
     ElseIf InStr(filePath, ":") > 0 Then
@@ -869,13 +885,18 @@ End Function
 Private Function ParentFolder(ByVal filePath As String) As String
     Dim slashPosition As Long
     Dim colonPosition As Long
+    Dim backslashPosition As Long
     Dim splitPosition As Long
 
     slashPosition = InStrRev(filePath, "/")
     colonPosition = InStrRev(filePath, ":")
+    backslashPosition = InStrRev(filePath, "\")
     splitPosition = slashPosition
     If colonPosition > splitPosition Then
         splitPosition = colonPosition
+    End If
+    If backslashPosition > splitPosition Then
+        splitPosition = backslashPosition
     End If
 
     If splitPosition = 0 Then

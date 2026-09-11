@@ -658,14 +658,19 @@ Private Function LocalFileNameWithoutExtensionV2(ByVal filePath As String) As St
     Dim fileName As String
     Dim slashPosition As Long
     Dim colonPosition As Long
+    Dim backslashPosition As Long
     Dim splitPosition As Long
     Dim dotPosition As Long
 
     slashPosition = InStrRev(filePath, "/")
     colonPosition = InStrRev(filePath, ":")
+    backslashPosition = InStrRev(filePath, "\")
     splitPosition = slashPosition
     If colonPosition > splitPosition Then
         splitPosition = colonPosition
+    End If
+    If backslashPosition > splitPosition Then
+        splitPosition = backslashPosition
     End If
 
     If splitPosition = 0 Then
