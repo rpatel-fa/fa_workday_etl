@@ -150,6 +150,19 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--substitute-root-paths",
+        action="store_true",
+        help=(
+            "Skip the build; instead patch the already-built workbook's "
+            "reference/transform data-root path cells (mapping/customer/"
+            "supplier_spreadsheet, source_data, target_eib, output_file_path) in "
+            "place using root_path_substitutions.yaml, without re-copying the shell "
+            "or touching anything else. A separate step from the build itself -- run "
+            "after the default build, before the manual Import step "
+            "(docs/BUILD_WIN.md Step 3)."
+        ),
+    )
+    parser.add_argument(
         "--hygiene-only",
         action="store_true",
         help=(
@@ -285,6 +298,9 @@ def main() -> int:
     if args.verify:
         return _verify_built_workbook(output_path, vba_source, module_names, transform_bindings)
 
+    if args.substitute_root_paths:
+        return _substitute_root_paths(output_path, transform_bindings, path_substitution)
+
     _validate_inputs(runner_shell, vba_source, profile_dir, output_path)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -308,18 +324,76 @@ def main() -> int:
             f"source folder: {vba_source} -> {source_folder_value}"
         )
 
-    # Rewrite the data-root paths sourced from config/reference_paths.yaml and each
-    # transform's shell_defaults (all authored with one mac path root) for this build
-    # host, via the same path_substitution profile. See config/root_path_substitutions.yaml
-    # ("WHY THIS EXISTS", job 1) and docs/BUILD_WIN.md Step 2.
-    _DATA_ROOT_FIELDS = (
-        "mapping_spreadsheet",
-        "customer_spreadsheet",
-        "supplier_spreadsheet",
-        "source_data",
-        "target_eib",
-        "output_file_path",
-    )
+    # NOTE: this step does NOT rewrite the data-root paths sourced from
+    # config/reference_paths.yaml and each transform's shell_defaults (source_data,
+    # target_eib, output_file_path, mapping/customer/supplier_spreadsheet) -- they are
+    # written here as authored (one mac path root), unlike bootstrap_source_folder
+    # above. That is a separate, deliberate step: run
+    # `build_runner.py --substitute-root-paths` after this build, before the manual
+    # Import step. See docs/BUILD_WIN.md Step 3 and _substitute_root_paths() below.
+    _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, source_folder_value)
+    _clear_runner_tab_technical_columns(output_path)
+    _write_transform_registry_block(output_path, transform_bindings)
+    _write_shell_defaults_config_block(output_path, transform_bindings)
+    _rewrite_runner_formulas_block(output_path, transform_bindings)
+    _write_mapping_sheet_block(output_path)
+
+    print("Prep complete. Next, apply the root-path substitution (Step 3):")
+    print()
+    print(f"  uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python "
+          "elt_transform_excel/scripts/build_runner.py --substitute-root-paths")
+    print()
+    print("Then the module import itself must be run manually in Excel —")
+    print("driving it headlessly via AppleScript proved unreliable (it breaks mid-import")
+    print("unpredictably; see docs/RUNBOOK.md). To finish the build:")
+    print()
+    print(f"  1. Open {output_path} in Excel.")
+    print("  2. Tools > Macro > Macros, run: BootstrapImporter.BootstrapImportFromConfiguredSource")
+    print("     (the source folder is already filled in on the Runner sheet).")
+    print("  3. The macro saves the workbook itself when it finishes.")
+    print(f"  4. Verify with: uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project "
+          "python elt_transform_excel/scripts/build_runner.py --verify")
+    return 0
+
+
+_DATA_ROOT_FIELDS = (
+    "mapping_spreadsheet",
+    "customer_spreadsheet",
+    "supplier_spreadsheet",
+    "source_data",
+    "target_eib",
+    "output_file_path",
+)
+
+
+def _substitute_root_paths(
+    output_path: Path,
+    transform_bindings: list["TransformBinding"],
+    path_substitution: "PathSubstitution",
+) -> int:
+    """Patch the already-built workbook's data-root path cells in place -- a distinct
+    step from the build itself (docs/BUILD_WIN.md Step 3: "Root-path substitution"),
+    run after Step 2's `build_runner.py` build and before the manual Step 4 import.
+
+    Does NOT copy the shell, does not touch the transform registry's non-path columns,
+    and does not touch bootstrap_source_folder (written once, by Step 2's build; it
+    does not depend on the data root -- see config/root_path_substitutions.yaml
+    "WHY THIS EXISTS", job 2). Rewrites only mapping/customer/supplier_spreadsheet,
+    source_data, target_eib, and output_file_path across every transform binding, via
+    the same path_substitution profile used for job 2, then re-writes just the blocks
+    those fields live in."""
+    if not output_path.is_file():
+        raise FileNotFoundError(
+            f"Built workbook not found: {output_path}\n"
+            "Run the build first (docs/BUILD_WIN.md Step 2): uv run --with pyOpenVBA "
+            "--with openpyxl --with pyyaml --no-project python "
+            "elt_transform_excel/scripts/build_runner.py"
+        )
+    print(f"Output:       {output_path}")
+    print(f"Bindings:     {len(transform_bindings)}")
+    print(f"Path profile: {path_substitution.profile_name}")
+    print()
+
     data_root_rewrites = 0
     for binding in transform_bindings:
         for field_name in _DATA_ROOT_FIELDS:
@@ -334,23 +408,19 @@ def main() -> int:
             f"fields: {data_root_rewrites} value(s) rewritten across "
             f"{len(transform_bindings)} binding(s)."
         )
-    _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, source_folder_value)
+    else:
+        print(
+            f"Path substitution [{path_substitution.profile_name}]: no data-root "
+            "values needed rewriting (already matched)."
+        )
+
     _clear_runner_tab_technical_columns(output_path)
     _write_transform_registry_block(output_path, transform_bindings)
     _write_shell_defaults_config_block(output_path, transform_bindings)
     _rewrite_runner_formulas_block(output_path, transform_bindings)
-    _write_mapping_sheet_block(output_path)
 
-    print("Prep complete. The module import itself must be run manually in Excel —")
-    print("driving it headlessly via AppleScript proved unreliable (it breaks mid-import")
-    print("unpredictably; see docs/RUNBOOK.md). To finish the build:")
     print()
-    print(f"  1. Open {output_path} in Excel.")
-    print("  2. Tools > Macro > Macros, run: BootstrapImporter.BootstrapImportFromConfiguredSource")
-    print("     (the source folder is already filled in on the Runner sheet).")
-    print("  3. The macro saves the workbook itself when it finishes.")
-    print(f"  4. Verify with: uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project "
-          "python elt_transform_excel/scripts/build_runner.py --verify")
+    print("Root-path substitution complete. Continue with the manual Import step (Step 4).")
     return 0
 
 
@@ -4544,6 +4614,15 @@ def _write_shell_defaults_config_sheet(worksheet, transform_bindings: list[Trans
         worksheet.max_row,
         CONFIG_START_ROW_AFTER + len(transform_bindings) + 5,
     )
+    # This function re-merges CONFIG_BANNER_ROW below (banner spans columns 1-15). On a
+    # first-ever call (fresh shell copy) nothing is merged yet, so this is a no-op; on any
+    # later call against an already-built workbook (e.g. --substitute-root-paths patching
+    # an existing build) the merge from the previous call is still there, and writing
+    # .value into a non-top-left cell of an existing merge raises "'MergedCell' object
+    # attribute 'value' is read-only". Unmerge first so this function is safely re-runnable.
+    for merged_range in list(worksheet.merged_cells.ranges):
+        if merged_range.min_row <= CONFIG_BANNER_ROW <= merged_range.max_row:
+            worksheet.unmerge_cells(str(merged_range))
     for row_index in range(CONFIG_BANNER_ROW, max_row + 1):
         for column_index in range(1, 16):
             worksheet.cell(row=row_index, column=column_index).value = None

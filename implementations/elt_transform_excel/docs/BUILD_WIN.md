@@ -30,7 +30,7 @@ reliable: the macOS sandbox failure modes (`com.apple.quarantine` xattrs, contai
 `Import()` denials, the AppleScript-can't-pass-arguments limitation that forced the manual step
 in the first place) simply do not exist. There is one Windows-only snag instead — a path
 separator quirk in `BootstrapImporter` — which `build_runner.py` handles automatically via
-`config/root_path_substitutions.yaml` (see Step 3 below).
+`config/root_path_substitutions.yaml` (see Step 2 below).
 
 ## Prerequisites
 
@@ -113,24 +113,19 @@ fills the **Bootstrap Source Folder** cell on the `Runner` sheet with the absolu
 `vba_src`. It does **not** import any modules (that is Step 4). The macOS quarantine-xattr
 stripping this script does on every build is a no-op on Windows.
 
-### Step 3 — Root-path substitution
+This step writes the reference/transform data-root paths (`customer_spreadsheet`,
+`supplier_spreadsheet`, `mapping_spreadsheet`, `source_data`, `target_eib`,
+`output_file_path`) **exactly as authored** in `reference_paths.yaml`/`transforms/*.yaml` — one
+person's mac paths, unchanged. That's deliberate: swapping them for your own data root is a
+separate step (Step 3), not part of this build.
 
-Not a separate command — this happens automatically inside the same `build_runner.py` run from
-Step 2, before it writes any of the paths above. Documented as its own step because it changes
-values Step 2 writes, and you may need to edit its rule.
-
+**Bootstrap folder path substitution.** This step does rewrite one path:
 `build_runner.py` applies a build-time path-rewrite profile from
-`config/root_path_substitutions.yaml` to the paths it writes into the workbook. The profile is
-auto-selected from the OS: on Windows it selects `windows_forward_slash`, which does two things —
-(1) rewrites the mac data root baked into `reference_paths.yaml`/`transforms/*.yaml` to this
-host's own data root (edit that rule's `with:` value for your machine — see its `EDIT THIS`
-comment in the YAML) on `customer_spreadsheet`/`supplier_spreadsheet`/`mapping_spreadsheet`/
-`source_data`/`target_eib`/`output_file_path`, and (2) rewrites the **Bootstrap Source Folder**
-value from `C:\...\vba_src` to `C:/.../vba_src` — required, see the box below. The console prints
-the active profile (`Path profile: windows_forward_slash`) and every rewrite it performed
-(`Path substitution ... data-root fields: N value(s) rewritten`). Override with
-`--path-profile <name>` if ever needed (`none` disables it); edit the YAML to change or extend
-the rules.
+`config/root_path_substitutions.yaml` to the **Bootstrap Source Folder** value, from
+`C:\...\vba_src` to `C:/.../vba_src`. The profile is auto-selected from the OS: on Windows it
+selects `windows_forward_slash`; on macOS/Linux, `none` (no rewrite). The console prints the
+active profile (`Path profile: windows_forward_slash`) and the rewrite it performed. Override
+with `--path-profile <name>` if ever needed (`none` disables it).
 
 > **Why the forward-slash rewrite is required.** `BootstrapImporter.DetectSeparator`
 > (`vba_src/bootstrap/BootstrapImporter.bas`) picks the path separator by scanning for `/`
@@ -141,14 +136,33 @@ the rules.
 > `GetAttr`, `FileCopy`, `Open`, `Kill`) accepts `/` transparently. UNC paths become
 > `//server/share/...`, which Windows also accepts.
 
+### Step 3 — Root-path substitution
+
+A separate command, run after Step 2 and before Step 4 — not merged into the build.
+
+```powershell
+uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py --substitute-root-paths
+```
+
+Patches the already-built `dist/Runner.xlsm` in place: rewrites the six data-root fields listed
+above (both the `registry` and `config` sheets) using the same `root_path_substitutions.yaml`
+profile, swapping the mac root baked into `reference_paths.yaml`/`transforms/*.yaml` for this
+build host's own data root. Edit that rule's `with:` value for your machine — see its
+`EDIT THIS` comment in the YAML. Does **not** re-copy the shell, and does not touch the
+**Bootstrap Source Folder** cell (Step 2 already wrote that correctly). The console prints the
+active profile and every rewrite it performed
+(`Path substitution ... data-root fields: N value(s) rewritten`). If it reports 0 rewrites, the
+rule's root already matches — that's fine, not an error. Fails clearly if run before Step 2 (no
+built workbook to patch yet).
+
 ### Step 4 — Import the modules in Excel (manual)
 
 1. Open `implementations/elt_transform_excel/dist/Runner.xlsm` in Excel. Enable macros if prompted.
 
 2. Confirm the **Bootstrap Source Folder** cell (column A label on the `Runner` sheet, value in
-   the cell beside it) shows a **forward-slash** path ending in `.../vba_src`. Step 3's path
-   substitution writes it this way; if you see backslashes, Step 2's `build_runner.py` run was
-   done with `--path-profile none` or on a non-Windows OS — fix the cell by hand or re-run Step 2.
+   the cell beside it) shows a **forward-slash** path ending in `.../vba_src`. Step 2's path
+   substitution writes it this way; if you see backslashes, Step 2 was run with
+   `--path-profile none` or on a non-Windows OS — fix the cell by hand or re-run Step 2.
 
 3. Press **Alt+F8**, select **`BootstrapImporter.BootstrapImportFromConfiguredSource`**, click **Run**.
 
@@ -213,11 +227,12 @@ Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 | Symptom | Cause | Fix |
 |---|---|---|
 | `BootstrapImporter` fails instantly, before any import, mentioning the VBA project | "Trust access to the VBA project object model" is off | Trust Center → Macro Settings → tick it, restart Excel |
-| *"No .bas or .cls files found under: C:\…\vba_src"* | Backslash path + the `DetectSeparator` colon quirk — Step 3's path substitution was bypassed | Re-run Step 2 (which performs Step 3 automatically) on Windows without `--path-profile none`; or set the Bootstrap Source Folder cell to a forward-slash path by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
+| *"No .bas or .cls files found under: C:\…\vba_src"* | Backslash path + the `DetectSeparator` colon quirk — Step 2's path substitution was bypassed | Re-run Step 2 on Windows without `--path-profile none`; or set the Bootstrap Source Folder cell to a forward-slash path by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
 | `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 4 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
 | Step 0: `LF-only line ending(s)` | git checkout stripped CRLF | `git config core.autocrlf true` and re-checkout `vba_src` (Step 0 above) |
-| `pyOpenVBA` import error from Step 1/2 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
-| Built workbook points at reference/transform files that don't exist on this machine | `config/root_path_substitutions.yaml`'s data-root rule (Step 3) doesn't match this host's actual data folder | Edit the rule's `with:` value (see its own `EDIT THIS` comment) and re-run Step 2 (which performs Step 3 automatically); check the console's "Path substitution ... data-root fields: N value(s) rewritten" line to confirm it ran |
+| `pyOpenVBA` import error from Step 1/2/3 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
+| Built workbook points at reference/transform files that don't exist on this machine | Step 3 (`--substitute-root-paths`) was never run, or `config/root_path_substitutions.yaml`'s data-root rule doesn't match this host's actual data folder | Edit the rule's `with:` value (see its own `EDIT THIS` comment) and run/re-run Step 3; check the console's "Path substitution ... data-root fields: N value(s) rewritten" line to confirm it ran |
+| Step 3: *"Built workbook not found"* | Step 3 was run before Step 2 | Run Step 2 first — Step 3 patches an existing build, it does not create one |
 
 ## Optional — unattended import (PowerShell + Excel COM)
 

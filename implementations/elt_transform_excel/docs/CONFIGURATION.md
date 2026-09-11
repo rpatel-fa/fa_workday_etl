@@ -87,8 +87,9 @@ stale file and silently rejects valid rows — the exact multi-file-edit drift t
 **Per-host root.** `reference_paths.yaml` — and every `config/transforms/*.yaml` profile's
 `source_data` / `target_eib` / `output_file_path` — is authored with one person's local mac data
 root (`/Users/Rakesh.Patel/Documents/__data`). Rather than editing any of those committed files
-per host, a build-time root-path substitution rewrites that root automatically for the current
-build host; see "Build-time path substitutions" below.
+per host, a separate build step (`build_runner.py --substitute-root-paths`, run after the
+normal build) rewrites that root for the current build host; see "Build-time path substitutions"
+below and `docs/BUILD_WIN.md` Step 3.
 
 ### Build-time path substitutions (`config/root_path_substitutions.yaml`)
 
@@ -98,18 +99,27 @@ this file.
 
 The profile is auto-selected from `platform.system()` via the file's `os_default_profile` map
 (`--path-profile <name>` overrides; `none` disables). On macOS/Linux it selects `none` (paths
-written verbatim). On **Windows** it selects `windows_forward_slash`, which does two ordered
-rewrites to every value listed in `apply_to`:
+written verbatim). On **Windows** it selects `windows_forward_slash`, whose two rules cover two
+jobs run from **two separate commands**, not one:
 
-1. **Data root.** Rewrites the mac data root baked into `reference_paths.yaml` and
-   `transforms/*.yaml` shell_defaults (`mapping_spreadsheet`, `customer_spreadsheet`,
-   `supplier_spreadsheet`, `source_data`, `target_eib`, `output_file_path`) to this build host's
-   local data root — edit this rule's `with:` value for your own machine (see the rule's own
-   `EDIT THIS` comment in `config/root_path_substitutions.yaml`).
-2. **Separator.** Rewrites the **Bootstrap Source Folder** value (the absolute `vba_src` path
-   `BootstrapImporter` reads) from `C:\...\vba_src` to `C:/.../vba_src` — required because
-   `BootstrapImporter.DetectSeparator` mis-parses a drive-letter path's `C:` colon as the path
-   separator. Runs after (1) so backslashes it introduces also get normalized.
+1. **Data root** (`docs/BUILD_WIN.md` Step 3, `build_runner.py --substitute-root-paths`).
+   Rewrites the mac data root baked into `reference_paths.yaml` and `transforms/*.yaml`
+   shell_defaults (`mapping_spreadsheet`, `customer_spreadsheet`, `supplier_spreadsheet`,
+   `source_data`, `target_eib`, `output_file_path`) to this build host's local data root — edit
+   this rule's `with:` value for your own machine (see the rule's own `EDIT THIS` comment in
+   `config/root_path_substitutions.yaml`). Patches the already-built workbook in place; run after
+   the normal build.
+2. **Separator** (`docs/BUILD_WIN.md` Step 2, the normal `build_runner.py` build). Rewrites the
+   **Bootstrap Source Folder** value (the absolute `vba_src` path `BootstrapImporter` reads) from
+   `C:\...\vba_src` to `C:/.../vba_src` — required because `BootstrapImporter.DetectSeparator`
+   mis-parses a drive-letter path's `C:` colon as the path separator. Runs automatically as part
+   of every build.
+
+Both jobs are rules in the same profile (rule (1)'s data-root swap is ordered before rule (2)'s
+separator normalize so backslashes it introduces also get normalized), but each job is invoked
+independently, against only the field(s) its own call site asks `PathSubstitution.rewrite()` to
+rewrite — job 2 never touches the data-root fields, and job 1 never touches
+`bootstrap_source_folder`.
 
 Rules are ordered literal string replacements, applied top to bottom; `apply_to` lists which
 build-written values a profile touches. See `docs/BUILD_WIN.md` and the file's own header comment.
