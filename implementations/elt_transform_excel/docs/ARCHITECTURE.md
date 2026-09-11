@@ -314,9 +314,11 @@ one.
    status cells' source-folder input, and writes a visible transform-registry block sourced from
    `config/transforms/*.yaml`. It does **not** import any transform module itself. Paths it writes
    into the workbook pass through the OS-selected path-rewrite profile in
-   `config/path_substitutions.yaml` — a no-op on the macOS build host, but on a Windows build host it
-   forward-slashes the `vba_src` source-folder path so `BootstrapImporter.DetectSeparator` parses it
-   (see `docs/BUILD_WIN.md`). This is build-host tooling config; the VBA runtime never reads it.
+   `config/root_path_substitutions.yaml` — a no-op on the macOS build host, but on a Windows build
+   host it (1) rewrites the mac data root baked into `reference_paths.yaml`/`transforms/*.yaml` to
+   the local build host's data root, and (2) forward-slashes the `vba_src` source-folder path so
+   `BootstrapImporter.DetectSeparator` parses it (see `docs/BUILD_WIN.md`). This is build-host
+   tooling config; the VBA runtime never reads it.
 3. **Manual step:** a developer opens `dist/Runner.xlsm` in Excel and runs
    `BootstrapImporter.BootstrapImportFromConfiguredSource` (Tools > Macro > Macros). This calls the same
    `VBComponents.Import` mechanism a developer would use by hand, reading the source folder from the cell

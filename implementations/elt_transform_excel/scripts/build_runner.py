@@ -22,7 +22,7 @@ DEFAULT_VBA_SOURCE = MODULE_ROOT / "vba_src"
 DEFAULT_PROFILE_DIR = MODULE_ROOT / "config" / "transforms"
 DEFAULT_BUILD_MANIFEST = MODULE_ROOT / "config" / "build_manifest.yaml"
 DEFAULT_REFERENCE_PATHS = MODULE_ROOT / "config" / "reference_paths.yaml"
-DEFAULT_PATH_SUBSTITUTIONS = MODULE_ROOT / "config" / "path_substitutions.yaml"
+DEFAULT_PATH_SUBSTITUTIONS = MODULE_ROOT / "config" / "root_path_substitutions.yaml"
 DEFAULT_OUTPUT = MODULE_ROOT / "dist" / "Runner.xlsm"
 CONFIG_SHEET_NAME = "config"
 RUNNER_SHEET_NAME = "Runner"
@@ -150,6 +150,19 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--substitute-root-paths",
+        action="store_true",
+        help=(
+            "Skip the build; instead patch the already-built workbook's "
+            "reference/transform data-root path cells (mapping/customer/"
+            "supplier_spreadsheet, source_data, target_eib, output_file_path) in "
+            "place using root_path_substitutions.yaml, without re-copying the shell "
+            "or touching anything else. A separate step from the build itself -- run "
+            "after the default build, before the manual Import step "
+            "(docs/BUILD_WIN.md Step 3)."
+        ),
+    )
+    parser.add_argument(
         "--hygiene-only",
         action="store_true",
         help=(
@@ -164,7 +177,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--path-substitutions",
         default=str(DEFAULT_PATH_SUBSTITUTIONS),
         help=(
-            "Path to path_substitutions.yaml — build-time filesystem-path rewrites "
+            "Path to root_path_substitutions.yaml — build-time filesystem-path rewrites "
             f"applied to paths written into the workbook (default: {DEFAULT_PATH_SUBSTITUTIONS})"
         ),
     )
@@ -172,7 +185,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--path-profile",
         default=None,
         help=(
-            "Named profile from path_substitutions.yaml to apply to build-written "
+            "Named profile from root_path_substitutions.yaml to apply to build-written "
             "paths. Default: auto-selected from the OS via that file's "
             "os_default_profile (Windows -> forward-slash rewrite so "
             "BootstrapImporter can read the vba_src path; macOS/Linux -> none)."
@@ -285,6 +298,9 @@ def main() -> int:
     if args.verify:
         return _verify_built_workbook(output_path, vba_source, module_names, transform_bindings)
 
+    if args.substitute_root_paths:
+        return _substitute_root_paths(output_path, transform_bindings, path_substitution)
+
     _validate_inputs(runner_shell, vba_source, profile_dir, output_path)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -307,6 +323,14 @@ def main() -> int:
             f"Path substitution [{path_substitution.profile_name}] on bootstrap "
             f"source folder: {vba_source} -> {source_folder_value}"
         )
+
+    # NOTE: this step does NOT rewrite the data-root paths sourced from
+    # config/reference_paths.yaml and each transform's shell_defaults (source_data,
+    # target_eib, output_file_path, mapping/customer/supplier_spreadsheet) -- they are
+    # written here as authored (one mac path root), unlike bootstrap_source_folder
+    # above. That is a separate, deliberate step: run
+    # `build_runner.py --substitute-root-paths` after this build, before the manual
+    # Import step. See docs/BUILD_WIN.md Step 3 and _substitute_root_paths() below.
     _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, source_folder_value)
     _clear_runner_tab_technical_columns(output_path)
     _write_transform_registry_block(output_path, transform_bindings)
@@ -314,7 +338,12 @@ def main() -> int:
     _rewrite_runner_formulas_block(output_path, transform_bindings)
     _write_mapping_sheet_block(output_path)
 
-    print("Prep complete. The module import itself must be run manually in Excel —")
+    print("Prep complete. Next, apply the root-path substitution (Step 3):")
+    print()
+    print(f"  uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python "
+          "elt_transform_excel/scripts/build_runner.py --substitute-root-paths")
+    print()
+    print("Then the module import itself must be run manually in Excel —")
     print("driving it headlessly via AppleScript proved unreliable (it breaks mid-import")
     print("unpredictably; see docs/RUNBOOK.md). To finish the build:")
     print()
@@ -324,6 +353,74 @@ def main() -> int:
     print("  3. The macro saves the workbook itself when it finishes.")
     print(f"  4. Verify with: uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project "
           "python elt_transform_excel/scripts/build_runner.py --verify")
+    return 0
+
+
+_DATA_ROOT_FIELDS = (
+    "mapping_spreadsheet",
+    "customer_spreadsheet",
+    "supplier_spreadsheet",
+    "source_data",
+    "target_eib",
+    "output_file_path",
+)
+
+
+def _substitute_root_paths(
+    output_path: Path,
+    transform_bindings: list["TransformBinding"],
+    path_substitution: "PathSubstitution",
+) -> int:
+    """Patch the already-built workbook's data-root path cells in place -- a distinct
+    step from the build itself (docs/BUILD_WIN.md Step 3: "Root-path substitution"),
+    run after Step 2's `build_runner.py` build and before the manual Step 4 import.
+
+    Does NOT copy the shell, does not touch the transform registry's non-path columns,
+    and does not touch bootstrap_source_folder (written once, by Step 2's build; it
+    does not depend on the data root -- see config/root_path_substitutions.yaml
+    "WHY THIS EXISTS", job 2). Rewrites only mapping/customer/supplier_spreadsheet,
+    source_data, target_eib, and output_file_path across every transform binding, via
+    the same path_substitution profile used for job 2, then re-writes just the blocks
+    those fields live in."""
+    if not output_path.is_file():
+        raise FileNotFoundError(
+            f"Built workbook not found: {output_path}\n"
+            "Run the build first (docs/BUILD_WIN.md Step 2): uv run --with pyOpenVBA "
+            "--with openpyxl --with pyyaml --no-project python "
+            "elt_transform_excel/scripts/build_runner.py"
+        )
+    print(f"Output:       {output_path}")
+    print(f"Bindings:     {len(transform_bindings)}")
+    print(f"Path profile: {path_substitution.profile_name}")
+    print()
+
+    data_root_rewrites = 0
+    for binding in transform_bindings:
+        for field_name in _DATA_ROOT_FIELDS:
+            original = getattr(binding, field_name)
+            rewritten = path_substitution.rewrite(field_name, original)
+            if rewritten != original:
+                setattr(binding, field_name, rewritten)
+                data_root_rewrites += 1
+    if data_root_rewrites:
+        print(
+            f"Path substitution [{path_substitution.profile_name}] on data-root "
+            f"fields: {data_root_rewrites} value(s) rewritten across "
+            f"{len(transform_bindings)} binding(s)."
+        )
+    else:
+        print(
+            f"Path substitution [{path_substitution.profile_name}]: no data-root "
+            "values needed rewriting (already matched)."
+        )
+
+    _clear_runner_tab_technical_columns(output_path)
+    _write_transform_registry_block(output_path, transform_bindings)
+    _write_shell_defaults_config_block(output_path, transform_bindings)
+    _rewrite_runner_formulas_block(output_path, transform_bindings)
+
+    print()
+    print("Root-path substitution complete. Continue with the manual Import step (Step 4).")
     return 0
 
 
@@ -2338,7 +2435,12 @@ def _write_label_value(workbook_path: Path, label_text: str, value: str) -> None
 def _load_reference_paths(reference_path: Path) -> dict:
     """Load the shared reference-data paths (customer/supplier/mapping) that every transform
     inherits unless its profile overrides the key. Single source of truth so an updated Workday
-    extract or finance mapping file is changed once, not in every profile."""
+    extract or finance mapping file is changed once, not in every profile.
+
+    Authored with one person's mac path root; a build-time root-path substitution (see
+    config/root_path_substitutions.yaml, applied in main() via PathSubstitution.rewrite for the
+    mapping_spreadsheet/customer_spreadsheet/supplier_spreadsheet targets) rewrites that root
+    for other build hosts. This function itself does no host-specific rewriting."""
     yaml = _import_yaml()
     if not reference_path.is_file():
         raise RuntimeError(
@@ -2357,14 +2459,21 @@ def _load_reference_paths(reference_path: Path) -> dict:
 class PathSubstitution:
     """The build-time path-rewrite profile selected for this run.
 
-    Build-time only: the VBA runtime never reads path_substitutions.yaml (same
-    status as config/transforms/*.yaml). It exists so a Windows build can write
-    a vba_src path that BootstrapImporter.DetectSeparator can parse — see the
-    header of config/path_substitutions.yaml for the full rationale.
+    Build-time only: the VBA runtime never reads root_path_substitutions.yaml (same
+    status as config/transforms/*.yaml) — see its header for the full rationale.
+
+    A profile does exactly three things, in this order, to any target field listed
+    in apply_to: (1) replace `root_path_substitution` with `new_root_path` (a
+    literal string swap; no-op if `root_path_substitution` is empty), then (3)
+    normalize every remaining "/" to "\\" if `convert_forward_slash_to_backslash`
+    is true. There is no per-field targeting — every field in apply_to gets the
+    same treatment.
     """
 
     profile_name: str
-    rules: tuple[tuple[str, str], ...]
+    root_path_substitution: str
+    new_root_path: str
+    convert_forward_slash_to_backslash: bool
     apply_to: frozenset[str]
 
     def rewrite(self, target: str, value: str) -> str:
@@ -2372,13 +2481,15 @@ class PathSubstitution:
         if target not in self.apply_to:
             return value
         result = value
-        for old, new in self.rules:
-            result = result.replace(old, new)
+        if self.root_path_substitution:
+            result = result.replace(self.root_path_substitution, self.new_root_path)
+        if self.convert_forward_slash_to_backslash:
+            result = result.replace("/", "\\")
         return result
 
 
 def _load_path_substitution(substitutions_path: Path, profile_override: str | None) -> PathSubstitution:
-    """Resolve the active path-substitution profile from path_substitutions.yaml.
+    """Resolve the active path-substitution profile from root_path_substitutions.yaml.
 
     Selection order: --path-profile if given, else os_default_profile for the
     current platform.system(), else the file's fallback_profile.
@@ -2388,7 +2499,7 @@ def _load_path_substitution(substitutions_path: Path, profile_override: str | No
         raise RuntimeError(
             f"Path-substitutions config not found: {substitutions_path}. "
             "It selects the build-time filesystem-path rewrites (e.g. the "
-            "Windows forward-slash rewrite for the bootstrap source folder)."
+            "Windows data-root swap and backslash normalization)."
         )
     with substitutions_path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
@@ -2410,18 +2521,19 @@ def _load_path_substitution(substitutions_path: Path, profile_override: str | No
             f"{substitutions_path} (available: {sorted(profiles)})."
         )
 
-    raw_rules = (profiles[profile_name] or {}).get("rules") or []
-    rules: list[tuple[str, str]] = []
-    for index, rule in enumerate(raw_rules, start=1):
-        if not isinstance(rule, dict) or "replace" not in rule or "with" not in rule:
-            raise RuntimeError(
-                f"{substitutions_path}: profile {profile_name!r} rule #{index} must be a "
-                "mapping with 'replace' and 'with' keys."
-            )
-        rules.append((str(rule["replace"]), str(rule["with"])))
+    profile = profiles[profile_name] or {}
+    root_path_substitution = str(profile.get("root_path_substitution") or "")
+    new_root_path = str(profile.get("new_root_path") or "")
+    convert_forward_slash_to_backslash = bool(profile.get("convert_forward_slash_to_backslash", False))
 
     apply_to = frozenset(str(item) for item in (data.get("apply_to") or []))
-    return PathSubstitution(profile_name, tuple(rules), apply_to)
+    return PathSubstitution(
+        profile_name,
+        root_path_substitution,
+        new_root_path,
+        convert_forward_slash_to_backslash,
+        apply_to,
+    )
 
 
 VALID_WORKSHEET_RESOLUTIONS = {"named", "first_sheet"}
@@ -4512,6 +4624,15 @@ def _write_shell_defaults_config_sheet(worksheet, transform_bindings: list[Trans
         worksheet.max_row,
         CONFIG_START_ROW_AFTER + len(transform_bindings) + 5,
     )
+    # This function re-merges CONFIG_BANNER_ROW below (banner spans columns 1-15). On a
+    # first-ever call (fresh shell copy) nothing is merged yet, so this is a no-op; on any
+    # later call against an already-built workbook (e.g. --substitute-root-paths patching
+    # an existing build) the merge from the previous call is still there, and writing
+    # .value into a non-top-left cell of an existing merge raises "'MergedCell' object
+    # attribute 'value' is read-only". Unmerge first so this function is safely re-runnable.
+    for merged_range in list(worksheet.merged_cells.ranges):
+        if merged_range.min_row <= CONFIG_BANNER_ROW <= merged_range.max_row:
+            worksheet.unmerge_cells(str(merged_range))
     for row_index in range(CONFIG_BANNER_ROW, max_row + 1):
         for column_index in range(1, 16):
             worksheet.cell(row=row_index, column=column_index).value = None
