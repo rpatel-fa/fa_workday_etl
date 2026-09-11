@@ -41,8 +41,9 @@
 # (job 1) or a source folder BootstrapImporter can't parse (job 2). A wrong
 # os_default_profile on macOS would rewrite paths that are already correct.
 #
-# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 2 -- Prep the
-# distribution workbook), which applies both jobs automatically.
+# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 3 -- Root-path
+# substitution), which explains both jobs; they run automatically as part of
+# Step 2's build_runner.py invocation, not as a separate command.
 version: 1
 
 # build_runner.py selects a profile in this order:
