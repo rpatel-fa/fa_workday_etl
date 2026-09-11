@@ -1,13 +1,13 @@
 # Building the Runner on Windows
 
-`docs/BUILD.md` is written for the project owner's macOS build host. This file is the Windows
-equivalent for `dist/Runner.xlsm` — the finance-user workbook. Everything else in `BUILD.md`
-(rules enforced, the ingest-template render, the source-hygiene contract) applies unchanged;
-only the host-specific mechanics differ.
+This is the complete, self-contained guide for building `dist/Runner.xlsm` — the finance-user
+workbook — on Windows. You don't need `docs/BUILD.md` to follow it; that file is the project
+owner's macOS build guide, kept only as the macOS-host equivalent for reference.
 
 > **COLD-START PRE-READ NOTICE (read before editing ANY code/VBA/config).**
-> Same as `BUILD.md`: read `docs/AGENT_COLD_START_PROMPT_CONTRACT.md` §0.4 / §0.5 / §0.6 first.
-> This file changes *where you run the build*, not *what the build is allowed to contain*.
+> Read `docs/AGENT_COLD_START_PROMPT_CONTRACT.md` §0.4 / §0.5 / §0.6 first — this requirement is
+> the same on every host. This file changes *where you run the build*, not *what the build is
+> allowed to contain*.
 
 > **Path note (post-extraction).** Commands below are repo-root-relative and use
 > `implementations/elt_transform_excel/...`. Historical docs (`BUILD.md`, `RUNBOOK.md`) show
@@ -82,10 +82,12 @@ git checkout -- implementations/elt_transform_excel/vba_src
 (Or convert the working-tree `.bas`/`.cls` files to CRLF with any editor. The repo blobs are
 already CRLF; the goal is only to keep them that way on checkout.)
 
-Rules enforced are identical to `BUILD.md` Step 0 (non-ASCII ceilings, CRLF everywhere,
-component names ≤ 31 chars, 300-char line ceiling, no `Worksheets(n)` index lookups,
-`ResolveSelectedTransformKey` / `Run<Name>` arity contracts, every `step_list_macro` maps to a
-real `Public Sub`).
+Rules enforced: non-ASCII byte ceilings (≤ 20 WARN / > 20 ERROR), CRLF everywhere (no lone-LF),
+component/stem names ≤ 31 chars, source lines ≥ 300 chars = HARD ERROR, no `Worksheets(n)`
+index-based lookups, `ResolveSelectedTransformKey` call sites always take 2 args, every
+`Public Sub Run<Name>` has the 2-typed-arg signature, and every `runtime.step_list_macro`
+declared in YAML maps to a concrete VBA `Public Sub`. The check script is pure Python and does
+not branch on OS, so these rules are identical on every build host.
 
 ### Step 1 — Create the shell workbook
 
@@ -150,6 +152,32 @@ BootstrapImporter.BootstrapImportFromFolder "C:/Users/you/.../implementations/el
 
 This bypasses the cell entirely and is a good option for a scripted build.
 
+**If import fails on a specific module** with `Method 'Import' of object '_VBComponents'
+failed` — and, if the error additionally says *"Imported 'Module1'"* instead of the real module
+name, the parser silently fell back to a blank module — check these causes in order; earliest is
+cheapest to rule out:
+
+0. **Module name > 31 characters.** VBA's hard limit on component names. If
+   `Attribute VB_Name` / the `mod<Name>.bas` filename exceeds it, `Import` drops the name, keeps
+   the blank `Module1`, and fails the rename back — surfacing as `-2147219692 (80040714)`. Not a
+   mid-parse abort; check first:
+   `python3 -c "import os,glob; bad=[f for f in glob.glob('vba_src/**/*.bas',recursive=True) if len(os.path.basename(f)[:-4])>31]; assert not bad, bad"`.
+   Shorten the module name only; the `Run<Name>` Sub / `step_list_macro` name is not limited.
+1. **Non-ASCII / Unicode content in the `.bas` file.** Documented as a macOS
+   `VBComponents.Import` failure mode (its ANSI-first parser silently aborts on multi-byte UTF-8,
+   even inside comments). Step 0 enforces the same byte ceiling on every host, so a file that
+   passes Step 0 will not trigger this on Windows either. If you bypassed Step 0, fix by
+   transcoding to ASCII equivalents (`—` → `--`, `─` → `-`, `→` → `->`, curly quotes `"`/`'` →
+   straight `"`/`'`).
+2. **VBA source files must be CRLF, not LF-only.** With LF-only, the parser may fail to
+   recognise `Attribute VB_Name` / class-module headers and falls back to `Module1`. Step 0
+   catches this — see the CRLF note under Step 0 above for the fix.
+3. **Unbalanced procedure terminators** (`Sub` ... `End Sub`, `Function` ... `End Function`).
+   An unterminated procedure aborts the whole import.
+4. **Long line-continuation-heavy procedure signatures/calls.** Documented as a macOS import
+   failure mode; not observed on Windows, but if it recurs here, shorten the signature by moving
+   shared state/arguments into module-level variables or helpers.
+
 ### Step 4 — Verify
 
 ```powershell
@@ -171,7 +199,7 @@ Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 |---|---|---|
 | `BootstrapImporter` fails instantly, before any import, mentioning the VBA project | "Trust access to the VBA project object model" is off | Trust Center → Macro Settings → tick it, restart Excel |
 | *"No .bas or .cls files found under: C:\…\vba_src"* | Backslash path + the `DetectSeparator` colon quirk — Step 2's path substitution was bypassed | Re-run Step 2 on Windows without `--path-profile none`; or set the Bootstrap Source Folder cell to a forward-slash path by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
-| `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` per `BUILD.md` Step 3 causes (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
+| `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 3 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
 | Step 0: `LF-only line ending(s)` | git checkout stripped CRLF | `git config core.autocrlf true` and re-checkout `vba_src` (Step 0 above) |
 | `pyOpenVBA` import error from Step 1/2 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
 
@@ -206,10 +234,25 @@ the macro must use forward slashes. Follow with Step 4 (`--verify`) as usual. Do
 any tool (`pyOpenVBA` included) at the VBA project of an existing `dist/Runner.xlsm` to add
 modules directly — that path is rejected on both platforms (`RUNBOOK.md` → "Diagnosis").
 
-## Ingest template (unchanged)
+## Ingest template
 
-No Excel, no VBA, identical to `BUILD.md`:
+Render the template a finance team populate by hand, from its ingest spec. One step, no Excel,
+no VBA — nothing here touches the Runner build above.
 
 ```powershell
 uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py ar_customer --overwrite
 ```
+
+`config/ingest_specs/ar_customer.yaml` → `dist/ingest_templates/ar_customer.xlsx`. The argument
+is the spec key (any file under `config/ingest_specs/`); a path to a spec YAML also works. Add
+`--sample-row` to also fill row 2 from each column's `example`. Columns with a `default` are
+pre-filled either way.
+
+The spec is the source of truth and the workbook is a render of it — **never hand-edit the
+generated `.xlsx`**, as the next render silently discards the edit. The render is deterministic
+(identical spec in, byte-identical workbook out), so re-rendering an unchanged spec is a no-op
+you can run freely.
+
+For the edit → render → review loop and what the header colours mean, see `docs/ops/CLI.md`
+("Ingest Template Prototyping Loop"). For the spec schema, see `docs/CONFIGURATION.md` ("Ingest
+Specs").
