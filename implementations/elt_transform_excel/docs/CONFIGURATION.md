@@ -84,32 +84,39 @@ cells it needs (AP → supplier + mapping, AR → customer + mapping).
 **Consequence if this drifts:** every transform resolves suppliers/customers/cost-centres against a
 stale file and silently rejects valid rows — the exact multi-file-edit drift this file removes.
 
-**Per-host override.** `reference_paths.yaml` is authored with one person's local file paths, but
-every build host needs its own copies of these three workbooks at its own location — there's no
-fixed cross-platform mirror to derive one from the other, so (unlike the `vba_src` bootstrap
-folder, see `docs/BUILD_WIN.md`) no automatic path rewrite applies. Rather than editing the
-committed `reference_paths.yaml` (which would overwrite the shared value for every other host),
-copy `config/reference_paths.local.yaml.example` to `config/reference_paths.local.yaml` (gitignored)
-and set only the keys this host needs to override; `build_runner.py` merges it on top of
-`reference_paths.yaml` at build time and prints which keys it overrode.
+**Per-host root.** `reference_paths.yaml` — and every `config/transforms/*.yaml` profile's
+`source_data` / `target_eib` / `output_file_path` — is authored with one person's local mac data
+root (`/Users/Rakesh.Patel/Documents/__data`). Rather than editing any of those committed files
+per host, a build-time root-path substitution rewrites that root automatically for the current
+build host; see "Build-time path substitutions" below.
 
-### Build-time path substitutions (`config/path_substitutions.yaml`)
+### Build-time path substitutions (`config/root_path_substitutions.yaml`)
 
-`scripts/build_runner.py` applies a named path-rewrite profile from `config/path_substitutions.yaml`
+`scripts/build_runner.py` applies a named path-rewrite profile from `config/root_path_substitutions.yaml`
 to filesystem paths it writes into `dist/Runner.xlsm`. Build-time only — the VBA runtime never reads
 this file.
 
 The profile is auto-selected from `platform.system()` via the file's `os_default_profile` map
-(`--path-profile <name>` overrides; `none` disables). On **Windows** it selects
-`windows_forward_slash`, which rewrites the **Bootstrap Source Folder** value (the absolute `vba_src`
-path `BootstrapImporter` reads) from `C:\...\vba_src` to `C:/.../vba_src` — required because
-`BootstrapImporter.DetectSeparator` mis-parses a drive-letter path's `C:` colon as the path
-separator. On macOS/Linux it selects `none` (paths written verbatim). Rules are ordered literal
-string replacements; `apply_to` lists which build-written values a profile touches (currently only
-`bootstrap_source_folder`). See `docs/BUILD_WIN.md` and the file's own header comment.
+(`--path-profile <name>` overrides; `none` disables). On macOS/Linux it selects `none` (paths
+written verbatim). On **Windows** it selects `windows_forward_slash`, which does two ordered
+rewrites to every value listed in `apply_to`:
 
-**Consequence if this drifts:** a Windows build silently writes an unusable `vba_src` path and the
-manual `BootstrapImporter` step fails with *"No .bas or .cls files found"*.
+1. **Data root.** Rewrites the mac data root baked into `reference_paths.yaml` and
+   `transforms/*.yaml` shell_defaults (`mapping_spreadsheet`, `customer_spreadsheet`,
+   `supplier_spreadsheet`, `source_data`, `target_eib`, `output_file_path`) to this build host's
+   local data root — edit this rule's `with:` value for your own machine (`docs/BUILD_WIN.md`
+   Step 2).
+2. **Separator.** Rewrites the **Bootstrap Source Folder** value (the absolute `vba_src` path
+   `BootstrapImporter` reads) from `C:\...\vba_src` to `C:/.../vba_src` — required because
+   `BootstrapImporter.DetectSeparator` mis-parses a drive-letter path's `C:` colon as the path
+   separator. Runs after (1) so backslashes it introduces also get normalized.
+
+Rules are ordered literal string replacements, applied top to bottom; `apply_to` lists which
+build-written values a profile touches. See `docs/BUILD_WIN.md` and the file's own header comment.
+
+**Consequence if this drifts:** a Windows build silently writes unusable paths — either pointing
+at files that don't exist on this host (job 1) or a `vba_src` path `BootstrapImporter` can't parse,
+failing with *"No .bas or .cls files found"* (job 2).
 
 ## Source Layout Metadata
 

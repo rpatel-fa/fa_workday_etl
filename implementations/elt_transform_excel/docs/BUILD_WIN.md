@@ -30,7 +30,7 @@ reliable: the macOS sandbox failure modes (`com.apple.quarantine` xattrs, contai
 `Import()` denials, the AppleScript-can't-pass-arguments limitation that forced the manual step
 in the first place) simply do not exist. There is one Windows-only snag instead — a path
 separator quirk in `BootstrapImporter` — which `build_runner.py` handles automatically via
-`config/path_substitutions.yaml` (see Step 3 below).
+`config/root_path_substitutions.yaml` (see Step 3 below).
 
 ## Prerequisites
 
@@ -101,31 +101,18 @@ uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implem
 
 Writes `implementations/elt_transform_excel/runner_shell/RunnerShell.xlsm`.
 
-### Step 2 — Point the build at your own reference workbooks (root-path conversion)
-
-`config/reference_paths.yaml` is the committed source of truth for three shared reference
-workbooks every transform inherits (Customer extract, Supplier extract, Mapping MASTER) — but
-it is currently authored with one person's local mac paths
-(`/Users/Rakesh.Patel/Documents/...`). Step 3 writes these values **verbatim** into the built
-workbook's `config` sheet; there is no automatic path rewrite for them (unlike the `vba_src`
-bootstrap folder — see the path-substitution box under Step 3 below, which only covers that one
-path). If you skip this step, your build will point at files that don't exist on your machine.
-
-Do **not** edit `reference_paths.yaml` itself to point at your own paths — that would overwrite
-the shared canonical values for every other build host. Instead, create a sibling, gitignored
-override file:
+### Step 2 — Point the build at your own data root (root-path conversion)
 
 ```powershell
-cp implementations/elt_transform_excel/config/reference_paths.local.yaml.example implementations/elt_transform_excel/config/reference_paths.local.yaml
+notepad implementations/elt_transform_excel/config/root_path_substitutions.yaml
 ```
 
-Edit `reference_paths.local.yaml` and set `customer_spreadsheet`, `supplier_spreadsheet`, and
-`mapping_spreadsheet` to wherever your own copies of those three workbooks live on this machine
-(ordinary Windows paths, backslash or forward-slash both work here — this file is never parsed
-by `BootstrapImporter.DetectSeparator`). Omit any key you don't need to override; it falls back
-to `reference_paths.yaml`. `build_runner.py` merges it automatically at build time and prints
-which keys it overrode. The file is gitignored — it will not get committed, so your local paths
-never leak into the shared repo.
+Under `profiles.windows_forward_slash.rules`, confirm the first rule's `with:` value is your
+own local data root. Save, close. Step 3 applies it automatically to every reference/transform
+file path (`customer_spreadsheet`, `supplier_spreadsheet`, `mapping_spreadsheet`, `source_data`,
+`target_eib`, `output_file_path`) — no per-file editing needed. (Rationale:
+`config/root_path_substitutions.yaml`'s own header comment; `docs/CONFIGURATION.md` → "Shared
+reference-data paths".)
 
 ### Step 3 — Prep the distribution workbook
 
@@ -140,7 +127,7 @@ fills the **Bootstrap Source Folder** cell on the `Runner` sheet with the absolu
 stripping this script does on every build is a no-op on Windows.
 
 **Path substitution.** `build_runner.py` applies a build-time path-rewrite profile from
-`config/path_substitutions.yaml` to the paths it writes into the workbook. The profile is
+`config/root_path_substitutions.yaml` to the paths it writes into the workbook. The profile is
 auto-selected from the OS: on Windows it selects `windows_forward_slash`, which rewrites the
 **Bootstrap Source Folder** value from `C:\...\vba_src` to `C:/.../vba_src`. This is required —
 see the box below. The console prints the active profile (`Path profile: windows_forward_slash`)
@@ -232,7 +219,7 @@ Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 | `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 4 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
 | Step 0: `LF-only line ending(s)` | git checkout stripped CRLF | `git config core.autocrlf true` and re-checkout `vba_src` (Step 0 above) |
 | `pyOpenVBA` import error from Step 1/3 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
-| Built workbook points at reference files that don't exist on this machine | `reference_paths.yaml`'s canonical paths belong to a different host — Step 2 (root-path conversion) was skipped | Create `config/reference_paths.local.yaml` per Step 2 above and re-run Step 3 |
+| Built workbook points at reference/transform files that don't exist on this machine | `root_path_substitutions.yaml`'s data-root rule doesn't match this host's actual data folder, or points at a different host's root | Edit the rule per Step 2 above and re-run Step 3; check the console's "Path substitution ... data-root fields: N value(s) rewritten" line to confirm it ran |
 
 ## Optional — unattended import (PowerShell + Excel COM)
 

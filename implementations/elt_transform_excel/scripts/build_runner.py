@@ -22,7 +22,7 @@ DEFAULT_VBA_SOURCE = MODULE_ROOT / "vba_src"
 DEFAULT_PROFILE_DIR = MODULE_ROOT / "config" / "transforms"
 DEFAULT_BUILD_MANIFEST = MODULE_ROOT / "config" / "build_manifest.yaml"
 DEFAULT_REFERENCE_PATHS = MODULE_ROOT / "config" / "reference_paths.yaml"
-DEFAULT_PATH_SUBSTITUTIONS = MODULE_ROOT / "config" / "path_substitutions.yaml"
+DEFAULT_PATH_SUBSTITUTIONS = MODULE_ROOT / "config" / "root_path_substitutions.yaml"
 DEFAULT_OUTPUT = MODULE_ROOT / "dist" / "Runner.xlsm"
 CONFIG_SHEET_NAME = "config"
 RUNNER_SHEET_NAME = "Runner"
@@ -164,7 +164,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--path-substitutions",
         default=str(DEFAULT_PATH_SUBSTITUTIONS),
         help=(
-            "Path to path_substitutions.yaml — build-time filesystem-path rewrites "
+            "Path to root_path_substitutions.yaml — build-time filesystem-path rewrites "
             f"applied to paths written into the workbook (default: {DEFAULT_PATH_SUBSTITUTIONS})"
         ),
     )
@@ -172,7 +172,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--path-profile",
         default=None,
         help=(
-            "Named profile from path_substitutions.yaml to apply to build-written "
+            "Named profile from root_path_substitutions.yaml to apply to build-written "
             "paths. Default: auto-selected from the OS via that file's "
             "os_default_profile (Windows -> forward-slash rewrite so "
             "BootstrapImporter can read the vba_src path; macOS/Linux -> none)."
@@ -306,6 +306,33 @@ def main() -> int:
         print(
             f"Path substitution [{path_substitution.profile_name}] on bootstrap "
             f"source folder: {vba_source} -> {source_folder_value}"
+        )
+
+    # Rewrite the data-root paths sourced from config/reference_paths.yaml and each
+    # transform's shell_defaults (all authored with one mac path root) for this build
+    # host, via the same path_substitution profile. See config/root_path_substitutions.yaml
+    # ("WHY THIS EXISTS", job 1) and docs/BUILD_WIN.md Step 2.
+    _DATA_ROOT_FIELDS = (
+        "mapping_spreadsheet",
+        "customer_spreadsheet",
+        "supplier_spreadsheet",
+        "source_data",
+        "target_eib",
+        "output_file_path",
+    )
+    data_root_rewrites = 0
+    for binding in transform_bindings:
+        for field_name in _DATA_ROOT_FIELDS:
+            original = getattr(binding, field_name)
+            rewritten = path_substitution.rewrite(field_name, original)
+            if rewritten != original:
+                setattr(binding, field_name, rewritten)
+                data_root_rewrites += 1
+    if data_root_rewrites:
+        print(
+            f"Path substitution [{path_substitution.profile_name}] on data-root "
+            f"fields: {data_root_rewrites} value(s) rewritten across "
+            f"{len(transform_bindings)} binding(s)."
         )
     _write_label_value(output_path, SOURCE_FOLDER_INPUT_LABEL, source_folder_value)
     _clear_runner_tab_technical_columns(output_path)
@@ -2340,13 +2367,10 @@ def _load_reference_paths(reference_path: Path) -> dict:
     inherits unless its profile overrides the key. Single source of truth so an updated Workday
     extract or finance mapping file is changed once, not in every profile.
 
-    A sibling, untracked `<name>.local.yaml` (e.g. `reference_paths.local.yaml` next to
-    `reference_paths.yaml`) is merged on top when present, overriding only the keys it sets.
-    This lets each build host point at its own local copies of the three reference workbooks
-    (they commonly live at unrelated, per-person paths — not a fixed cross-platform mirror) without
-    editing the committed, canonical `reference_paths.yaml`. See
-    `config/reference_paths.local.yaml.example` for the shape and `docs/BUILD_WIN.md` for the
-    Windows walkthrough."""
+    Authored with one person's mac path root; a build-time root-path substitution (see
+    config/root_path_substitutions.yaml, applied in main() via PathSubstitution.rewrite for the
+    mapping_spreadsheet/customer_spreadsheet/supplier_spreadsheet targets) rewrites that root
+    for other build hosts. This function itself does no host-specific rewriting."""
     yaml = _import_yaml()
     if not reference_path.is_file():
         raise RuntimeError(
@@ -2358,35 +2382,17 @@ def _load_reference_paths(reference_path: Path) -> dict:
     paths = data.get("reference_paths")
     if not isinstance(paths, dict):
         raise RuntimeError(f"'{reference_path}' must contain a 'reference_paths' mapping.")
-    merged = {key: str(value or "") for key, value in paths.items()}
-
-    local_path = reference_path.with_name(
-        reference_path.stem + ".local" + reference_path.suffix
-    )
-    if local_path.is_file():
-        with local_path.open("r", encoding="utf-8") as handle:
-            local_data = yaml.safe_load(handle) or {}
-        local_paths = local_data.get("reference_paths") or {}
-        if not isinstance(local_paths, dict):
-            raise RuntimeError(f"'{local_path}' must contain a 'reference_paths' mapping.")
-        overridden = {key: str(value or "") for key, value in local_paths.items() if value}
-        merged.update(overridden)
-        if overridden:
-            print(
-                f"Reference paths: {len(overridden)} key(s) overridden by "
-                f"{local_path.name} -> {', '.join(sorted(overridden))}"
-            )
-    return merged
+    return {key: str(value or "") for key, value in paths.items()}
 
 
 @dataclass(frozen=True)
 class PathSubstitution:
     """The build-time path-rewrite profile selected for this run.
 
-    Build-time only: the VBA runtime never reads path_substitutions.yaml (same
+    Build-time only: the VBA runtime never reads root_path_substitutions.yaml (same
     status as config/transforms/*.yaml). It exists so a Windows build can write
     a vba_src path that BootstrapImporter.DetectSeparator can parse — see the
-    header of config/path_substitutions.yaml for the full rationale.
+    header of config/root_path_substitutions.yaml for the full rationale.
     """
 
     profile_name: str
@@ -2404,7 +2410,7 @@ class PathSubstitution:
 
 
 def _load_path_substitution(substitutions_path: Path, profile_override: str | None) -> PathSubstitution:
-    """Resolve the active path-substitution profile from path_substitutions.yaml.
+    """Resolve the active path-substitution profile from root_path_substitutions.yaml.
 
     Selection order: --path-profile if given, else os_default_profile for the
     current platform.system(), else the file's fallback_profile.
