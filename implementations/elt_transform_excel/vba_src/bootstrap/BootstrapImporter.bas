@@ -616,6 +616,19 @@ Private Function JoinPathLocal(ByVal parentFolder As String, ByVal childName As 
 End Function
 
 Private Function DetectSeparator(ByVal filePath As String) As String
+    ' A Windows drive-letter path (e.g. "C:\Users\...") has no "/" but does contain a
+    ' ":", so the classic-Mac "HD:Folder:File" check below would misread that drive
+    ' prefix's colon as the separator itself, building "C:\Users\...:*.*", which
+    ' matches nothing (see config/root_path_substitutions.yaml header for the full
+    ' history of this exact failure). Recognise the drive-letter shape explicitly
+    ' first -- a single letter, then ":", then "\" -- and use "\" instead.
+    If Len(filePath) >= 3 Then
+        If (Left$(filePath, 1) Like "[A-Za-z]") And (Mid$(filePath, 2, 2) = ":\") Then
+            DetectSeparator = "\"
+            Exit Function
+        End If
+    End If
+
     If InStr(filePath, "/") > 0 Then
         DetectSeparator = "/"
     ElseIf InStr(filePath, ":") > 0 Then
@@ -628,13 +641,18 @@ End Function
 Private Function BaseName(ByVal filePath As String) As String
     Dim slashPosition As Long
     Dim colonPosition As Long
+    Dim backslashPosition As Long
     Dim splitPosition As Long
 
     slashPosition = InStrRev(filePath, "/")
     colonPosition = InStrRev(filePath, ":")
+    backslashPosition = InStrRev(filePath, "\")
     splitPosition = slashPosition
     If colonPosition > splitPosition Then
         splitPosition = colonPosition
+    End If
+    If backslashPosition > splitPosition Then
+        splitPosition = backslashPosition
     End If
 
     If splitPosition = 0 Then

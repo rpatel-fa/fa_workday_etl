@@ -99,34 +99,45 @@ this file.
 
 The profile is auto-selected from `platform.system()` via the file's `os_default_profile` map
 (`--path-profile <name>` overrides; `none` disables). On macOS/Linux it selects `none` (paths
-written verbatim). On **Windows** it selects `windows_forward_slash`, whose two rules cover two
-jobs run from **two separate commands**, not one:
+written verbatim). On **Windows** it selects `windows_local`, which does exactly three things,
+in order, to whichever field(s) a given call site asks it to rewrite:
 
-1. **Data root** (`docs/BUILD_WIN.md` Step 3, `build_runner.py --substitute-root-paths`).
-   Rewrites the mac data root baked into `reference_paths.yaml` and `transforms/*.yaml`
-   shell_defaults (`mapping_spreadsheet`, `customer_spreadsheet`, `supplier_spreadsheet`,
-   `source_data`, `target_eib`, `output_file_path`) to this build host's local data root — edit
-   this rule's `with:` value for your own machine (see the rule's own `EDIT THIS` comment in
-   `config/root_path_substitutions.yaml`). Patches the already-built workbook in place; run after
-   the normal build.
-2. **Separator** (`docs/BUILD_WIN.md` Step 2, the normal `build_runner.py` build). Rewrites the
-   **Bootstrap Source Folder** value (the absolute `vba_src` path `BootstrapImporter` reads) from
-   `C:\...\vba_src` to `C:/.../vba_src` — required because `BootstrapImporter.DetectSeparator`
-   mis-parses a drive-letter path's `C:` colon as the path separator. Runs automatically as part
-   of every build.
+1. **`root_path_substitution` → `new_root_path`.** A literal string swap: the mac data root
+   baked into `reference_paths.yaml` and `transforms/*.yaml` shell_defaults is replaced with this
+   build host's own local root. Edit both values for your machine (see the `EDIT THIS` comment in
+   `config/root_path_substitutions.yaml`). No-op for a value that doesn't contain the mac root
+   (e.g. `bootstrap_source_folder`, which is the repo's own `vba_src` path, unrelated to the data
+   root).
+2. **`convert_forward_slash_to_backslash`.** Every remaining `/` is normalized to `\`, so the
+   result is a fully native `C:\Users\...\...` path — including any backslashes step 1 just
+   introduced, and any forward slashes already present in the original value.
 
-Both jobs are rules in the same profile (rule (1)'s data-root swap is ordered before rule (2)'s
-separator normalize so backslashes it introduces also get normalized), but each job is invoked
-independently, against only the field(s) its own call site asks `PathSubstitution.rewrite()` to
-rewrite — job 2 never touches the data-root fields, and job 1 never touches
-`bootstrap_source_folder`.
+There's no per-field targeting: every field listed in `apply_to` gets the same two-step
+treatment via `PathSubstitution.rewrite()`. What differs between fields is **when** each gets
+rewritten, not **how**:
 
-Rules are ordered literal string replacements, applied top to bottom; `apply_to` lists which
+- `bootstrap_source_folder` is rewritten automatically as part of the normal build
+  (`docs/BUILD_WIN.md` Step 2). It's already a native Windows path before this runs (step 1 is a
+  no-op for it), so in practice this step only matters for parity — the result is unchanged from
+  what `vba_source.resolve()` already produced.
+- `mapping_spreadsheet` / `customer_spreadsheet` / `supplier_spreadsheet` / `source_data` /
+  `target_eib` / `output_file_path` are rewritten only by the separate
+  `build_runner.py --substitute-root-paths` command (`docs/BUILD_WIN.md` Step 3), which patches
+  the already-built workbook in place.
+
+Writing `bootstrap_source_folder` as a native backslash path is safe: `BootstrapImporter.DetectSeparator`
+and `BaseName` (`vba_src/bootstrap/BootstrapImporter.bas`) explicitly recognise the Windows
+drive-letter shape and handle it correctly. Before that fix, `DetectSeparator` misread a
+drive-letter path's `C:` colon as a classic-Mac `HD:Folder:File` separator — this file's
+predecessor rewrote that one field to forward-slash as a workaround; that workaround is gone now
+that the underlying VBA bug is fixed.
+
+Rules are applied top to bottom (string swap, then separator normalize); `apply_to` lists which
 build-written values a profile touches. See `docs/BUILD_WIN.md` and the file's own header comment.
 
-**Consequence if this drifts:** a Windows build silently writes unusable paths — either pointing
-at files that don't exist on this host (job 1) or a `vba_src` path `BootstrapImporter` can't parse,
-failing with *"No .bas or .cls files found"* (job 2).
+**Consequence if this drifts:** a Windows build silently writes unusable paths pointing at files
+that don't exist on this host, if `root_path_substitution`/`new_root_path` don't match this
+machine's actual data root.
 
 ## Source Layout Metadata
 

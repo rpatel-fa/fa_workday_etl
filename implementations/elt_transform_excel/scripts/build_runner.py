@@ -2460,13 +2460,20 @@ class PathSubstitution:
     """The build-time path-rewrite profile selected for this run.
 
     Build-time only: the VBA runtime never reads root_path_substitutions.yaml (same
-    status as config/transforms/*.yaml). It exists so a Windows build can write
-    a vba_src path that BootstrapImporter.DetectSeparator can parse — see the
-    header of config/root_path_substitutions.yaml for the full rationale.
+    status as config/transforms/*.yaml) — see its header for the full rationale.
+
+    A profile does exactly three things, in this order, to any target field listed
+    in apply_to: (1) replace `root_path_substitution` with `new_root_path` (a
+    literal string swap; no-op if `root_path_substitution` is empty), then (3)
+    normalize every remaining "/" to "\\" if `convert_forward_slash_to_backslash`
+    is true. There is no per-field targeting — every field in apply_to gets the
+    same treatment.
     """
 
     profile_name: str
-    rules: tuple[tuple[str, str], ...]
+    root_path_substitution: str
+    new_root_path: str
+    convert_forward_slash_to_backslash: bool
     apply_to: frozenset[str]
 
     def rewrite(self, target: str, value: str) -> str:
@@ -2474,8 +2481,10 @@ class PathSubstitution:
         if target not in self.apply_to:
             return value
         result = value
-        for old, new in self.rules:
-            result = result.replace(old, new)
+        if self.root_path_substitution:
+            result = result.replace(self.root_path_substitution, self.new_root_path)
+        if self.convert_forward_slash_to_backslash:
+            result = result.replace("/", "\\")
         return result
 
 
@@ -2490,7 +2499,7 @@ def _load_path_substitution(substitutions_path: Path, profile_override: str | No
         raise RuntimeError(
             f"Path-substitutions config not found: {substitutions_path}. "
             "It selects the build-time filesystem-path rewrites (e.g. the "
-            "Windows forward-slash rewrite for the bootstrap source folder)."
+            "Windows data-root swap and backslash normalization)."
         )
     with substitutions_path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
@@ -2512,18 +2521,19 @@ def _load_path_substitution(substitutions_path: Path, profile_override: str | No
             f"{substitutions_path} (available: {sorted(profiles)})."
         )
 
-    raw_rules = (profiles[profile_name] or {}).get("rules") or []
-    rules: list[tuple[str, str]] = []
-    for index, rule in enumerate(raw_rules, start=1):
-        if not isinstance(rule, dict) or "replace" not in rule or "with" not in rule:
-            raise RuntimeError(
-                f"{substitutions_path}: profile {profile_name!r} rule #{index} must be a "
-                "mapping with 'replace' and 'with' keys."
-            )
-        rules.append((str(rule["replace"]), str(rule["with"])))
+    profile = profiles[profile_name] or {}
+    root_path_substitution = str(profile.get("root_path_substitution") or "")
+    new_root_path = str(profile.get("new_root_path") or "")
+    convert_forward_slash_to_backslash = bool(profile.get("convert_forward_slash_to_backslash", False))
 
     apply_to = frozenset(str(item) for item in (data.get("apply_to") or []))
-    return PathSubstitution(profile_name, tuple(rules), apply_to)
+    return PathSubstitution(
+        profile_name,
+        root_path_substitution,
+        new_root_path,
+        convert_forward_slash_to_backslash,
+        apply_to,
+    )
 
 
 VALID_WORKSHEET_RESOLUTIONS = {"named", "first_sheet"}
