@@ -41,7 +41,8 @@
 # (job 1) or a source folder BootstrapImporter can't parse (job 2). A wrong
 # os_default_profile on macOS would rewrite paths that are already correct.
 #
-# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 2/3).
+# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 2 -- Prep the
+# distribution workbook), which applies both jobs automatically.
 version: 1
 
 # build_runner.py selects a profile in this order:
@@ -73,7 +74,7 @@ profiles:
     # top to bottom. Not regex - keep it boring and predictable.
     rules:
       # (1) Data root swap. EDIT THIS to your own local data root before
-      # building on Windows -- see docs/BUILD_WIN.md Step 2.
+      # building on Windows.
       - { replace: "/Users/Rakesh.Patel/Documents/__data", with: "C:\\Users\\chika\\Documents\\temp_fa\\data" }
       # (2) Separator normalize. Must run after (1) -- see rationale above.
       - { replace: "\\", with: "/" }

@@ -104,8 +104,8 @@ rewrites to every value listed in `apply_to`:
 1. **Data root.** Rewrites the mac data root baked into `reference_paths.yaml` and
    `transforms/*.yaml` shell_defaults (`mapping_spreadsheet`, `customer_spreadsheet`,
    `supplier_spreadsheet`, `source_data`, `target_eib`, `output_file_path`) to this build host's
-   local data root — edit this rule's `with:` value for your own machine (`docs/BUILD_WIN.md`
-   Step 2).
+   local data root — edit this rule's `with:` value for your own machine (see the rule's own
+   `EDIT THIS` comment in `config/root_path_substitutions.yaml`).
 2. **Separator.** Rewrites the **Bootstrap Source Folder** value (the absolute `vba_src` path
    `BootstrapImporter` reads) from `C:\...\vba_src` to `C:/.../vba_src` — required because
    `BootstrapImporter.DetectSeparator` mis-parses a drive-letter path's `C:` colon as the path
