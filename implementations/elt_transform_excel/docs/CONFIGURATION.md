@@ -84,6 +84,15 @@ cells it needs (AP → supplier + mapping, AR → customer + mapping).
 **Consequence if this drifts:** every transform resolves suppliers/customers/cost-centres against a
 stale file and silently rejects valid rows — the exact multi-file-edit drift this file removes.
 
+**Per-host override.** `reference_paths.yaml` is authored with one person's local file paths, but
+every build host needs its own copies of these three workbooks at its own location — there's no
+fixed cross-platform mirror to derive one from the other, so (unlike the `vba_src` bootstrap
+folder, see `docs/BUILD_WIN.md`) no automatic path rewrite applies. Rather than editing the
+committed `reference_paths.yaml` (which would overwrite the shared value for every other host),
+copy `config/reference_paths.local.yaml.example` to `config/reference_paths.local.yaml` (gitignored)
+and set only the keys this host needs to override; `build_runner.py` merges it on top of
+`reference_paths.yaml` at build time and prints which keys it overrode.
+
 ### Build-time path substitutions (`config/path_substitutions.yaml`)
 
 `scripts/build_runner.py` applies a named path-rewrite profile from `config/path_substitutions.yaml`

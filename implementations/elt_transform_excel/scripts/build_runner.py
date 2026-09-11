@@ -2338,7 +2338,15 @@ def _write_label_value(workbook_path: Path, label_text: str, value: str) -> None
 def _load_reference_paths(reference_path: Path) -> dict:
     """Load the shared reference-data paths (customer/supplier/mapping) that every transform
     inherits unless its profile overrides the key. Single source of truth so an updated Workday
-    extract or finance mapping file is changed once, not in every profile."""
+    extract or finance mapping file is changed once, not in every profile.
+
+    A sibling, untracked `<name>.local.yaml` (e.g. `reference_paths.local.yaml` next to
+    `reference_paths.yaml`) is merged on top when present, overriding only the keys it sets.
+    This lets each build host point at its own local copies of the three reference workbooks
+    (they commonly live at unrelated, per-person paths — not a fixed cross-platform mirror) without
+    editing the committed, canonical `reference_paths.yaml`. See
+    `config/reference_paths.local.yaml.example` for the shape and `docs/BUILD_WIN.md` for the
+    Windows walkthrough."""
     yaml = _import_yaml()
     if not reference_path.is_file():
         raise RuntimeError(
@@ -2350,7 +2358,25 @@ def _load_reference_paths(reference_path: Path) -> dict:
     paths = data.get("reference_paths")
     if not isinstance(paths, dict):
         raise RuntimeError(f"'{reference_path}' must contain a 'reference_paths' mapping.")
-    return {key: str(value or "") for key, value in paths.items()}
+    merged = {key: str(value or "") for key, value in paths.items()}
+
+    local_path = reference_path.with_name(
+        reference_path.stem + ".local" + reference_path.suffix
+    )
+    if local_path.is_file():
+        with local_path.open("r", encoding="utf-8") as handle:
+            local_data = yaml.safe_load(handle) or {}
+        local_paths = local_data.get("reference_paths") or {}
+        if not isinstance(local_paths, dict):
+            raise RuntimeError(f"'{local_path}' must contain a 'reference_paths' mapping.")
+        overridden = {key: str(value or "") for key, value in local_paths.items() if value}
+        merged.update(overridden)
+        if overridden:
+            print(
+                f"Reference paths: {len(overridden)} key(s) overridden by "
+                f"{local_path.name} -> {', '.join(sorted(overridden))}"
+            )
+    return merged
 
 
 @dataclass(frozen=True)

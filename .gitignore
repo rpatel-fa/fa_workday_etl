@@ -31,6 +31,10 @@ RunnerStatus.txt
 # Excel lock files
 ~$*.xls*
 
+# Per-host reference-path overrides (personal file paths; see
+# implementations/elt_transform_excel/config/reference_paths.local.yaml.example)
+implementations/elt_transform_excel/config/reference_paths.local.yaml
+
 # Test / tooling caches
 .pytest_cache/
 .ruff_cache/

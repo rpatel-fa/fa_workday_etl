@@ -30,7 +30,7 @@ reliable: the macOS sandbox failure modes (`com.apple.quarantine` xattrs, contai
 `Import()` denials, the AppleScript-can't-pass-arguments limitation that forced the manual step
 in the first place) simply do not exist. There is one Windows-only snag instead — a path
 separator quirk in `BootstrapImporter` — which `build_runner.py` handles automatically via
-`config/path_substitutions.yaml` (see Step 2 below).
+`config/path_substitutions.yaml` (see Step 3 below).
 
 ## Prerequisites
 
@@ -57,6 +57,10 @@ it cannot add modules to the project. Close and reopen Excel after changing this
 ## Runner workbook — build steps
 
 Run all commands from the **repo root** in PowerShell. Each is a single line.
+
+```powershell
+cd C:\Users\chika\Documents\temp_fa\fa_workday_etl
+```
 
 ### Step 0 — VBA source hygiene pre-flight (no Excel)
 
@@ -97,7 +101,33 @@ uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implem
 
 Writes `implementations/elt_transform_excel/runner_shell/RunnerShell.xlsm`.
 
-### Step 2 — Prep the distribution workbook
+### Step 2 — Point the build at your own reference workbooks (root-path conversion)
+
+`config/reference_paths.yaml` is the committed source of truth for three shared reference
+workbooks every transform inherits (Customer extract, Supplier extract, Mapping MASTER) — but
+it is currently authored with one person's local mac paths
+(`/Users/Rakesh.Patel/Documents/...`). Step 3 writes these values **verbatim** into the built
+workbook's `config` sheet; there is no automatic path rewrite for them (unlike the `vba_src`
+bootstrap folder — see the path-substitution box under Step 3 below, which only covers that one
+path). If you skip this step, your build will point at files that don't exist on your machine.
+
+Do **not** edit `reference_paths.yaml` itself to point at your own paths — that would overwrite
+the shared canonical values for every other build host. Instead, create a sibling, gitignored
+override file:
+
+```powershell
+cp implementations/elt_transform_excel/config/reference_paths.local.yaml.example implementations/elt_transform_excel/config/reference_paths.local.yaml
+```
+
+Edit `reference_paths.local.yaml` and set `customer_spreadsheet`, `supplier_spreadsheet`, and
+`mapping_spreadsheet` to wherever your own copies of those three workbooks live on this machine
+(ordinary Windows paths, backslash or forward-slash both work here — this file is never parsed
+by `BootstrapImporter.DetectSeparator`). Omit any key you don't need to override; it falls back
+to `reference_paths.yaml`. `build_runner.py` merges it automatically at build time and prints
+which keys it overrode. The file is gitignored — it will not get committed, so your local paths
+never leak into the shared repo.
+
+### Step 3 — Prep the distribution workbook
 
 ```powershell
 uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py
@@ -106,7 +136,7 @@ uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implem
 Copies the shell to `implementations/elt_transform_excel/dist/Runner.xlsm`, writes the
 very-hidden transform registry, the `config` sheet defaults, the `mapping` lookup sheet, and
 fills the **Bootstrap Source Folder** cell on the `Runner` sheet with the absolute path to
-`vba_src`. It does **not** import any modules (that is Step 3). The macOS quarantine-xattr
+`vba_src`. It does **not** import any modules (that is Step 4). The macOS quarantine-xattr
 stripping this script does on every build is a no-op on Windows.
 
 **Path substitution.** `build_runner.py` applies a build-time path-rewrite profile from
@@ -126,14 +156,14 @@ and the rewrite it performed. Override with `--path-profile <name>` if ever need
 > `GetAttr`, `FileCopy`, `Open`, `Kill`) accepts `/` transparently. UNC paths become
 > `//server/share/...`, which Windows also accepts.
 
-### Step 3 — Import the modules in Excel (manual)
+### Step 4 — Import the modules in Excel (manual)
 
 1. Open `implementations/elt_transform_excel/dist/Runner.xlsm` in Excel. Enable macros if prompted.
 
 2. Confirm the **Bootstrap Source Folder** cell (column A label on the `Runner` sheet, value in
-   the cell beside it) shows a **forward-slash** path ending in `.../vba_src`. Step 2's path
-   substitution writes it this way; if you see backslashes, Step 2 was run with
-   `--path-profile none` or on a non-Windows OS — fix the cell by hand or re-run Step 2.
+   the cell beside it) shows a **forward-slash** path ending in `.../vba_src`. Step 3's path
+   substitution writes it this way; if you see backslashes, Step 3 was run with
+   `--path-profile none` or on a non-Windows OS — fix the cell by hand or re-run Step 3.
 
 3. Press **Alt+F8**, select **`BootstrapImporter.BootstrapImportFromConfiguredSource`**, click **Run**.
 
@@ -178,7 +208,7 @@ cheapest to rule out:
    failure mode; not observed on Windows, but if it recurs here, shorten the signature by moving
    shared state/arguments into module-level variables or helpers.
 
-### Step 4 — Verify
+### Step 5 — Verify
 
 ```powershell
 uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py --verify
@@ -198,14 +228,15 @@ Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 | Symptom | Cause | Fix |
 |---|---|---|
 | `BootstrapImporter` fails instantly, before any import, mentioning the VBA project | "Trust access to the VBA project object model" is off | Trust Center → Macro Settings → tick it, restart Excel |
-| *"No .bas or .cls files found under: C:\…\vba_src"* | Backslash path + the `DetectSeparator` colon quirk — Step 2's path substitution was bypassed | Re-run Step 2 on Windows without `--path-profile none`; or set the Bootstrap Source Folder cell to a forward-slash path by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
-| `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 3 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
+| *"No .bas or .cls files found under: C:\…\vba_src"* | Backslash path + the `DetectSeparator` colon quirk — Step 3's path substitution was bypassed | Re-run Step 3 on Windows without `--path-profile none`; or set the Bootstrap Source Folder cell to a forward-slash path by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
+| `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 4 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
 | Step 0: `LF-only line ending(s)` | git checkout stripped CRLF | `git config core.autocrlf true` and re-checkout `vba_src` (Step 0 above) |
-| `pyOpenVBA` import error from Step 1/2 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
+| `pyOpenVBA` import error from Step 1/3 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
+| Built workbook points at reference files that don't exist on this machine | `reference_paths.yaml`'s canonical paths belong to a different host — Step 2 (root-path conversion) was skipped | Create `config/reference_paths.local.yaml` per Step 2 above and re-run Step 3 |
 
 ## Optional — unattended import (PowerShell + Excel COM)
 
-The manual Step 3 is the canonical, supported path. On Windows only, it *can* be automated,
+The manual Step 4 is the canonical, supported path. On Windows only, it *can* be automated,
 because Windows Excel exposes a real COM automation surface that reliably passes string
 arguments to a macro — the specific limitation that made this unreliable on macOS
 (`osascript` "run VB macro" cannot pass arguments; see `BootstrapImporter.bas` header comment)
@@ -230,7 +261,7 @@ try {
 ```
 
 Note the `-replace '\\','/'` — the same `DetectSeparator` quirk applies, so the path handed to
-the macro must use forward slashes. Follow with Step 4 (`--verify`) as usual. Do **not** point
+the macro must use forward slashes. Follow with Step 5 (`--verify`) as usual. Do **not** point
 any tool (`pyOpenVBA` included) at the VBA project of an existing `dist/Runner.xlsm` to add
 modules directly — that path is rejected on both platforms (`RUNBOOK.md` → "Diagnosis").
 

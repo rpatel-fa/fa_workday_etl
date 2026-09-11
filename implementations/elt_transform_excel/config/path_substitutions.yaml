@@ -27,7 +27,7 @@
 # "No .bas or .cls files found". A wrong os_default_profile on macOS would rewrite
 # paths that are already correct.
 #
-# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 2/3).
+# See docs/BUILD_WIN.md ("Runner workbook - build steps", Step 3/4).
 version: 1
 
 # build_runner.py selects a profile in this order:
