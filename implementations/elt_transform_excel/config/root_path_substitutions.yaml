@@ -79,7 +79,7 @@ profiles:
     # building on Windows -- these two values are a matched pair (root to find,
     # root to replace it with).
     root_path_substitution: "/Users/Rakesh.Patel/Documents/__data"
-    new_root_path: "C:\\Users\\chika\\Documents\\temp_fa\\data"
+    new_root_path: "C:\\Users\\Chika.Etheridge\\Documents\\workday_finance\\data"
     # (3) Normalize forward slashes to backslashes after the swap above (also
     # catches forward slashes from the rest of the original mac path, not just
     # the ones the swap just introduced).

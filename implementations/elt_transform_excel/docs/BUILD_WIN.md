@@ -60,7 +60,7 @@ it cannot add modules to the project. Close and reopen Excel after changing this
 Run all commands from the **repo root** in PowerShell. Each is a single line.
 
 ```powershell
-cd C:\Users\chika\Documents\temp_fa\fa_workday_etl
+cd C:\Users\Chika.Etheridge\Documents\workday_finance\fa_workday_etl
 ```
 
 ### Step 0 — VBA source hygiene pre-flight (no Excel)
