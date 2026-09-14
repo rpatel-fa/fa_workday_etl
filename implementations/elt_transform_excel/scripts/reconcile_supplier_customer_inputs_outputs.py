@@ -15,10 +15,10 @@ For EVERY registered transform profile (Supplier Invoice AND Customer Invoice):
   v4. Opens any existing output_file_path and counts populated rows on the target sheet,
       comparing the output/source-row ratio to a sanity band (0.25..1.10).
 
-Results printed to stdout + written to elt_transform_excel/_reports/reconcile_report.txt.
+Results printed to stdout + written to implementations/elt_transform_excel/_reports/reconcile_report.txt.
 
 Usage:
-  cd elt_transform_excel
+  cd implementations/elt_transform_excel
   uv run --with pyyaml --with openpyxl --no-project \
       python scripts/reconcile_supplier_customer_inputs_outputs.py
 

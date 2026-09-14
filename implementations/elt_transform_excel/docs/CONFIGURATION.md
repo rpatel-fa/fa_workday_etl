@@ -36,11 +36,11 @@ generated workbook tables.
 
 Current locations:
 
-- `elt_transform_excel/config/transforms/ar_invoice.yaml`
-- `elt_transform_excel/config/transforms/ar_invoice_run.yaml`
-- `elt_transform_excel/config/transforms/ar_discipline_invoice.yaml`
-- `elt_transform_excel/config/transforms/ap_amex_hotel.yaml`
-- `elt_transform_excel/config/transforms/ap_amex_trains.yaml`
+- `implementations/elt_transform_excel/config/transforms/ar_invoice.yaml`
+- `implementations/elt_transform_excel/config/transforms/ar_invoice_run.yaml`
+- `implementations/elt_transform_excel/config/transforms/ar_discipline_invoice.yaml`
+- `implementations/elt_transform_excel/config/transforms/ap_amex_hotel.yaml`
+- `implementations/elt_transform_excel/config/transforms/ap_amex_trains.yaml`
 
 Current purpose of a profile under `config/transforms/`:
 
@@ -257,7 +257,7 @@ that point at them — e.g. `Default_Customer_Group`). The migration's output is
 happened to need. For customer groups those differ: the named range has **7** values, the migration
 emitted **5**, so building the list from the output would silently deny AR `Experiences by Wembley
 Seats` and `Experiences by Wembley Boxes` — legitimate groups with zero migrated rows. Reference data
-the EIB or `elt_ingest_excel` does not already own lives in `elt_transform_excel/config/data/`.
+the EIB or `elt_ingest_excel` does not already own lives in `implementations/elt_transform_excel/config/data/`.
 
 **Derive what the user already told you; ask for the rest.** A value that is mechanically determined by
 another column is not a question — record it as a `drives` rule on the column it comes from. The

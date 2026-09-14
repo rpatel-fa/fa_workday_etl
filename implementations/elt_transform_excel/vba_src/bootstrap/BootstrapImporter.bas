@@ -141,7 +141,7 @@ End Sub
 '       the copied path.  This bypasses the #1 sandbox failure mode: the
 '       Runner.xlsm is *already* opened in Excel, so the workbook's own
 '       directory is implicitly inside Excel's sandbox security scope,
-'       whereas an arbitrary path under /Users/.../elt_lake can sit outside
+'       whereas an arbitrary path elsewhere in the repo checkout can sit outside
 '       that scope depending on macOS Privacy > Files & Folders toggles.
 '   (3) If FileCopy to workbook-relative also fails (very rare), fall back
 '       to an in-memory copy read via VBA Open ... For Binary into a
@@ -305,7 +305,7 @@ Layer3Failed:
         "Next steps: (i) open Excel -> Preferences -> Security -> enable 'Trust access to VBA project object model', " & _
         "(ii) re-run build_runner.py (it strips quarantine/provenance xattrs on every build), " & _
         "(iii) grant Full Disk Access to Microsoft Excel in macOS System Settings -> Privacy & Security, " & _
-        "(iv) try moving the entire elt_lake checkout under ~/Library/Containers/com.microsoft.Excel/Data."
+        "(iv) try moving the entire repo checkout under ~/Library/Containers/com.microsoft.Excel/Data."
 
 CleanReturn:
     On Error Resume Next

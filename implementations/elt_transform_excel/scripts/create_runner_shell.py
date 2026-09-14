@@ -258,7 +258,7 @@ def _load_build_manifest(manifest_path: Path) -> dict:
     yaml = _import_yaml()
     if not manifest_path.exists():
         raise FileNotFoundError(
-            f"Build manifest not found: {manifest_path}. Expected at elt_transform_excel/config/build_manifest.yaml."
+            f"Build manifest not found: {manifest_path}. Expected at implementations/elt_transform_excel/config/build_manifest.yaml."
         )
     with manifest_path.open("r", encoding="utf-8") as handle:
         manifest = yaml.safe_load(handle) or {}

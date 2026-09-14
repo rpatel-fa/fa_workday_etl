@@ -37,7 +37,7 @@ Never silently assume values — the whole point of the g10/g11 gap sweeps was t
 
 | Pattern | Action (run, then paste output verbatim into the answer) |
 |---|---|
-| Stakeholder-count / manifest / label / list-all-Runner-dropdown / AP-AR-EIB-summary / "how many EIBs?" / "list all labels" | `uv run --with pyyaml --no-project python elt_transform_excel/scripts/manifest_summary.py` (raw dropdown counts: 15 AP / 5 AR / 4 defunct as of Sep-2026) |
+| Stakeholder-count / manifest / label / list-all-Runner-dropdown / AP-AR-EIB-summary / "how many EIBs?" / "list all labels" | `uv run --with pyyaml --no-project python implementations/elt_transform_excel/scripts/manifest_summary.py` (raw dropdown counts: 15 AP / 5 AR / 4 defunct as of Sep-2026) |
 | Same, but stakeholder / C-suite / "Amex Trains recorded as one" / consolidated view | Add `--consolidate-amex-trains` flag (merges `ap_amex_trains` + `ap_amex_trains_v2` → 1 line; 14 AP / 5 AR total) |
 | Same, but caller wants JSON / machine-readable counts | Add `--json` flag (includes `_summary` block with totals) |
 
@@ -92,7 +92,7 @@ the script or the transform YAML — never patch the report manually.
    2. If any transform spec's `shared_helpers:` block omits the concern → add the entry.
    3. If `ARCHITECTURE.md` / `CONFIGURATION.md` redirect pointers are missing → add them.
 3. **BUILD GUARDRAIL PASS #1.** Run
-   `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py --hygiene-only`.
+   `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py --hygiene-only`.
    It MUST exit clean with `HYGIENE OK`. If any ERROR from the Step 6 Stage 1
    config↔VBA linkage/coverage guards fires → RESOLVE THE CONFIG GAP. DO NOT start
    writing VBA to "fix" it yet. This pass is config-only.
@@ -130,13 +130,12 @@ same atomic change.
 > vanish → user sees "sub or function not defined" → 30+ minutes debugging lost modules. **This gate
 > prevents it entirely, zero ambiguity about when to run.**
 
-**Run EVERY SESSION the agent touches elt_transform_excel/.bas files or Runner build files, in this exact order:**
+**Run EVERY SESSION the agent touches `implementations/elt_transform_excel/vba_src/` `.bas` files or Runner build files, in this exact order:**
 
 ### Step G1 — Ultra-fast stdlib pre-flight (no deps, < 50 ms):
 
 ```bash
-cd elt_lake
-python3 elt_transform_excel/scripts/check_vba_hygiene.py
+python3 implementations/elt_transform_excel/scripts/check_vba_hygiene.py
 ```
 
 If any NON_ASCII WARN/ERROR appears (em-dashes, curly quotes, right-arrows, ellipsis in comments from
@@ -144,7 +143,7 @@ copy-paste or IDE smart-quote auto-substitute):
 
 ```bash
 # Auto-strips the 26 most common non-ASCII chars to ASCII equivalents in-place across all .bas:
-python3 elt_transform_excel/scripts/check_vba_hygiene.py --fix
+python3 implementations/elt_transform_excel/scripts/check_vba_hygiene.py --fix
 ```
 
 Rules enforced in G1:
@@ -196,7 +195,7 @@ with full profile YAML bindings, checks RSTK/RUN_SUB signatures against all 9 pr
 
 ```bash
 uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project \
-    python elt_transform_excel/scripts/build_runner.py --hygiene-only
+    python implementations/elt_transform_excel/scripts/build_runner.py --hygiene-only
 ```
 
 Output `HYGIENE OK — N modules, M bindings, 0 ERROR-class violations.` → proceed. Anything else →
@@ -474,13 +473,13 @@ After disambiguation, before declaring work done, the agent MUST run. For any to
 
 | Step | Command / Action | Gate |
 |---|---|---|
-| Build gate (schema validators 1–4) | `from scripts.build_runner import _load_transform_bindings as L; from pathlib import Path as P; L(P('elt_transform_excel/config/transforms'))` — no Exception | PASS = 9/9 bindings (now N+1), exit 0. FAIL = report the validator message to user. |
-| Reconcile (source ↔ headers ↔ output ratio) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/reconcile_supplier_customer_inputs_outputs.py --profiles <stem> --scan-rows 500 --scan-cols 200` → exit 0; 0 FATAL, 0 WARN | PASS = header found N/N, paths exist, ratio [0.25, 1.10]. FAIL = report reconcile findings. |
-| VBA hygiene (MANDATORY if ANY `.bas` module touched this session) | 1) `python3 elt_transform_excel/scripts/check_vba_hygiene.py --fix` (if NON_ASCII), 2) `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py --hygiene-only`. Then optionally after Excel manual Bootstrap Import, run `uv run … build_runner.py --verify` to confirm macro modules actually loaded. | PASS = 0 ERROR-class violations in both steps, OPTIONAL --verify 9/9 modules FOUND. FAIL = stop everything until hygiene passes (see §0.5 rules list above). |
-| Validate input × N touched profiles | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/validate_input.py -t <stem>` — once for each profile YAML you touched this session. | PASS = "Full VERDICT: GREEN" / "All checks passed" / 14/14 or equivalent + 0 required-column empty samples. FAIL = report which header could not be resolved on its declared header row. |
-| Verify gates (cross-check 9 profiles' 9 config/engine invariants) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/verify_gates.py` → tail -10 lines. | PASS = "9/9 cross-checks: VERIFIED" or equivalent (no FAIL rows). FAIL = report which cross-check ID and which profile. |
-| Gap sweep (spec YAML ↔ transforms YAML literal coverage. Any new config tokens in transforms YAML must be reflected in transform_specs or they're orphaned) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/gap_sweep.py` → tail -5 lines. | PASS = "XXX FILLED / 0 GAP". Any GAP means a transform YAML field/section exists but has no decision-record entry in `config/transform_specs/<stem>.yaml`. Fix by appending the missing spec entry. |
-| Impl-detail audit (VBA literal strings vs YAML-engine literal tokens) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/impl_detail_audit.py` → tail -8 lines. | PASS = 0 STRING DRIFT / 0 NUMERIC DRIFT. Any DRIFT = a literal string in VBA doesn't match the canonical YAML value (e.g. `"Error"` in VBA YAML `error_token: "Error"`, `"ERROR"` → DRIFT). Fix whichever side is canonical per `config/transforms/<stem>.yaml`. |
+| Build gate (schema validators 1–4) | `from scripts.build_runner import _load_transform_bindings as L; from pathlib import Path as P; L(P('implementations/elt_transform_excel/config/transforms'))` — no Exception | PASS = 9/9 bindings (now N+1), exit 0. FAIL = report the validator message to user. |
+| Reconcile (source ↔ headers ↔ output ratio) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/reconcile_supplier_customer_inputs_outputs.py --profiles <stem> --scan-rows 500 --scan-cols 200` → exit 0; 0 FATAL, 0 WARN | PASS = header found N/N, paths exist, ratio [0.25, 1.10]. FAIL = report reconcile findings. |
+| VBA hygiene (MANDATORY if ANY `.bas` module touched this session) | 1) `python3 implementations/elt_transform_excel/scripts/check_vba_hygiene.py --fix` (if NON_ASCII), 2) `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py --hygiene-only`. Then optionally after Excel manual Bootstrap Import, run `uv run … build_runner.py --verify` to confirm macro modules actually loaded. | PASS = 0 ERROR-class violations in both steps, OPTIONAL --verify 9/9 modules FOUND. FAIL = stop everything until hygiene passes (see §0.5 rules list above). |
+| Validate input × N touched profiles | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/validate_input.py -t <stem>` — once for each profile YAML you touched this session. | PASS = "Full VERDICT: GREEN" / "All checks passed" / 14/14 or equivalent + 0 required-column empty samples. FAIL = report which header could not be resolved on its declared header row. |
+| Verify gates (cross-check 9 profiles' 9 config/engine invariants) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/verify_gates.py` → tail -10 lines. | PASS = "9/9 cross-checks: VERIFIED" or equivalent (no FAIL rows). FAIL = report which cross-check ID and which profile. |
+| Gap sweep (spec YAML ↔ transforms YAML literal coverage. Any new config tokens in transforms YAML must be reflected in transform_specs or they're orphaned) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/gap_sweep.py` → tail -5 lines. | PASS = "XXX FILLED / 0 GAP". Any GAP means a transform YAML field/section exists but has no decision-record entry in `config/transform_specs/<stem>.yaml`. Fix by appending the missing spec entry. |
+| Impl-detail audit (VBA literal strings vs YAML-engine literal tokens) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/impl_detail_audit.py` → tail -8 lines. | PASS = 0 STRING DRIFT / 0 NUMERIC DRIFT. Any DRIFT = a literal string in VBA doesn't match the canonical YAML value (e.g. `"Error"` in VBA YAML `error_token: "Error"`, `"ERROR"` → DRIFT). Fix whichever side is canonical per `config/transforms/<stem>.yaml`. |
 | Optional: full-file Final Code derivation audit vs Finance Final Code (Hotel/Trains V2 or any profile with `final_code_derivation` block) | `/tmp/_final_auditor_correct_layers.py` against the real raw source xlsx (scans kept rows only). Run this after any change to DeriveFinalCode macros. | PASS = 100.00% char-for-char equality of engine Final Code vs Finance-precomputed Final Code legacy column on raw source sheet. Trains/Hotels allow 99.88%+ if only case-only ERROR/Error. Any 99.87% or below = 3-tier override misapplication bug, do not ship. |
 
 ---

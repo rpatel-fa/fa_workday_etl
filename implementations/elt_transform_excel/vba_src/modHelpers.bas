@@ -115,7 +115,7 @@ Public Function GetRegistrySheet(ByVal runnerWorkbook As Workbook) As Worksheet
         Err.Raise vbObjectError + 1609, "modHelpers.GetRegistrySheet", _
             "Runner workbook is missing the '" & REGISTRY_SHEET_NAME & "' sheet. " & _
             "Rebuild the Runner with: uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project " & _
-            "python elt_transform_excel/scripts/build_runner.py"
+            "python implementations/elt_transform_excel/scripts/build_runner.py"
     End If
     On Error GoTo 0
 End Function

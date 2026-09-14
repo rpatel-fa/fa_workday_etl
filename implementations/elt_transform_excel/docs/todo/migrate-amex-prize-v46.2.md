@@ -71,7 +71,7 @@
 
 - Per-module audit (expect old=0, v46.2 present):
   `for m in modApAmexHotelSupplierInvoice modApAmexTrainsSupplierInvoice modApAmexTrainV2SupplierInvoice modApPrizeFundSupplierInvoice; do echo $m; grep -oE 'ColumnIndex\("(IK|IL|AR|DD|GF|GQ|AG|EK)"\)' vba_src/transforms/$m.bas | sort | uniq -c; done`
-- Build (all gates incl. spec↔code): `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py` → "Prep complete", no `SPEC<->CODE DRIFT`.
+- Build (all gates incl. spec↔code): `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py` → "Prep complete", no `SPEC<->CODE DRIFT`.
 - Input contract: `validate_input.py -t ap_amex_hotel` (etc.) → GREEN.
 
 ## Gotchas

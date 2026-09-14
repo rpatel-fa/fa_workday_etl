@@ -71,9 +71,9 @@
 
 ## Verification
 
-- Build (all gates): `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py` → "Prep complete", 0 hygiene errors, no `SPEC<->CODE DRIFT`.
-- Gates cross-check: `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/verify_gates.py` → "Bindings parsed: 15".
-- Per-transform input contract: `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/validate_input.py -t <profile>` → GREEN.
+- Build (all gates): `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py` → "Prep complete", 0 hygiene errors, no `SPEC<->CODE DRIFT`.
+- Gates cross-check: `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/verify_gates.py` → "Bindings parsed: 15".
+- Per-transform input contract: `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/validate_input.py -t <profile>` → GREEN.
 - **Phase 0 output-diff harness (to be built): `<harness> --transform <profile>` → BYTE-IDENTICAL vs golden.** This is the gate for every Phase 1+ step.
 
 ## Gotchas

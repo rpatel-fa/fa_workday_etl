@@ -11,8 +11,8 @@ Defunct, plus a consolidated view (Amex Trains V1+V2 → 1 line item) on request
 
 Usage:
     uv run --with pyyaml --no-project python \\
-        elt_transform_excel/scripts/manifest_summary.py [--consolidate-amex-trains] [--json]
-    # Or: cd elt_transform_excel && uv run --with pyyaml --no-project python scripts/manifest_summary.py
+        implementations/elt_transform_excel/scripts/manifest_summary.py [--consolidate-amex-trains] [--json]
+    # Or: cd implementations/elt_transform_excel && uv run --with pyyaml --no-project python scripts/manifest_summary.py
 """
 
 from __future__ import annotations

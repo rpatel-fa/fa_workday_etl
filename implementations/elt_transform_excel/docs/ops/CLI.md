@@ -8,32 +8,32 @@ This document records the command surface for developers and operators working f
 
 | Purpose | Command |
 |---|---|
-| List the implementation scaffold | `ls -R elt_transform_excel` |
-| Check the active backlog index (all items archived — shows summary of completed work) | `sed -n '1,120p' elt_transform_excel/docs/TODO.md` |
-| Open the archived cold-start / hardening anchor (H1/H2.1 done) | `sed -n '1,280p' elt_transform_excel/docs/todo/archive/cold-start-scale.md` |
-| Open the archived build anchor (build history) | `sed -n '1,260p' elt_transform_excel/docs/todo/archive/build-elt_transform_excel.md` |
-| Open the archived ar_customer operating contract + history | `sed -n '1,400p' elt_transform_excel/docs/todo/archive/ar-ingest-specs.md ; sed -n '1,120p' elt_transform_excel/docs/todo/archive/ar-ingest-specs-history.md` |
-| Verify forbidden runtime libraries are only mentioned in rejected-history sections | `grep -in "ADODB\|ACE OLEDB\|Power Query\|sql_src" elt_transform_excel/PRD.md elt_transform_excel/docs/ARCHITECTURE.md` |
+| List the implementation scaffold | `ls -R implementations/elt_transform_excel` |
+| Check the active backlog index (all items archived — shows summary of completed work) | `sed -n '1,120p' implementations/elt_transform_excel/docs/TODO.md` |
+| Open the archived cold-start / hardening anchor (H1/H2.1 done) | `sed -n '1,280p' implementations/elt_transform_excel/docs/todo/archive/cold-start-scale.md` |
+| Open the archived build anchor (build history) | `sed -n '1,260p' implementations/elt_transform_excel/docs/todo/archive/build-elt_transform_excel.md` |
+| Open the archived ar_customer operating contract + history | `sed -n '1,400p' implementations/elt_transform_excel/docs/todo/archive/ar-ingest-specs.md ; sed -n '1,120p' implementations/elt_transform_excel/docs/todo/archive/ar-ingest-specs-history.md` |
+| Verify forbidden runtime libraries are only mentioned in rejected-history sections | `grep -in "ADODB\|ACE OLEDB\|Power Query\|sql_src" implementations/elt_transform_excel/PRD.md implementations/elt_transform_excel/docs/ARCHITECTURE.md` |
 | Confirm old Power Query spike files remain removed | `find ~/Documents /tmp -iname "pq_spike*" 2>/dev/null` |
-| Render a finance-facing input template from an ingest spec (`config/ingest_specs/<key>.yaml` → `dist/ingest_templates/<key>.xlsx`) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite` |
-| Same, plus one illustrative row from each column's `example` (`default`s are pre-filled either way) | `uv run --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite --sample-row` |
-| Generate `runner_shell/RunnerShell.xlsm` with the bootstrap macro and profile-driven control-sheet layout | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/create_runner_shell.py --overwrite` |
-| Prep `dist/Runner.xlsm` (copy shell, write YAML-driven transform registry, write the source-folder cell) — does **not** import any transform modules itself | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py` |
-| Manual step (required): in Excel, Tools > Macro > Macros, run `BootstrapImporter.BootstrapImportFromConfiguredSource` on the prepped workbook to actually import every `vba_src/` module | *(no CLI command — must be run inside Excel; see Gotchas below)* |
-| Verify the manually-built workbook (status cells, registry, module set) | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py --verify` |
-| Print the current manifest/label summary (raw Runner-dropdown view: all active entries split by AP/AR, plus defunct) | `uv run --with pyyaml --no-project python elt_transform_excel/scripts/manifest_summary.py` |
-| Same, but stakeholder view (Amex Trains V1+V2 consolidated to 1 line item per stakeholder reporting directive) | `uv run --with pyyaml --no-project python elt_transform_excel/scripts/manifest_summary.py --consolidate-amex-trains` |
-| Machine-readable manifest summary (JSON, with `_summary` block for counts) | `uv run --with pyyaml --no-project python elt_transform_excel/scripts/manifest_summary.py --json` |
-| Attempt to open `dist/Runner.xlsm` in Excel and run `modDispatcher.RunSelectedTransform` from a user-approved Apple Event host | `osascript elt_transform_excel/scripts/run_runner_macro.applescript` |
+| Render a finance-facing input template from an ingest spec (`implementations/elt_transform_excel/config/ingest_specs/<key>.yaml` -> `implementations/elt_transform_excel/dist/ingest_templates/<key>.xlsx`) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite` |
+| Same, plus one illustrative row from each column's `example` (`default`s are pre-filled either way) | `uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite --sample-row` |
+| Generate `implementations/elt_transform_excel/runner_shell/RunnerShell.xlsm` with the bootstrap macro and profile-driven control-sheet layout | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_runner_shell.py --overwrite` |
+| Prep `implementations/elt_transform_excel/dist/Runner.xlsm` (copy shell, write YAML-driven transform registry, write the source-folder cell) — does **not** import any transform modules itself | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py` |
+| Manual step (required): in Excel, Tools > Macro > Macros, run `BootstrapImporter.BootstrapImportFromConfiguredSource` on the prepped workbook to actually import every `implementations/elt_transform_excel/vba_src/` module | *(no CLI command — must be run inside Excel; see Gotchas below)* |
+| Verify the manually-built workbook (status cells, registry, module set) | `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py --verify` |
+| Print the current manifest/label summary (raw Runner-dropdown view: all active entries split by AP/AR, plus defunct) | `uv run --with pyyaml --no-project python implementations/elt_transform_excel/scripts/manifest_summary.py` |
+| Same, but stakeholder view (Amex Trains V1+V2 consolidated to 1 line item per stakeholder reporting directive) | `uv run --with pyyaml --no-project python implementations/elt_transform_excel/scripts/manifest_summary.py --consolidate-amex-trains` |
+| Machine-readable manifest summary (JSON, with `_summary` block for counts) | `uv run --with pyyaml --no-project python implementations/elt_transform_excel/scripts/manifest_summary.py --json` |
+| Attempt to open `implementations/elt_transform_excel/dist/Runner.xlsm` in Excel and run `modDispatcher.RunSelectedTransform` from a user-approved Apple Event host | `osascript implementations/elt_transform_excel/scripts/run_runner_macro.applescript` |
 
 ### Manifest/label summary — playbook
 
 When a stakeholder asks "how many EIBs do we have?" or "list all the AP/AR labels" — **never**
 open the `config/transform_specs/*.yaml` decision records. Read only:
 
-1. `elt_transform_excel/config/build_manifest.yaml` → the authoritative list of
+1. `implementations/elt_transform_excel/config/build_manifest.yaml` → the authoritative list of
    `active_profiles` / `defunct_profiles`.
-2. `elt_transform_excel/config/transforms/<profile_key>.yaml` → Runner labels come from
+2. `implementations/elt_transform_excel/config/transforms/<profile_key>.yaml` → Runner labels come from
    either `shell_defaults.variants[].profile_label` (per-supplier / per-tab fan-out) or, if
    no variants block, from `transform.label` (one dropdown row per profile key).
 
@@ -48,12 +48,11 @@ The spec is the source of truth; the workbook is a render of it. Never hand-edit
 `.xlsx` — the next regenerate silently discards the edit. Change the spec and re-render:
 
 ```bash
-cd /Users/rpatel/Documents/__code/git/emailrak/elt_lake
-# 1. edit elt_transform_excel/config/ingest_specs/<key>.yaml
+# 1. edit implementations/elt_transform_excel/config/ingest_specs/<key>.yaml
 # 2. re-render (add --sample-row to see example values in row 2):
 uv run --with openpyxl --with pyyaml --no-project python \
-  elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite
-# 3. open elt_transform_excel/dist/ingest_templates/<key>.xlsx and review
+  implementations/elt_transform_excel/scripts/create_ingest_template.py <key> --overwrite
+# 3. open implementations/elt_transform_excel/dist/ingest_templates/<key>.xlsx and review
 ```
 
 The render is **deterministic** — identical spec in, byte-identical workbook out — so
@@ -78,7 +77,7 @@ What the render shows you, all from the spec — the script contains no domain v
 
 A spec whose `feeds` still uses the superseded prose-string form is **rejected**, naming the
 offending columns — rendering it would produce a plausible-looking template built on the
-pre-inversion column set. See `docs/CONFIGURATION.md` ("Ingest Specs").
+pre-inversion column set. See `implementations/elt_transform_excel/docs/CONFIGURATION.md` ("Ingest Specs").
 
 ## Python Invocation Rule
 
@@ -90,47 +89,43 @@ Preferred house rule:
 uv run --package <package-name> python <script-or-module>
 ```
 
-Current exception for `elt_transform_excel`:
+Current standalone form for `elt_transform_excel`:
 
 ```bash
-cd /Users/rpatel/Documents/__code/git/emailrak/elt_lake
-uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/create_runner_shell.py --overwrite
-uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python elt_transform_excel/scripts/build_runner.py
+uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_runner_shell.py --overwrite
+uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py
 ```
 
-This module is not yet registered as a workspace package, so do not `cd` into
-the directory first; run the build script from the workspace root exactly as shown above.
-Plain `uv run python ...` currently fails in this repo state because the workspace-level
-`ai-agent-core` source dependency does not build cleanly.
+Run these from the workspace root exactly as shown above.
 
 `create_runner_shell.py` defaults to the transform profile at
-`elt_transform_excel/config/transforms/ar_invoice.yaml`; pass `--profile-config` to seed a different
+`implementations/elt_transform_excel/config/transforms/ar_invoice.yaml`; pass `--profile-config` to seed a different
 default selected transform instead, or edit the script's `DEFAULT_PROFILE_CONFIG` constant directly.
 Regardless of that starting selection, the generated Runner's `Transform` dropdown is built from every
 profile's `transform.label`, and the generated `Source Type` / `EIB Population Type` values also come
 from those same profiles via the visible registry block on `Runner`. The path/reference defaults are
 formula-populated from the generated `config` sheet so business users can edit those values in the
 workbook. `build_runner.py`
-(no flag) reads all YAML profiles in `elt_transform_excel/config/transforms/` to write both the
+(no flag) reads all YAML profiles in `implementations/elt_transform_excel/config/transforms/` to write both the
 registry and the `config` sheet — but it does not import the transform modules themselves. Each
-transform's field mapping lives as the `mapping:` section of `config/transform_specs/<key>.yaml` and
+transform's field mapping lives as the `mapping:` section of `implementations/elt_transform_excel/config/transform_specs/<key>.yaml` and
 is mirrored by the module `.bas`; there is no build-time hash check (a mapping change is reviewed as a
 normal text diff).
 
 `build_runner.py`'s module import is a manual Excel step, not a CLI command. Driving
 `VBComponents.Import` headlessly via AppleScript proved unreliable (parameter-passing failures, Apple
-Event instability mid-import — see `docs/RUNBOOK.md`); a human must run
+Event instability mid-import — see `implementations/elt_transform_excel/docs/RUNBOOK.md`); a human must run
 `BootstrapImporter.BootstrapImportFromConfiguredSource` from Excel's Tools > Macro > Macros dialog on the
 already-prepped workbook. The source folder it reads is pre-filled by `build_runner.py` into a
 `Bootstrap Source Folder` cell on the Runner sheet. Run `build_runner.py --verify` afterward to confirm
 the import succeeded.
 
-`run_runner_macro.applescript` defaults to `elt_transform_excel/dist/Runner.xlsm` and
+`run_runner_macro.applescript` defaults to `implementations/elt_transform_excel/dist/Runner.xlsm` and
 `modDispatcher.RunSelectedTransform`. You can override both:
 
 ```bash
-osascript elt_transform_excel/scripts/run_runner_macro.applescript \
-  /Users/rpatel/Documents/__code/git/emailrak/elt_lake/elt_transform_excel/dist/Runner.xlsm \
+osascript implementations/elt_transform_excel/scripts/run_runner_macro.applescript \
+  /Users/Rakesh.Patel/Documents/__code/git/rakeshpatelfa/fa_workday_etl/implementations/elt_transform_excel/dist/Runner.xlsm \
   modDispatcher.RunSelectedTransform
 ```
 
@@ -151,4 +146,4 @@ verification for every registered transform profile (currently `AR Invoice -> Cu
 `AP AMEX Trains -> Supplier Invoice`).
 
 The build command above is only usable after the shell-generation command creates
-`runner_shell/RunnerShell.xlsm`.
+`implementations/elt_transform_excel/runner_shell/RunnerShell.xlsm`.

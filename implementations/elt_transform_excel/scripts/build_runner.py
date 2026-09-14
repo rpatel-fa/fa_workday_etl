@@ -352,7 +352,7 @@ def main() -> int:
     print("     (the source folder is already filled in on the Runner sheet).")
     print("  3. The macro saves the workbook itself when it finishes.")
     print(f"  4. Verify with: uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project "
-          "python elt_transform_excel/scripts/build_runner.py --verify")
+          "python implementations/elt_transform_excel/scripts/build_runner.py --verify")
     return 0
 
 
@@ -3842,7 +3842,7 @@ def _load_build_manifest(manifest_path: Path) -> dict:
     yaml = _import_yaml()
     if not manifest_path.exists():
         raise FileNotFoundError(
-            f"Build manifest not found: {manifest_path}. Expected at elt_transform_excel/config/build_manifest.yaml. "
+            f"Build manifest not found: {manifest_path}. Expected at implementations/elt_transform_excel/config/build_manifest.yaml. "
             "This file is the single source of truth for which transform profiles are active/defunct and the default profile."
         )
     with manifest_path.open("r", encoding="utf-8") as handle:
