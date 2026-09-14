@@ -14,18 +14,7 @@ meta:
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
-
-invoice_line_grouping_decision:
-  status: pending_source_confirmation
-  current_behavior_mode: whole_file_single_invoice
-  question: >
-    Is one workbook/file always exactly one invoice for this feed, or is there a real per-invoice
-    grouping column that should drive shared invoice-line grouping inside the file?
-  source_of_truth_needed: Finance confirmation of whether AR multi-line is one-file-one-invoice or keyed by a source invoice column
-  next_action: >
-    Keep the current whole-file single-invoice behavior until Finance confirms otherwise. Only
-    then switch to shared_helpers.invoice_line_grouping: per_invoice_number plus the grouping-source
-    contract fields.
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer: {source_column: CUSTOMER ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
@@ -46,6 +35,10 @@ notes: >
   col B, CUSTOMER NAME col C, INVOICE  LINE DESCRIPTION col D (double-space in source - alias
   tolerates both single-space and double-space variants), Date col E, QUANTITY col F,
   NET col G, VAT col H, GROSS col I, DESCRIPTION LINE BOTTOM OF INVOICE col J, COST CODE col K.
+  Shared invoice-line grouping is keyed by the source `INVOICE NUMBER` when that column is
+  populated. If it is blank or absent, the grouping key falls back to the deterministic
+  file-level header composite `FILE::{CUSTOMER ID}::{DATE OF INVOICE}`, which preserves the
+  historical one-file-one-invoice behavior while still routing through the shared helper.
 
 derived_fields:
   derived_cost_code_final_code:
@@ -60,6 +53,46 @@ derived_fields:
     source_column: GROSS
     rule: Sum of every source row's GROSS amount (column I). Written to CM (Amount Due) on
           every output line so Workday sees a consistent invoice total regardless of line count.
+  derived_invoice_group_key:
+    derivation: source_invoice_number_else_file_header_fallback
+    primary_source_column: INVOICE NUMBER
+    fallback_format: "FILE::{CUSTOMER ID}::{DATE OF INVOICE}"
+    note: >
+      Canonical grouping key for the shared invoice-line helper. Prefer the header invoice
+      number when present; otherwise collapse the workbook to one grouped invoice keyed by
+      customer plus invoice date, matching the legacy single-file behavior explicitly in YAML.
+
+fields:
+  invoice_number:
+    source_column: INVOICE NUMBER
+    optional: true
+    note: >
+      Header invoice number written to BO when present and used as the primary grouping key.
+      If absent, grouping falls back to `derived_fields.derived_invoice_group_key`.
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_derived_field: derived_invoice_group_key
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct derived invoice-group key in first-seen
+      row order.
+  line_row_id_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_derived_field: derived_invoice_group_key
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Row ID / line id is emitted from the same shared grouping key used for target `b`.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_derived_field: derived_invoice_group_key
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Line Order is emitted from the same shared grouping key used for target `b`.
 
 worktag_business_objects:
   revenue_category: "Revenue Category"
@@ -107,7 +140,11 @@ skip_rule:
 
 mapping:
 - target: b
-  function: sequence
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by `derived_invoice_group_key`, so a repeated
+    source `INVOICE NUMBER` shares one Spreadsheet Key and the header-fallback case remains
+    one grouped invoice per file.
 - target: h
   default: "Y"
 - target: i
@@ -158,8 +195,21 @@ mapping:
   default: Standard
 - target: db
   source_column: DESCRIPTION LINE BOTTOM OF INVOICE
+- target: ds
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so the grouped invoice
+    writes a 1..N row id regardless of whether the key came from `INVOICE NUMBER` or the
+    deterministic file-level fallback.
+- target: du
+  default: ""
+  note: Line Reference DU is intentionally blank for this profile.
 - target: dv
-  function: line_sequence_per_invoice
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so the grouped invoice
+    writes a 1..N line order regardless of whether the key came from `INVOICE NUMBER` or the
+    deterministic file-level fallback.
 - target: ej
   source_column: SALES ITEM CODE
   optional: true

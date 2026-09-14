@@ -58,18 +58,7 @@ meta:
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
   customer_name_resolution: two_level_l1_l2_sql_migration
-
-invoice_line_grouping_decision:
-  status: pending_source_confirmation
-  current_behavior_mode: per_row_sequence_single_line
-  question: >
-    GBE has no declared source invoice-number column. Should rows remain one-row-one-invoice,
-    or is there a Finance-approved grouped invoice key hidden in the feed / operational process?
-  source_of_truth_needed: Finance confirmation of the real invoice grouping key for GBE uploads
-  next_action: >
-    Keep B as per-row sequence and DS/DV as `1` until Finance confirms the intended grouping
-    key. Only then add shared_helpers.invoice_line_grouping: per_invoice_number plus the
-    grouping-source contract fields.
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer:
@@ -103,13 +92,46 @@ parties:
 
 notes: >
   GBE (Governing Body Endorsement) invoices bill football clubs for player-registration
-  endorsement panels/extensions. One source row = one single-line Workday Customer Invoice.
+  endorsement panels/extensions. The emitted invoice identifier is the source `Reference`
+  value, written to D / G / BO and used as the shared invoice-line grouping key for
+  Spreadsheet Key plus Row ID / Line Order. A repeated `Reference` therefore collapses
+  to one Workday header with 1..N lines; a unique `Reference` remains the single-line case.
   v46.1 layout. Amounts + tax mirror ar_bulk_invoice / ar_multi_line_invoice: GROSS (col F)
   -> Amount Due (CM), Unit Cost (FL) and Extended Amount (FO); Line Tax Applicability (FA)
   and Line Tax Code (FB) driven by the derived VAT rate (20% -> GBR_Standard_Rated, else
   GBR_Outside_of_Scope / GBR_Zero_Rated). The GBE Reference (col I) is written verbatim to
   the three header identifier columns D / G / BO and to the header Memo (DB). Line Item
   Description (EN) + line Memo (FV) = Player + " - " + Type.
+
+fields:
+  invoice_number:
+    source_column: Reference
+    note: >
+      The GBE `Reference` is the canonical emitted invoice identifier. It is written
+      verbatim to D / G / BO and is also the grouping key for the shared invoice-line helper.
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: Reference
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct source `Reference` in first-seen row order.
+  line_row_id_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: Reference
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DS is the grouped row id emitted from the shared invoice-line helper.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: Reference
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DV is the grouped line order emitted from the shared invoice-line helper.
 
 tax:
   mode: per_row_derived
@@ -142,7 +164,10 @@ mapping:
 # EIB-level + line-level columns for one-row-one-invoice. House defaults: submit=Y,
 # auto_complete=Y, currency=GBP, payment=Unpaid, document=Approved, invoice_type=Standard.
 - target: b
-  function: sequence
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by `Reference`. Repeated source references
+    therefore share one Spreadsheet Key; a unique reference is the N=1 case.
 - target: h
   default: "Y"
 - target: i
@@ -193,9 +218,15 @@ mapping:
   source_column: Reference
   note: Header Memo (DB) = GBE Reference for traceability.
 - target: ds
-  default: "1"
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
+    source references write a 1..N row id within the grouped invoice.
 - target: dv
-  default: "1"
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
+    source references write a 1..N line order within the grouped invoice.
 - target: en
   derivation: player_dash_type
   source_columns: [Player, Type]

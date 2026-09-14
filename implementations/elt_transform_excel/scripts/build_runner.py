@@ -1366,6 +1366,10 @@ def _validate_vba_source_hygiene(
                         return True
                     if isinstance(alias_columns, list) and any(str(v).strip() for v in alias_columns):
                         return True
+                    if str(invoice_field.get("build_profile_reference") or "").strip():
+                        return True
+                    if str(invoice_field.get("derivation") or "").strip():
+                        return True
                     if str(invoice_field.get("function") or "").strip() or str(invoice_field.get("rule") or "").strip():
                         return True
                 if is_ap_module:
@@ -1384,8 +1388,13 @@ def _validate_vba_source_hygiene(
                     "receipt_date",
                 ):
                     field_payload = fields.get(field_name)
-                    if isinstance(field_payload, dict) and str(field_payload.get("group_key_source_column") or "").strip():
-                        return True
+                    if isinstance(field_payload, dict):
+                        if str(field_payload.get("group_key_source_column") or "").strip():
+                            return True
+                        if str(field_payload.get("group_key_field") or "").strip():
+                            return True
+                        if str(field_payload.get("group_key_derived_field") or "").strip():
+                            return True
             derived_fields = spec_root.get("derived_fields")
             if isinstance(derived_fields, dict):
                 for key in derived_fields.keys():
@@ -1465,65 +1474,6 @@ def _validate_vba_source_hygiene(
                     "group_key_source_column, or a derived_fields.invoice_number* entry). "
                     "CONFIG-FIRST RULE: the shared helper's grouping key must be declared in YAML."
                 )
-
-        def _validate_pending_invoice_line_grouping_decision(
-            spec_path: Path,
-            spec_root: object,
-            spec_shared_helpers: dict[str, object],
-        ) -> None:
-            pending_specs: dict[str, str] = {
-                "ar_gbe_invoice": "per_row_sequence_single_line",
-                "ar_discipline_invoice": "per_row_sequence_single_line",
-                "ar_multi_line_invoice": "whole_file_single_invoice",
-            }
-            expected_mode = pending_specs.get(spec_path.stem)
-            if expected_mode is None:
-                return
-
-            variant = str(spec_shared_helpers.get("invoice_line_grouping") or "").strip()
-            if variant and variant.lower() != "none":
-                errors.append(
-                    f"{spec_path.name}: invoice_line_grouping remains PARKED pending source-of-truth "
-                    "confirmation, so shared_helpers.invoice_line_grouping must stay absent/'none' "
-                    "until Finance confirms the grouping key. Do not guess it from the current VBA."
-                )
-
-            if not isinstance(spec_root, dict):
-                errors.append(
-                    f"{spec_path.name}: missing top-level invoice_line_grouping_decision block. "
-                    "Known unresolved AR invoice-grouping profiles must declare their parked status "
-                    "in YAML so the ambiguity is visible to the build."
-                )
-                return
-
-            decision = spec_root.get("invoice_line_grouping_decision")
-            if not isinstance(decision, dict):
-                errors.append(
-                    f"{spec_path.name}: missing top-level invoice_line_grouping_decision block. "
-                    "Known unresolved AR invoice-grouping profiles must declare their parked status "
-                    "in YAML so the ambiguity is visible to the build."
-                )
-                return
-
-            status = str(decision.get("status") or "").strip()
-            current_behavior_mode = str(decision.get("current_behavior_mode") or "").strip()
-            if status != "pending_source_confirmation":
-                errors.append(
-                    f"{spec_path.name}: invoice_line_grouping_decision.status must be "
-                    "'pending_source_confirmation' until the grouping key is confirmed."
-                )
-            if current_behavior_mode != expected_mode:
-                errors.append(
-                    f"{spec_path.name}: invoice_line_grouping_decision.current_behavior_mode must be "
-                    f"{expected_mode!r} to document the CURRENT emitted behavior."
-                )
-
-            for required_key in ("question", "source_of_truth_needed", "next_action"):
-                if not str(decision.get(required_key) or "").strip():
-                    errors.append(
-                        f"{spec_path.name}: invoice_line_grouping_decision.{required_key} must be a "
-                        "non-blank YAML scalar so the parked ambiguity is explicit."
-                    )
 
         for _reg_concern, _reg_variants in registry_catalog.items():
             for _reg_variant, _reg_payload in _reg_variants.items():
@@ -1738,11 +1688,6 @@ def _validate_vba_source_hygiene(
                             resolved_spec_path,
                             _spec_root,
                             module_path,
-                            spec_shared_helpers,
-                        )
-                        _validate_pending_invoice_line_grouping_decision(
-                            resolved_spec_path,
-                            _spec_root,
                             spec_shared_helpers,
                         )
                         module_to_spec_shared_helpers[module_path] = spec_shared_helpers

@@ -16,11 +16,12 @@
   line-order fields from the same helper. The shared-helper contract is now declared in
   `config/shared_helper_registry.yaml` as `invoice_line_grouping.per_invoice_number`, and
   Step 6 of `build_runner.py` enforces the helper call/spec declaration in both directions.
-  **All VBA changes remain pending manual Excel verify**. Still open: unresolved-key AR
-  transforms (`ar_gbe`, `ar_discipline`, `ar_multi_line`), AR integration uniformity, and
-  AMEX GF (Decision 2).
+  `ar_gbe`, `ar_discipline`, `ar_multi_line`, and `ar_integration` are now also aligned to
+  the same helper with their grouping key declared in YAML. **All VBA changes remain pending
+  manual Excel verify.** Still open: AMEX GF (Decision 2) plus any reruns/verification of
+  previously generated output files.
 - **Read first:** `docs/ARCHITECTURE.md` (Authoring model + the AR/AP EIB column invariants),
-  `config/shared_helper_registry.yaml` (no `invoice_line_grouping` concern exists yet),
+  `config/shared_helper_registry.yaml` (`invoice_line_grouping.per_invoice_number` is canonical),
   `config/transform_specs/ap_stationery.yaml` Rules 15/16/18/19 and `ap_taxi.yaml` Rules 15/16/18/19
   (the proven grouping pattern to promote), and the sibling refactor
   `docs/todo/collapse-transform-shells-engine.md` (this is the first concrete slice of it).
@@ -56,9 +57,10 @@ Audited all 23 output EIBs in the AP/AR target folders with the new
 - **AMEX outputs use a non-classic column layout** (Invoice Number col K blank; tax/GE/GF
   blank at classic letters). `audit_outputs.py` flags them as not-classic and skips the
   letter-based checks. Their real column map needs confirming before auditing/refactoring.
-- **AR:** `ar_multi_line` collapses a whole file into ONE invoice (B=1, DV=1..23); every
-  other AR transform keys B per-row. Same single-vs-multi split as AP, but AR has a
-  dedicated multi-line MODULE rather than a per-row toggle.
+- **AR historical note:** this review started because `ar_multi_line` collapsed a whole file
+  into one invoice while the other AR transforms keyed B per-row. That legacy split has now
+  been removed from the implementation/config contract: all active AR invoice transforms route
+  Spreadsheet Key plus line-order assignment through the shared helper.
 
 ## Done (2026-09-14; all VBA pending manual Excel verify per the contract)
 
@@ -85,9 +87,17 @@ Audited all 23 output EIBs in the AP/AR target folders with the new
 - `modArInvoiceCustomerInvoice.bas`, `modArInvoiceRunCustInvoice.bas`, and
   `modArBulkInvoiceCustInvoice.bas` — Spreadsheet Key plus line-order fields now route through
   `AssignInvoiceLineGroup`, keyed by the source invoice number column each profile already reads.
+- `modArGbeInvoiceCustInvoice.bas`, `modArDisciplineCustInvoice.bas`,
+  `modArMultiLineCustInvoice.bas`, and `modArIntegrationCustInvoice.bas` — the remaining AR
+  transforms now also route Spreadsheet Key plus line-order fields through
+  `AssignInvoiceLineGroup`, using the same invoice identifier each profile already emits:
+  `Reference`, `Document Number`, `INVOICE NUMBER` with deterministic file-header fallback, and
+  the build-profile-derived `invoiceRefId` respectively.
 - `config/shared_helper_registry.yaml` + `scripts/build_runner.py` — NEW shared-helper concern
   `invoice_line_grouping.per_invoice_number`; Step-6 POS/NEG/reverse guards now enforce
   `AssignInvoiceLineGroup` declarations and usage. Relevant AP/AR transform specs declare it.
+  The earlier parked-AR `invoice_line_grouping_decision` validator has been removed because the
+  grouping keys are now explicit in YAML rather than intentionally unresolved.
 - AP standard-rated tax -> Domestic PURCHASE triple for `ap_cfa_distributions`, `ap_amex_trains`,
   `ap_amex_trains_v2` (build-profile `tax_*` blocks + local Private Const shadows). AR untouched.
 - Removed stale `control_amount_eib_as` line from `config/transform_specs/ap_commercial_invoice.yaml`.
@@ -128,13 +138,10 @@ Audited all 23 output EIBs in the AP/AR target folders with the new
    but confirm Workday accepts it (taxi/stationery already ship EM=1..N, so it should). `ap_wnl_grants`
    must now show its multi-line groups sharing one B with EK=EM=1..N (DUP-REF + STALE flags cleared).
    Non-negotiable gate before trusting the helper.
-2. **AR side — finish the unresolved-key transforms only.**
-   - `ar_integration`: optional uniformity migration only; its synthetic per-row ref already means
-     grouping remains single-line in practice.
-   - **NEEDS the grouping key confirmed (do NOT guess):** `ar_gbe` (customer resolved by club NAME,
-     no invoice-number column), `ar_discipline` (invoice-number source unclear), and `ar_multi_line`
-     (currently treats the WHOLE FILE as one invoice — is its group key a real per-invoice column, or
-     is one-file-one-invoice the intended rule?). Ask Finance / the user before wiring these.
+2. **AR side — verification/rerun only.**
+   - The AR cleanup is now implemented across `ar_invoice`, `ar_invoice_run`, `ar_bulk_invoice`,
+     `ar_gbe`, `ar_discipline`, `ar_multi_line`, and `ar_integration`.
+   - Remaining work is verification in Excel and any output reruns required after that check.
 4. **AMEX GF (Decision 2)** — confirm the AMEX EIB column map (`IK` vs `GF`), then write or leave blank.
 5. **Re-run the stale outputs** the audit flagged (stationery Addison/DHL/E-Courier; AMEX) — they
    are pre-fix vintages carrying the dup-ref bug and must NOT be loaded to Workday as-is.

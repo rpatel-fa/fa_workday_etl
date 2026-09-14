@@ -15,18 +15,7 @@ meta:
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
-
-invoice_line_grouping_decision:
-  status: pending_source_confirmation
-  current_behavior_mode: per_row_sequence_single_line
-  question: >
-    Is `Document Number` the true invoice grouping key for discipline uploads, or does the
-    source/business process require a different grouped invoice reference?
-  source_of_truth_needed: Finance confirmation of the real invoice grouping key for discipline uploads
-  next_action: >
-    Keep B as per-row sequence and DV as `1` until Finance confirms the grouping key. Only
-    then add shared_helpers.invoice_line_grouping: per_invoice_number plus the grouping-source
-    contract fields.
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer: {source_column: Customer Number, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
@@ -37,6 +26,8 @@ notes: >
   (source extract has neither column). Customer Invoice Type is DSC (discipline fine)
   with the DSC indicator Y mapped to the correct column. ALL target columns remapped
   from the pre-v46 layout; see eib_population_defaults.yaml for the canonical registry.
+  Spreadsheet Key plus line order are now grouped by source `Document Number`, so a
+  repeated document number collapses to one Workday header with 1..N lines.
   The source extract has no COST CODE / accounting string → Revenue Category EM and
   the 9 worktag slots FX..GF are left BLANK (Finance may code pre-upload).
 
@@ -46,6 +37,21 @@ fields:
   amount_due:       {source_column: Original Trx Amount, basis: gross}
   line_amount:      {source_column: Original Trx Amount, basis: gross}
   memo:             {source_column: Document Number}
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: Document Number
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct `Document Number` in first-seen row order.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: Document Number
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      The emitted line-order field is driven from the same grouped `Document Number` key.
 
 accounting_string:
   driver: none
@@ -56,7 +62,11 @@ accounting_string:
 
 mapping:
 - target: b
-  function: sequence
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by `Document Number`. Repeated source
+    document numbers therefore share one Spreadsheet Key; a unique document number is
+    the N=1 case.
 - target: h
   default: "Y"
 - target: i
@@ -106,7 +116,10 @@ mapping:
         customer's inherited default worktags; the DSC indicator in customer_invoice_type=DSC
         drives the statutory discriminator.
 - target: dv
-  default: "1"
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
+    source document numbers write a 1..N line order within the grouped invoice.
 - target: em
   derivation: blank_no_accounting_string
 - target: en

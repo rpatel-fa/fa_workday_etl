@@ -15,6 +15,10 @@ Private Const OUTPUT_DSC_INDICATOR As String = "Y"
 ' mapping -- the fallback used when the live "company" mapping lookup has no match.
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Direct transform: load the Discipline (fines/payments) invoice extract and the
 ' Workday customer extract, look up each row's customer via the customer extract's
 ' pipe-delimited "Reference ID" field, and write straight into the cloned target EIB.
@@ -101,6 +105,9 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MT"
     targetRow = TARGET_DATA_START_ROW
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     For rowIndex = sourceDataStartRow To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
@@ -196,12 +203,17 @@ Private Sub WriteOutputRow( _
     Dim companyId As String
     Dim invoiceDate As String
     Dim amount As Double
+    Dim documentNumberValue As String
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
 
     companyId = ResolveMappedCompany(runnerWorkbook, SOURCE_COMPANY_CODE, COMPANY_DEFAULT_FALLBACK)
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, documentDateColumn))
     amount = ResolveAmount(sourceTable(sourceRow, amountColumn))
+    documentNumberValue = Trim$(CStr(sourceTable(sourceRow, documentNumberColumn)))
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, documentNumberValue, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("E")).Value = OUTPUT_AUTO_COMPLETE
     targetSheet.Cells(targetRow, ColumnIndex("H")).Value = CStr(sourceTable(sourceRow, documentNumberColumn))
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
@@ -220,9 +232,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("HA")).Value = amount
     targetSheet.Cells(targetRow, ColumnIndex("HC")).Value = OUTPUT_INVOICE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex("HL")).Value = OUTPUT_DSC_INDICATOR
-    targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = "1"
+    targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex("MJ")).Value = amount
-    targetSheet.Cells(targetRow, ColumnIndex("MT")).Value = CStr(sourceTable(sourceRow, documentNumberColumn))
+    targetSheet.Cells(targetRow, ColumnIndex("MT")).Value = documentNumberValue
 End Sub
 Private Function RowIsSkippable( _
     ByVal tableData As Variant, _

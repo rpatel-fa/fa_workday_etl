@@ -21,6 +21,7 @@ meta:
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer:
@@ -68,6 +69,44 @@ notes: >
   then pick the tax triple: VAT_rate ~= 0% -> zero-rated (Outside Scope),
   VAT_rate ~= 20% -> standard-rated (Domestic 200_VAT). The source Gross column
   is the authoritative Amount Due and line Extended Amount.
+  Shared invoice-line grouping is keyed by the same derived invoice identifier that
+  the build profile writes to D / G / BO. That makes the shared helper contract
+  explicit in YAML even though the identifier itself is assembled from PO / customer /
+  date fallback logic in config/transforms/ar_integration_invoice.yaml.
+
+fields:
+  invoice_number:
+    derivation: from_build_profile_invoice_identifier
+    build_profile_reference: transform_constants.invoice_identifier
+    note: >
+      Canonical emitted invoice identifier. The build-profile `invoice_identifier`
+      block computes the exact value once per non-skipped source row and that same
+      string is written to D / G / BO and used as the grouping key for the shared
+      invoice-line helper.
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_field: invoice_number
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct derived invoice identifier in
+      first-seen row order.
+  line_row_id_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_field: invoice_number
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DS is the grouped row id emitted from the shared invoice-line helper.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_field: invoice_number
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DV is the grouped line order emitted from the shared invoice-line helper.
 
 source_lookup_sheets:
   course_hierarchy:
@@ -203,8 +242,11 @@ skip_rule:
 mapping:
 # --- EIB scaffolding columns ---
 - target: b
-  function: sequence
-  note: Spreadsheet Key B = 1..N sequential per output row.
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by the derived invoice identifier from
+    `transform_constants.invoice_identifier`. Repeated derived identifiers therefore
+    share one Spreadsheet Key; a unique identifier is the N=1 case.
 
 - target: c
   default: "Y"
@@ -348,17 +390,23 @@ mapping:
 
 # --- Line scaffolding ---
 - target: ds
-  function: line_row_id_sequence
-  note: Row ID DS = "1" uniform (one line per invoice archetype).
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
+    derived invoice identifiers write a 1..N row id within the grouped invoice.
 
 - target: du
   function: line_ref_from_row
-  format: "LINE-{spreadsheet_key}-1"
-  note: Line Reference DU = unique per output row, single-line archetype.
+  format: "LINE-{spreadsheet_key}-{line_order}"
+  note: >
+    Line Reference DU mirrors the shared invoice-line grouping outputs:
+    `LINE-{spreadsheet_key}-{line_order}`.
 
 - target: dv
-  default: "1"
-  note: Line Order DV = "1" uniform (one line per invoice archetype).
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
+    derived invoice identifiers write a 1..N line order within the grouped invoice.
 
 # --- Line fields ---
 - target: em

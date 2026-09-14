@@ -98,6 +98,10 @@ Private Const COURSE_PACK_PROGRAMME As Long = 9
 Private Const COURSE_PACK_REVENUE_CATEGORY As Long = 10
 Private Const COURSE_PACK_SLOT_COUNT As Long = 10
 
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVal controlSheet As Worksheet)
     Dim sourceDataPath As String
     Dim targetEibPath As String
@@ -290,6 +294,9 @@ Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MV"
     targetRow = TARGET_DATA_START_ROW
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     For rowIndex = dataStartRowIndex To UBound(integrationTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(integrationTable, 1), runStartTime
@@ -432,6 +439,8 @@ Private Sub WriteOutputRow( _
     Dim lineDescription As String
     Dim lineMemo As String
     Dim invoiceRefId As String
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
     Dim worktagIndex As Long
     Dim worktagColumns As Variant
     Dim worktagValue As Variant
@@ -536,8 +545,9 @@ Private Sub WriteOutputRow( _
             invoiceRefId = "AR-INT-" & CStr(sequenceNumber)
         End If
     End If
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceRefId, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = sequenceNumber
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = "Y"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LOCKED_IN_WORKDAY)).Value = OUTPUT_AUTO_COMPLETE
@@ -560,9 +570,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INCLUDE_CUSTOMER_WORKTAGS)).Value = "Y"
     If LenB(headerMemo) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = headerMemo
 
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(1)
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_REFERENCE)).Value = "LINE-" & CStr(sequenceNumber) & "-1"
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = "1"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_REFERENCE)).Value = "LINE-" & CStr(spreadsheetKeyValue) & "-" & CStr(lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
 
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescription
