@@ -1,5 +1,10 @@
 This module has two independent build outputs. Both are built from the repo root.
 
+> **Canonical operator procedure.** This file is the single canonical build/manual-run procedure for
+> operators. Agents should reference `docs/BUILD.md` / `docs/BUILD_WIN.md` rather than re-listing
+> these steps in routine status or completion messages unless the user explicitly asks for the
+> procedure again.
+
 > This file assumes the project owner's **macOS** build host. To build `implementations/elt_transform_excel/dist/Runner.xlsm` on
 > **Windows** instead, see `implementations/elt_transform_excel/docs/BUILD_WIN.md` — same rules and same manual import step, with the
 > host-specific mechanics (Trust Center setting, a `BootstrapImporter` path-separator quirk)
@@ -50,6 +55,11 @@ uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implem
 ```bash
 uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/build_runner.py
 ```
+
+These two CLI commands are the only repo-side build steps the operator runs before opening Excel.
+`create_runner_shell.py` regenerates the shell workbook; `build_runner.py` then enforces the
+config/shared-helper/VBA parity contract before preparing the distributable workbook. Any drift
+between canonical YAML and checked-in VBA must fail here, before macro bootstrap/import.
 
 2.1 Validate (post macro setup in step 3)
 

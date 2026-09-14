@@ -25,6 +25,31 @@ the three standard user prompts. It defines:
 If an agent finds a scenario not covered by this contract → **DOCUMENT THE GAP HERE, then ask**.
 Never silently assume values — the whole point of the g10/g11 gap sweeps was to eliminate hidden inference.
 
+## 1.1 Communication Rule - Do Not Repeat Canonical Operator Instructions
+
+When reporting status or closing out work, the agent MUST NOT re-type build/manual operator
+steps that are already canonically documented in `docs/BUILD.md`, `docs/BUILD_WIN.md`, or
+`docs/RUNBOOK.md` unless the user explicitly asks for those steps again.
+
+Required behavior:
+
+1. If the operator procedure is already documented and the user did not ask for it, give the
+   result/blocker only and reference the canonical doc path if needed.
+2. If the work is pending a documented manual Excel/bootstrap/verify step, say that briefly
+   once, without re-listing the click-path / command sequence.
+3. Reproduce the actual procedure only when the user explicitly asks for the procedure, or
+   when the documented step itself is the subject under discussion.
+
+Anti-pattern:
+
+```text
+BAD: "Still required: open Runner.xlsm -> run BootstrapImporter -> save -> close -> run --verify"
+     on every completion message, even though BUILD.md already documents it.
+
+GOOD: "Build prep is complete; the remaining manual Excel bootstrap/verify step is the one
+      already documented in docs/BUILD.md."
+```
+
 ---
 
 ## 0.3. MANDATORY QUICK-LOOKUP WINS (run FIRST when prompt matches)

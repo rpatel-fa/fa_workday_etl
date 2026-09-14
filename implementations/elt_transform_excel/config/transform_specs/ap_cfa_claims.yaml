@@ -212,6 +212,7 @@ shared_helpers:
   row_net_resolution: direct_amount
   row_trailer_detection: text_cols_and_amount_cols_parameterized
   source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
 
 parties:
   supplier:

@@ -93,6 +93,10 @@ Private Const TGT_GRANT As String = "GD"
 Private Const TGT_PROGRAMME As String = "GE"
 Private Const TGT_PROJECT_LINE_WORKTAG As String = "GF"
 
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 Public Sub RunArBulkInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVal controlSheet As Worksheet)
     Dim sourceDataPath As String
     Dim targetEibPath As String
@@ -252,6 +256,9 @@ Public Sub RunArBulkInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MV"
     targetRow = TARGET_DATA_START_ROW
+      Set mGrpKey = New Collection
+      Set mGrpLine = New Collection
+      mGrpNextKey = 0
 
     For rowIndex = dataStartRowIndex To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
@@ -387,6 +394,8 @@ Private Sub WriteOutputRow( _
     Dim worktagIndex As Long
     Dim worktagColumns As Variant
     Dim worktagValue As Variant
+      Dim spreadsheetKeyValue As Long
+      Dim lineOrderValue As Long
 
     companyId = ResolveMappedCompany(runnerWorkbook, SOURCE_COMPANY_CODE, COMPANY_DEFAULT_FALLBACK)
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, invoiceDateColumn))
@@ -403,6 +412,7 @@ Private Sub WriteOutputRow( _
     lineTaxApplicability = TaxValueForRate(vatRate, TAX_APPLICABILITY_ZERO, TAX_APPLICABILITY_STANDARD)
     lineTaxCode = TaxValueForRate(vatRate, TAX_CODE_ZERO, TAX_CODE_STANDARD)
     costCodeValue = Trim$(CStr(sourceTable(sourceRow, costCodeColumn)))
+      spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
 
     If LenB(costCodeValue) > 0 Then
         revenueCategory = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(revenueCategoryLookup, costCodeValue)
@@ -417,7 +427,7 @@ Private Sub WriteOutputRow( _
         projectRef = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(projectLookup, costCodeValue)
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = sequenceNumber
+      targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_COMMENT)).Value = OUTPUT_AUTO_COMPLETE
     If LenB(invoiceNumberValue) > 0 Then
@@ -439,9 +449,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = grossAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = descBottomValue
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(1)
+      targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_REFERENCE)).Value = vbNullString
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = "1"
+      targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
 
     If LenB(salesItemValue) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_SALES_ITEM)).Value = salesItemValue
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory

@@ -14,6 +14,10 @@ Private Const OUTPUT_CURRENCY As String = "GBP"
 ' transform.
 Private Const COMPANY_DEFAULT_FALLBACK As String = ""
 
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Direct transform: load the source invoice extract and the Workday customer extract,
 ' look up each invoice row's customer via the customer extract's pipe-delimited
 ' "Reference ID" field, and write straight into the cloned target EIB. No Interim
@@ -107,6 +111,9 @@ Public Sub RunArInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVal c
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MT"
     targetRow = TARGET_DATA_START_ROW
+      Set mGrpKey = New Collection
+      Set mGrpLine = New Collection
+      mGrpNextKey = 0
 
     For rowIndex = sourceDataStartRow To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
@@ -210,14 +217,17 @@ Private Sub WriteOutputRow( _
     Dim companyId As String
     Dim invoiceDate As String
     Dim grossAmount As Double
-    Dim invoiceNumberValue As String
+      Dim invoiceNumberValue As String
+      Dim spreadsheetKeyValue As Long
+      Dim lineOrderValue As Long
 
     companyId = ResolveMappedCompany(runnerWorkbook, CStr(sourceTable(sourceRow, companyColumn)), COMPANY_DEFAULT_FALLBACK)
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, orderDateColumn))
     grossAmount = ResolveAmount(sourceTable(sourceRow, grossPriceColumn))
-    If invoiceNumberColumn > 0 Then invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, invoiceNumberColumn)))
+      If invoiceNumberColumn > 0 Then invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, invoiceNumberColumn)))
+      spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+      targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("E")).Value = OUTPUT_AUTO_COMPLETE
     If LenB(invoiceNumberValue) > 0 Then _
         targetSheet.Cells(targetRow, ColumnIndex("H")).Value = invoiceNumberValue
@@ -235,7 +245,7 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("GZ")).Value = OUTPUT_DOCUMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex("HA")).Value = grossAmount
     targetSheet.Cells(targetRow, ColumnIndex("HC")).Value = OUTPUT_INVOICE_TYPE
-    targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = "1"
+     targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = CStr(lineOrderValue)
     ' KE mapping default is "NULL" -> leave explicitly blank (already cleared by ClearPublishedRows).
     targetSheet.Cells(targetRow, ColumnIndex("KE")).Value = ""
     targetSheet.Cells(targetRow, ColumnIndex("KF")).Value = CStr(sourceTable(sourceRow, courseNameColumn)) & "-" & CStr(sourceTable(sourceRow, courseCodeColumn))

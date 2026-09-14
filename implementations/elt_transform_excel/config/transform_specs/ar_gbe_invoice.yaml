@@ -59,6 +59,18 @@ shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
   customer_name_resolution: two_level_l1_l2_sql_migration
 
+invoice_line_grouping_decision:
+  status: pending_source_confirmation
+  current_behavior_mode: per_row_sequence_single_line
+  question: >
+    GBE has no declared source invoice-number column. Should rows remain one-row-one-invoice,
+    or is there a Finance-approved grouped invoice key hidden in the feed / operational process?
+  source_of_truth_needed: Finance confirmation of the real invoice grouping key for GBE uploads
+  next_action: >
+    Keep B as per-row sequence and DS/DV as `1` until Finance confirms the intended grouping
+    key. Only then add shared_helpers.invoice_line_grouping: per_invoice_number plus the
+    grouping-source contract fields.
+
 parties:
   customer:
     source_column: Club

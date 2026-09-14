@@ -20,6 +20,7 @@ meta:
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer: {source_column: Code, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
@@ -29,11 +30,33 @@ parties:
   # it is left unmapped in this transform.
 
 fields:
+  invoice_number:   {source_column: Invoice Number, alias_columns: [Document Number]}
   invoice_date:     {source_column: Date}                 # EIB br - real Excel date in source
   line_amount:      {source_column: NET, basis: net}      # EIB fo - net taxable line amount (VAT itemised via tax code, decided 2026-07-30)
   amount_due:       {source_column: TOTAL, basis: gross}  # EIB cm - gross control total (net + Workday-calculated VAT)
   line_description: {source_column: Invoice type}         # EIB en - e.g. "League affilation fee"
   memo:             {source_column: Club Name}            # EIB db - records the club being invoiced
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: Invoice Number
+    alias_columns: [Document Number]
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct source invoice number. `Document Number`
+      is an accepted alias when `Invoice Number` is absent.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: Invoice Number
+    alias_columns: [Document Number]
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DV is the per-invoice 1..N line position from the same grouped invoice-number
+      key as Spreadsheet Key B. Single-line invoices write `1`.
+  # Spreadsheet Key plus line order are grouped by the source invoice number
+  # (`Invoice Number` / `Document Number`) via the shared invoice-line helper.
 
 cost_centre:
   derivation: none
@@ -73,7 +96,11 @@ skip_rule:
 
 mapping:
 - target: b
-  function: sequence
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by `Invoice Number` with `Document Number`
+    as the source-column alias. Repeated source invoice numbers therefore share one
+    Spreadsheet Key; a single-line invoice is the N=1 case of the same rule.
 - target: h
   default: "Y"
 - target: i
@@ -121,7 +148,11 @@ mapping:
 - target: co
   default: Standard
 - target: dv
-  default: "1"
+  function: invoice_group_line_order
+  note: >
+    Populated by the same AssignInvoiceLineGroup call as target `b`. Repeated source
+    invoice numbers therefore write a 1..N line position within the grouped invoice;
+    single-line invoices write `1`.
 - target: en
   source_column: Invoice type
 - target: fb

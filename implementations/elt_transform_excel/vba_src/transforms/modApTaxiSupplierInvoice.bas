@@ -51,6 +51,9 @@ Private mCommercialPartnerLookup As Collection
 Private mGrantLookup As Collection
 Private mProgramLookup As Collection
 Private mProjectLookup As Collection
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
 
 ' ====================================================================
 '  Entry point (called by the Runner via reflection on selected transform key).
@@ -234,31 +237,26 @@ Public Sub RunApTaxiSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal cont
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+      Set mGrpKey = New Collection
+      Set mGrpLine = New Collection
+      mGrpNextKey = 0
 
     '  CHANGE 2026-08-25 (FIRST CLASS Jul 26 Workday duplicate-ref rejection):
-    '  Phase 1 group-map PREPASS over valid non-skipped rows. Produces 7 pure-VBA
-    '  Collections (no ActiveX, no Scripting.Dictionary -- cross-OS safe via the same
+      '  Phase 1 header-consistency PREPASS over valid non-skipped rows. Produces 4 pure-VBA
+      '  Collections (no ActiveX, no Scripting.Dictionary -- cross-OS safe via the same
     '  Collection helper pattern used for CFA Rule 8 per-group counter in
     '  modApCfaClaimsSupplierInvoice.bas):
-    '    (A) groupSpreadsheetKeyId   -> key = invoiceNumberValue (col C), item = CLng B grouping key (1..M)
-    '    (B) groupNextLineOrder      -> key = invoiceNumberValue, item = CLng next Line Order (1..N per group)
-    '    (C) groupNetSum             -> key = invoiceNumberValue, item = CDbl Round(SUM Net,2)
-    '    (D) groupCompanyCaptured    -> key = invoiceNumberValue, item = CStr Rule 1 Company for guard
-    '    (E) groupSupplierCaptured   -> key = invoiceNumberValue, item = CStr Rule 2 Supplier for guard
-    '    (F) groupCurrencyCaptured   -> key = invoiceNumberValue, item = CStr Rule 12 Currency for guard
-    '    (G) groupInvDateCaptured    -> key = invoiceNumberValue, item = CStr Rule 4 InvoiceDate for guard
-    '  First non-skipped appearance of a group populates all capturers AND assigns a new B ID 1..M;
-    '  subsequent rows of same group accumulate Net SUM and assert header consistency Rule 18
+      '    (A) groupCompanyCaptured    -> key = invoiceNumberValue, item = CStr Rule 1 Company for guard
+      '    (B) groupSupplierCaptured   -> key = invoiceNumberValue, item = CStr Rule 2 Supplier for guard
+      '    (C) groupCurrencyCaptured   -> key = invoiceNumberValue, item = CStr Rule 12 Currency for guard
+      '    (D) groupInvDateCaptured    -> key = invoiceNumberValue, item = CStr Rule 4 InvoiceDate for guard
+      '  First non-skipped appearance of a group populates all capturers;
+      '  subsequent rows of same group assert header consistency Rule 18
     '  (4 header fields: Company/Supplier/Currency/InvoiceDate  --  ReceivedDate excluded deliberately
     '  because B+EM grouping is authoritative for Workday multi-line header collapse; a single
     '  Workday invoice can span multiple receipt months when split across cost codes at line level).
     '  If any of the 4 strict fields diverges within a group we raise a build ERROR before any
     '  EIB rows are written (corrupt source data, can't emit a valid multi-line Workday submission).
-    Dim nextSpreadsheetId As Long
-    nextSpreadsheetId = 0
-    Dim groupSpreadsheetKeyId As New Collection   ' key=InvoiceNumberValue, item=CLng B id
-    Dim groupNextLineOrder As New Collection      ' key=InvoiceNumberValue, item=CLng next line 1..N
-    Dim groupNetSum As New Collection             ' key=InvoiceNumberValue, item=CDbl Round(sum,2)
     Dim groupCompanyCaptured As New Collection    ' key=InvoiceNumberValue, item=CStr company
     Dim groupSupplierCaptured As New Collection   ' key=InvoiceNumberValue, item=CStr supplier
     Dim groupCurrencyCaptured As New Collection    ' key=InvoiceNumberValue, item=CStr currency
@@ -310,19 +308,14 @@ Public Sub RunApTaxiSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal cont
             rDt = NormalizeSourceDate(sourceTable(rowIndex, receivedDateColumn))
             If LenB(rDt) = 0 Then rDt = iDt
             cVal = Trim$(CStr(sourceTable(rowIndex, currencyColumn)))
-            If LenB(cVal) = 0 Then cVal = OUTPUT_DEFAULT_CURRENCY
-            If CollectionKeyExists(groupSpreadsheetKeyId, iNum) = False Then
-                nextSpreadsheetId = nextSpreadsheetId + 1
-                CollectionSetItemLong groupSpreadsheetKeyId, iNum, nextSpreadsheetId
-                CollectionSetItemLong groupNextLineOrder, iNum, 1
-                CollectionSetItemDouble groupNetSum, iNum, Round(nAmt, 2)
+              If LenB(cVal) = 0 Then cVal = OUTPUT_DEFAULT_CURRENCY
+              If CollectionKeyExists(groupCompanyCaptured, iNum) = False Then
                 groupCompanyCaptured.Add rCompanyId, iNum
                 groupSupplierCaptured.Add rSupplierId, iNum
                 groupCurrencyCaptured.Add cVal, iNum
                 groupInvDateCaptured.Add iDt, iNum
             Else
-                '  accumulate Net, then Rule 18 header consistency guard (4 strict fields)
-                CollectionSetItemDouble groupNetSum, iNum, Round(CDbl(CollectionGetItemDouble(groupNetSum, iNum)) + Round(nAmt, 2), 2)
+                  '  Rule 18 header consistency guard (4 strict fields)
                 prepassMsg = vbNullString
                 If StrComp(CStr(groupCompanyCaptured(iNum)), rCompanyId, vbBinaryCompare) <> 0 Then prepassMsg = prepassMsg & "Company(" & CStr(groupCompanyCaptured(iNum)) & " vs " & rCompanyId & "); "
                 If StrComp(CStr(groupSupplierCaptured(iNum)), rSupplierId, vbBinaryCompare) <> 0 Then prepassMsg = prepassMsg & "Supplier(" & CStr(groupSupplierCaptured(iNum)) & " vs " & rSupplierId & "); "
@@ -420,7 +413,7 @@ NextPrepassRow:
                             AppendRejectRow runnerWorkbook, selectionKey, rowIndex, "Unknown TaxCode '" & tcRaw & "' -- expected P20/P0/PZ. " & "Per spec on_unknown_when_value = reject_and_report.", "TaxCode raw=" & tcRaw, Trim$(CStr(sourceTable(rowIndex, descriptionColumn)))
                         Else
                             If WriteOutputRow( targetSheet, targetRow, sourceTable, rowIndex, resolvedCompanyId, supplierId, taxApply, taxCod, taxRecov, invoiceNumberColumn, invoiceDateColumn, receivedDateColumn, descriptionColumn, costCodeColumn, netColumn, taxColumn,  _
-                                grossColumn, currencyColumn, poNumberColumn, supplierIdColumn, costCenterId, spendCategoryId, optionalWorktagBlankRows, groupSpreadsheetKeyId, groupNextLineOrder, groupNetSum) Then
+                                  grossColumn, currencyColumn, poNumberColumn, supplierIdColumn, costCenterId, spendCategoryId, optionalWorktagBlankRows) Then
                                 rowsProcessed = rowsProcessed + 1
                                 targetRow = targetRow + 1
                             Else
@@ -530,8 +523,7 @@ End Sub
 '  --------------------------------------------------------------
 Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow As Long, ByVal sourceTable As Variant, ByVal sourceRow As Long, ByVal resolvedCompanyId As String, ByVal supplierId As String, ByVal taxApply As String, ByVal taxCod As String,  _
     ByVal taxRecov As String, ByVal invoiceNumberColumn As Long, ByVal invoiceDateColumn As Long, ByVal receivedDateColumn As Long, ByVal descriptionColumn As Long, ByVal costCodeColumn As Long, ByVal netColumn As Long, ByVal taxColumn As Long, ByVal grossColumn As Long,  _
-    ByVal currencyColumn As Long, ByVal poNumberColumn As Long, ByVal supplierIdColumn As Long, ByVal costCenterId As String, ByVal spendCategoryId As String, ByRef optionalWorktagBlankRows As Long, _
-    ByRef groupSpreadsheetKeyId As Collection, ByRef groupNextLineOrder As Collection, ByRef groupNetSum As Collection ) As Boolean
+      ByVal currencyColumn As Long, ByVal poNumberColumn As Long, ByVal supplierIdColumn As Long, ByVal costCenterId As String, ByVal spendCategoryId As String, ByRef optionalWorktagBlankRows As Long) As Boolean
     Dim netAmt As Double
     Dim grossAmt As Double
     Dim taxAmt As Double
@@ -551,10 +543,9 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     Dim grantId As String
     Dim programId As String
     Dim projectId As String
-    Dim anyWorktagBlank As Boolean
-    Dim bGroupKey As Long
-    Dim lineOrderNext As Long
-    Dim netSumGroup As Double
+      Dim anyWorktagBlank As Boolean
+      Dim spreadsheetKeyValue As Long
+      Dim lineOrderValue As Long
 
     '  INPUTS (source_table taxi "Upload Format" tab A..P):
     '    A=Template  B=SupplierID (split LEFT=Company, RIGHT=Creditor)  C=InvoiceNumber
@@ -562,10 +553,10 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     '    J=ItemCode  K=Account (Cost Code)  L=Net  M=Tax  N=Gross  O=Description/BOOKED BY
     '    P=TaxCode
     '  OUTPUT COLUMN MAPPING (Supplier Invoice EIB v46.2 template, header row 5 labels):
-    '    Rule 15 CHANGED 2026-08-25 after Finance duplicate-ref rejection: B Spreadsheet Key*
-    '         = SHARED GROUP KEY across all rows of same InvoiceNumber C (1 integer per distinct C value,
-    '           not per-row). Read from groupSpreadsheetKeyId collection assigned in Phase 1 prepass.
-    '         All rows of one invoice share the same B value -> Workday reads one header, N lines.
+      '    Rule 15 CHANGED 2026-08-25 after Finance duplicate-ref rejection: B Spreadsheet Key*
+      '         = SHARED GROUP KEY across all rows of same InvoiceNumber C (1 integer per distinct C value,
+      '           not per-row). AssignInvoiceLineGroup owns the increment logic.
+      '         All rows of one invoice share the same B value -> Workday reads one header, N lines.
     '    I=Add Only (OUTPUT_SUBMIT = Y) | Rule 3 K Invoice Number = source C DIRECT |
     '    Rule 1 R Company = split LEFT segment resolved | Rule 12 T Currency = F DIRECT |
     '    Rule 2 U Supplier = split RIGHT segment 2-part precedence |
@@ -576,9 +567,8 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     '         bitwise identical per row. Previously legacy AU col, now BG per v46.2 header).
     '    Rule 13 BH PO Number = I DIRECT if non-blank |
     '    NEW EL col 142 Supplier Invoice Line ID = Leave EMPTY (Workday auto-allocs from EM Line Order) |
-    '    NEW Rule 16 EM col 143 Line Order = per-group 1..N reset counter (groupNextLineOrder Phase 1 map,
-    '         increment AFTER write so Phase 2 writes sequentially). Mirrors AR multiline DV Line Order.
-    '    EK Row ID = 1 (HOUSE DEFAULT invoice_line_row_id_constant) |
+      '    NEW Rule 16 EM col 143 Line Order = per-group 1..N reset counter from AssignInvoiceLineGroup.
+      '    EK Row ID mirrors the same line-order value |
     '    Rule 8 EP Description = UCase(col O description) | Rule 7 line worktags EW..HH = resolved Cost Code
     '         segments via Mapping MASTER Hierarchy lowest specificity match (9 pack).
     '    Rule 11 tax triple FE Applicability / FF Code / FH INVOICE/ADJUSTMENT_DATE_TYPE /
@@ -625,13 +615,9 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    '  Rule 15, 16, 17: look up the group map (built in Phase 1 prepass).
-    '  Missing key at this point is INTERNAL DEFECT (Phase1/Phase2 skip_rule parity).
-    bGroupKey = CollectionGetItemLong(groupSpreadsheetKeyId, invoiceNumberValue)
-    lineOrderNext = CollectionGetItemLong(groupNextLineOrder, invoiceNumberValue)
-    netSumGroup = CollectionGetItemDouble(groupNetSum, invoiceNumberValue)
+      spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = bGroupKey                   ' Rule 15 (CHANGED 2026-08-25: per-group SHARED, no longer per-row sequential)
+      targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue         ' Rule 15 (per-invoice shared key from AssignInvoiceLineGroup)
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT                ' HOUSE DEFAULT Add Only = Y
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue           ' Rule 3 (source C DIRECT -- remains SAME as BG, both = raw passthrough; FIRST CLASS taxi already unique)
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = resolvedCompanyId            ' Rule 1
@@ -647,9 +633,9 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     ' NEW: Supplier Invoice Line ID stub col 142. Intentionally BLANK per spec.
     ' Leave EMPTY -- Workday auto-allocates internal line IDs from Line Order col EM.
     ' Explicit write keeps bidirectional drift guard HYGIENE OK (no spec/code drift).
-    targetSheet.Cells(targetRow, ColumnIndex("EL")).Value = Empty
-    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderNext               ' Rule 16 (NEW 2026-08-25: Line Order per group 1..N reset -- CORRECT for mixed single/multi-line batches (Sept). B+EM = authoritative line position; single-line groups trivially produce 1.)
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderNext               ' Rule 19 (EXACT MIRROR of EM col 143 -- per Sept mixed single/multi-line grouping requirement. Written from same lineOrderNext local to guarantee EK == EM per-row byte identity.)
+      targetSheet.Cells(targetRow, ColumnIndex("EL")).Value = Empty
+      targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue              ' Rule 16 (per-group 1..N from AssignInvoiceLineGroup)
+      targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue              ' Rule 19 (exact mirror of EM from the same shared-helper output)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue            ' Rule 8
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     targetSheet.Cells(targetRow, ColumnIndex("FE")).Value = taxApply
@@ -670,10 +656,6 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     targetSheet.Cells(targetRow, ColumnIndex("HD")).Value = grantId
     targetSheet.Cells(targetRow, ColumnIndex("HF")).Value = programId
     targetSheet.Cells(targetRow, ColumnIndex("HH")).Value = projectId
-
-    '  Phase 2 line-order advance: increment counter for THIS group AFTER successful write.
-    '  (Separate prepass initialised next = 1; so write 1 then increment to 2, etc.)
-    CollectionSetItemLong groupNextLineOrder, invoiceNumberValue, lineOrderNext + 1
 
     WriteOutputRow = True
 End Function

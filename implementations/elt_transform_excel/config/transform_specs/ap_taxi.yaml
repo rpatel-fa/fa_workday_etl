@@ -197,6 +197,7 @@ shared_helpers:
   row_net_resolution: effective_net_gross_tax_fallback
   row_trailer_detection: text_cols_and_amount_cols_parameterized
   source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
 
 parties:
   supplier:
@@ -233,6 +234,14 @@ fields:
       One workbook = MULTIPLE invoices (verified FIRST CLASS: 1SE28308, 1SE28313,
       1SE28314, 1SE28319, 1SE28320, 1SE28321 across 32 rows). Per-row read handles this
       naturally; no file-level batching needed.
+  suppliers_invoice_number:                   # EIB BG
+    function: mirror_invoice_number_value_from_target_column_k
+    source_column: InvoiceNumber
+    cross_column_guarantee: bitwise_equal_to_target_column_k_invoice_number
+    note: >
+      Rule 6: BG mirrors the same raw source InvoiceNumber value written to target K.
+      No separate derivation is allowed; the VBA reuses the same `invoiceNumberValue`
+      local so K == BG byte-for-byte on every written row.
   invoice_date:                               # EIB u
     source_column: InvoiceDate                # Rule 4 = col D, per-row Excel serial date
     format: Excel serial date coerced to YYYY-MM-DD text at VBA write time
@@ -246,6 +255,15 @@ fields:
       of them" — matches Stationery. Workday accepts blank ReceiptDate when B Spreadsheet Key
       multi-line grouping is in effect. Previously: source_column=ReceivedDate, fallback=InvoiceDate
       (FIRST CLASS exemplar showed ReceivedDate constant across rows).
+  spreadsheet_key_group_id:                   # EIB B col 2 Spreadsheet Key*; Rule 15
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: InvoiceNumber
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Rule 15: one shared Spreadsheet Key per distinct source InvoiceNumber, allocated in
+      first-seen row order. All rows of the same invoice therefore share target B, and a
+      single-line invoice is simply the one-row case of the same rule.
   line_order_within_group:                    # EIB col 143 Line Order; Rule 16
     function: per_source_invoice_number_group_1based_reset_counter
     group_key_source_column: InvoiceNumber

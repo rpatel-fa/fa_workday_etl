@@ -15,6 +15,18 @@ meta:
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
 
+invoice_line_grouping_decision:
+  status: pending_source_confirmation
+  current_behavior_mode: whole_file_single_invoice
+  question: >
+    Is one workbook/file always exactly one invoice for this feed, or is there a real per-invoice
+    grouping column that should drive shared invoice-line grouping inside the file?
+  source_of_truth_needed: Finance confirmation of whether AR multi-line is one-file-one-invoice or keyed by a source invoice column
+  next_action: >
+    Keep the current whole-file single-invoice behavior until Finance confirms otherwise. Only
+    then switch to shared_helpers.invoice_line_grouping: per_invoice_number plus the grouping-source
+    contract fields.
+
 parties:
   customer: {source_column: CUSTOMER ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
   company:  {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}

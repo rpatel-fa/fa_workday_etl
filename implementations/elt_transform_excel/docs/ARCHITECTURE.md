@@ -25,16 +25,16 @@ lookup join, not a multi-stage migration — didn't need it. The two projects sh
 
 Read this first — it is the mental model a cold-start session most often gets wrong.
 
-Creating one transform has exactly **two steps that require judgement** (today, model-assisted):
+Creating one transform has exactly **one step that requires judgement** (today, model-assisted):
 
 1. **Shape the transform spec** — `config/transform_specs/<key>.yaml`: the `mapping:` section plus the
    decision record, arrived at via Q&A from the input file + target EIB.
-2. **Author the executor** — `vba_src/transforms/mod<Name>.bas`, written to mirror that spec.
 
-Everything downstream is **deterministic**: `scripts/build_runner.py` assembles a fixed `vba_src/` +
-config into the Runner, and the macro runs identical output for identical input with no model in the
-loop. The macro's *behaviour* is deterministic; its *creation* (step 2) is not — it is authored, not
-generated.
+Everything downstream is **deterministic**: the YAML contract plus the shared-helper registry define the
+implementation shape, `vba_src/` must remain traceable 1:1 back to that config, and
+`scripts/build_runner.py` enforces config<->code parity before the Runner is prepared. The macro's
+runtime behaviour is deterministic for identical inputs, and any VBA change that cannot be justified
+from config/specs is a defect.
 
 **The VBA runtime never parses or reads YAML.** YAML files exist in three roles, all consumed
 *outside* the finance-user runtime:
@@ -54,12 +54,13 @@ filename) and the *shape* of the pipeline (column refs, constants, cell writes, 
 hasn't changed, the `.bas` source needs no textual edit. Rebuilding the Runner (shell +
 `build_runner.py`) is sufficient to propagate the new value into the cells the macros read.
 
-There is **no `spec → .bas` code generator.** The `.bas` is hand-authored and the spec↔`.bas`
-correspondence is held by co-located code review (one text diff), not by a build step. Do not assume
-one exists and do not invent one as a shortcut. Note the deliberate asymmetry with the **ingest** side,
-which *does* have a deterministic `spec → template` generator (`scripts/create_ingest_template.py`); the
-transform side intentionally does not — see `docs/ADDING_A_TRANSFORM.md`'s scaling note for the
-condition under which building one would become a governance-reviewed decision.
+The transform side is **config-authoritative**. `config/transform_specs/*.yaml` plus
+`config/shared_helper_registry.yaml` declare the behavior; the checked-in `.bas` must stay traceable
+to that contract and `build_runner.py` enforces the parity we have mechanised so far. Do not treat the
+VBA as freehand source material or bypass the config-first path when changing behavior. The deliberate
+asymmetry with the **ingest** side is only that ingest has a full workbook renderer
+(`scripts/create_ingest_template.py`), while transform parity is currently enforced through config +
+validation rather than a single monolithic spec->VBA emitter.
 
 ### Governance gate for H3 table-driven runner engine
 
@@ -189,8 +190,8 @@ transform module — not a generic relational `FilterRows`/`JoinRows`/`GroupByRo
 | **`config/ingest_lookups/ref_company.json`, `ref_default.json`** | Self-describing reference tables (`description`/`key_column`/`provenance`/`rows`) — the same mechanism as every other `ingest_lookups` dataset. `ref_company` holds source→target company names; `ref_default` holds per-domain defaults (e.g. currency→GBP). `scripts/build_runner.py` folds them into the Deployed Runner's `mapping` sheet (entity/source/target) at build time. Source of truth for the runtime company/default lookup — replaces the retired `RunnerShellMapping.xlsx`. | Edited by hand when the reference data changes; the `mapping` sheet is regenerated from them. | Yes — source of truth for the runtime mapping lookup. |
 | **`config/transforms/`** | YAML build-time transform profiles. Defines shell defaults, sample file paths, source layout, transform metadata, and the macro binding. Every `*.y*ml` here is globbed and parsed as a runnable profile by the build. | Extended whenever a new transform type is introduced. | Yes — source of truth for build-time defaults. |
 | **`config/reference_paths.yaml`** | Single source of truth for the shared reference files (Workday customer extract, supplier extract, finance Mapping MASTER + tab). The build injects these into each transform's registry row unless the profile's `shell_defaults` overrides the key (profile wins). Loaded once per build; not globbed as a profile. | Edited when a Workday extract or the finance mapping master is reissued. | Yes — source of truth for the shared reference-file paths. |
-| **`config/transform_specs/`** | Per-transform authoring files (see `docs/ADDING_A_TRANSFORM.md`). Hold the `mapping:` section — the source of truth for the field mapping that the `.bas` mirrors — plus the human decision record (finance-semantic choices and tenant Workday IDs the source data cannot supply). Deliberately outside `config/transforms/` so the build never parses them as profiles. Not read by any build tooling. | Written/edited whenever the mapping or a coding decision changes. | Yes — source of truth for each transform's field mapping + coding decisions. |
-| **`vba_src/`** | Plain-text `.bas`/`.cls` source for every VBA module, including the bootstrap importer: dispatcher, shared helpers, shared source-table operations, shared finance-domain helpers, and one module per transform step. | Edited continuously as source code. | Yes — this is the source of truth for all Runner logic. |
+| **`config/transform_specs/`** | Per-transform canonical authoring files (see `docs/ADDING_A_TRANSFORM.md`). Hold the mapping, derived-field rules, shared-helper selections, and the finance decision record. Deliberately outside `config/transforms/` so the build never parses them as profiles. Parsed by hygiene/parity tooling to ensure the checked-in VBA stays justified by config. | Written/edited whenever the mapping or a coding decision changes. | Yes — source of truth for transform behaviour. |
+| **`vba_src/`** | Plain-text `.bas`/`.cls` implementation artifacts for every VBA module, including the bootstrap importer: dispatcher, shared helpers, shared source-table operations, shared finance-domain helpers, and one module per transform step. | Updated only in lock-step with the canonical config/specs and shared-helper registry. | Yes — text implementation artifact imported into the Runner, but never authoritative over config. |
 | **Deployed Runner** (`.xlsm`) | Runner Shell + every module from `vba_src/`, synchronised by `scripts/build_runner.py`. This is what finance users actually open. Carries the `mapping` lookup tab, regenerated from `config/ingest_lookups/ref_company.json` + `ref_default.json` at build time. | Rebuilt whenever `vba_src/` changes. | No — build output. |
 | **Output workbook** | A clone of the Target EIB template, populated directly from the source/customer-extract lookup join — no intermediate workbook. | Produced at the end of a successful run. | No — run output. |
 | **`RunnerLog.csv` / `RunnerStatus.txt` / `<output>.rejects.csv`** | Run observability files written by every transform via native VBA file I/O (no `FileSystemObject`). `RunnerLog.csv` (append-only run history) and `RunnerStatus.txt` (overwritten with live progress) are runner-scoped singletons written beside `Runner.xlsm`. The rejects file is written **beside the run's output EIB**, named to pair with it (`AP_Travel_output.xlsx` → `AP_Travel_output.rejects.csv`), reset per run, and lists each rejected source row with its reason and the source value the reject turned on (`BuildRejectLogPath` in `modHelpers`; falls back to `RunnerRejects_<transform>.csv` beside `Runner.xlsm` if the output location can't be resolved). Best-effort; see `docs/RUNBOOK.md`'s "Watching a Run". | Written on each run; survive rebuilds; user-deletable. | No — run output. |
@@ -232,8 +233,8 @@ Source Data, Customer Spreadsheet (user file paths)         Target EIB (user fil
   `FA` / `THE FA GROUP - FA`) read live, every run, via `modHelpers.LookupMappingValue`. This is
   reference data that can change independently of a transform's field mapping, so it is read
   at runtime rather than baked into the VBA — contrast with the per-transform `mapping:` section in
-  `config/transform_specs/<key>.yaml`, which describes the field-mapping shape itself and is
-  authoring-time-only (hand-mirrored by the `.bas` — not generated from it; see "Authoring model" above).
+  `config/transform_specs/<key>.yaml`, which is the canonical declaration of the field-mapping shape
+  and shared-helper usage that the checked-in VBA must satisfy.
 - **Bootstrap importer macro** — sourced from `vba_src/bootstrap/BootstrapImporter.bas` and injected by
   `scripts/create_runner_shell.py`. Given a folder path, it imports every `.bas`/`.cls` file found into
   the workbook's VBA project and saves. This is what lets every other module be edited as a text file,
@@ -263,7 +264,7 @@ Source Data, Customer Spreadsheet (user file paths)         Target EIB (user fil
   A cold-start author MUST implement it by reading that shared-helper variant first — NOT by
   guessing from example VBA. The declared branch order, execution invariants, and anti-drift
   rationale live in the YAML and are the single source of truth; the VBA in `modSourceTable.bas`
-  is the hand-authored mirror of that contract. Critical invariants stated in the YAML (numeric
+  is the checked-in implementation artifact constrained by that contract. Critical invariants stated in the YAML (numeric
   Excel-serial detection by Variant subtype before any delimiter rewriting, `Fix()`-based time
   truncation, locale-aware decimal separator for text serials, conditional dot→slash rewrite
   gated by all-3-parts-numeric) are enforcement of known real-world bugs observed on the Travel
@@ -631,10 +632,12 @@ elt_transform_excel repeatable traps`.
         `derivation=per_row_lookup` and its `lookup_table` filter triple, and
         `on_unresolved` ALL explicitly declared.  No implicit "copy from exemplar"
         fields left unspecified.
-      - `shared_helpers:` top-level block (after `meta:`, before `parties:`) picks
-        exactly one variant per concern, derived from the user's 2 shape-decision rules.
-        Every concern/variant key declared first in `shared_helper_registry.yaml` if
-        this transform introduces a new variant shape.
+        - `shared_helpers:` top-level block (after `meta:`, before `parties:`) picks
+          exactly one variant per concern, derived from the user's 2 shape-decision rules.
+          This now includes `invoice_line_grouping: per_invoice_number` for any transform
+          that calls `AssignInvoiceLineGroup` to populate Spreadsheet Key plus Row ID / Line
+          Order. Every concern/variant key declared first in `shared_helper_registry.yaml`
+          if this transform introduces a new variant shape.
 
    3. You write the `.bas` module DETERMINISTICALLY from the transform_spec + registry,
       not from any existing transform code file:

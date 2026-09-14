@@ -1131,6 +1131,7 @@ def _validate_vba_source_hygiene(
             # NormalizeSourceDate at runtime. The REVERSE guard below catches the opposite
             # direction: modules that CALL it but FORGOT to declare the concern.
             ("source_date_normalization", "excel_serial_and_dmy_text"): ("NormalizeSourceDate",),
+            ("invoice_line_grouping", "per_invoice_number"): ("AssignInvoiceLineGroup",),
             # customer_name_resolution: every transform selecting the two-level GBE cascade
             # MUST invoke both the lookup builder AND the resolver at runtime. The bare-name
             # POS guard catches drift where a module declares the shared variant but still
@@ -1156,6 +1157,7 @@ def _validate_vba_source_hygiene(
         # same behavior inline in a new AR module.
         BARE_HELPER_TO_REQUIRED_CONCERN: dict[str, str] = {
             "NormalizeSourceDate": "source_date_normalization",
+            "AssignInvoiceLineGroup": "invoice_line_grouping",
         }
         # --- Stage 1: shared_helper_registry.yaml + transform_specs shared_helpers blocks ---
         # Declarative anti-drift: each transform spec declares which shared helper variant
@@ -1327,6 +1329,201 @@ def _validate_vba_source_hygiene(
                     continue
                 accepted.append(tok)
             return accepted
+
+        def _collect_transform_spec_mapping_entries(spec_root: object) -> list[dict[str, object]]:
+            entries: list[dict[str, object]] = []
+            if not isinstance(spec_root, dict):
+                return entries
+
+            def _append_mapping_block(mapping_block: object) -> None:
+                if isinstance(mapping_block, list):
+                    for item in mapping_block:
+                        if isinstance(item, dict):
+                            entries.append(dict(item))
+                elif isinstance(mapping_block, dict):
+                    for target_key, payload in mapping_block.items():
+                        if isinstance(payload, dict):
+                            item = dict(payload)
+                            item.setdefault("target", target_key)
+                            entries.append(item)
+
+            _append_mapping_block(spec_root.get("mapping"))
+            target_eib = spec_root.get("target_eib")
+            if isinstance(target_eib, dict):
+                _append_mapping_block(target_eib.get("mapping"))
+            return entries
+
+        def _has_invoice_number_contract(spec_root: object, is_ap_module: bool) -> bool:
+            if not isinstance(spec_root, dict):
+                return False
+            fields = spec_root.get("fields")
+            if isinstance(fields, dict):
+                invoice_field = fields.get("invoice_number")
+                if isinstance(invoice_field, dict):
+                    source_column = str(invoice_field.get("source_column") or "").strip()
+                    alias_columns = invoice_field.get("alias_columns")
+                    if source_column:
+                        return True
+                    if isinstance(alias_columns, list) and any(str(v).strip() for v in alias_columns):
+                        return True
+                    if str(invoice_field.get("function") or "").strip() or str(invoice_field.get("rule") or "").strip():
+                        return True
+                if is_ap_module:
+                    supplier_field = fields.get("suppliers_invoice_number") or fields.get("supplier_invoice_number")
+                    if isinstance(supplier_field, dict):
+                        if str(supplier_field.get("source_column") or "").strip():
+                            return True
+                        if str(supplier_field.get("function") or "").strip() or str(supplier_field.get("rule") or "").strip():
+                            return True
+                for field_name in (
+                    "spreadsheet_key_group_id",
+                    "line_order_within_group",
+                    "invoice_line_row_id",
+                    "control_amount_total_per_group",
+                    "header_consistency_guard_within_group",
+                    "receipt_date",
+                ):
+                    field_payload = fields.get(field_name)
+                    if isinstance(field_payload, dict) and str(field_payload.get("group_key_source_column") or "").strip():
+                        return True
+            derived_fields = spec_root.get("derived_fields")
+            if isinstance(derived_fields, dict):
+                for key in derived_fields.keys():
+                    if str(key).startswith("invoice_number"):
+                        return True
+                    if is_ap_module and str(key).startswith("suppliers_invoice_number"):
+                        return True
+            invoice_number_derivation = spec_root.get("invoice_number_derivation")
+            if isinstance(invoice_number_derivation, dict):
+                for key, value in invoice_number_derivation.items():
+                    key_str = str(key)
+                    if "invoice_number" in key_str and str(value).strip():
+                        return True
+            return False
+
+        def _validate_invoice_line_grouping_contract(
+            spec_path: Path,
+            spec_root: object,
+            module_path: Path,
+            spec_shared_helpers: dict[str, object],
+        ) -> None:
+            variant = str(spec_shared_helpers.get("invoice_line_grouping") or "").strip()
+            if variant != "per_invoice_number":
+                return
+            mapping_entries = _collect_transform_spec_mapping_entries(spec_root)
+            if mapping_entries:
+                def _entry_target(entry: dict[str, object]) -> str:
+                    return str(entry.get("target") or "").strip().upper()
+
+                def _entry_source(entry: dict[str, object]) -> str:
+                    return str(entry.get("source") or "").strip().lower()
+
+                def _entry_function(entry: dict[str, object]) -> str:
+                    return str(entry.get("function") or "").strip().lower()
+
+                has_spreadsheet_key_mapping = any(
+                    _entry_target(entry) == "B"
+                    and (
+                        _entry_function(entry) in {"invoice_group_spreadsheet_key", "invoice_line_grouping"}
+                        or "invoice_line_grouping" in _entry_source(entry)
+                        or "spreadsheet_key_group_id" in _entry_source(entry)
+                    )
+                    for entry in mapping_entries
+                )
+                if not has_spreadsheet_key_mapping:
+                    errors.append(
+                        f"{spec_path.name}: shared_helpers.invoice_line_grouping = 'per_invoice_number' "
+                        "but the spec does not declare a Spreadsheet Key mapping for target 'B'. "
+                        "Declare target B as invoice-group-driven (for example function "
+                        "'invoice_group_spreadsheet_key', function 'invoice_line_grouping', or "
+                        "source 'fields.spreadsheet_key_group_id')."
+                    )
+
+                has_line_order_mapping = any(
+                    _entry_target(entry) in {"DS", "DV", "EK", "EM"}
+                    and (
+                        _entry_function(entry) in {"invoice_group_line_order", "invoice_line_grouping"}
+                        or "invoice_line_grouping" in _entry_source(entry)
+                        or "line_order_within_group" in _entry_source(entry)
+                        or "invoice_line_row_id" in _entry_source(entry)
+                    )
+                    for entry in mapping_entries
+                )
+                if not has_line_order_mapping:
+                    errors.append(
+                        f"{spec_path.name}: shared_helpers.invoice_line_grouping = 'per_invoice_number' "
+                        "but the spec does not declare any invoice-group line-order mapping for "
+                        "targets DS/DV/EK/EM. The config must say where the shared helper writes "
+                        "line position fields."
+                    )
+
+            if not _has_invoice_number_contract(spec_root, module_path.name.startswith("modAp")):
+                errors.append(
+                    f"{spec_path.name}: shared_helpers.invoice_line_grouping = 'per_invoice_number' "
+                    "but the spec has no concrete invoice-number contract for the grouping key "
+                    "(fields.invoice_number, fields.suppliers_invoice_number, a "
+                    "group_key_source_column, or a derived_fields.invoice_number* entry). "
+                    "CONFIG-FIRST RULE: the shared helper's grouping key must be declared in YAML."
+                )
+
+        def _validate_pending_invoice_line_grouping_decision(
+            spec_path: Path,
+            spec_root: object,
+            spec_shared_helpers: dict[str, object],
+        ) -> None:
+            pending_specs: dict[str, str] = {
+                "ar_gbe_invoice": "per_row_sequence_single_line",
+                "ar_discipline_invoice": "per_row_sequence_single_line",
+                "ar_multi_line_invoice": "whole_file_single_invoice",
+            }
+            expected_mode = pending_specs.get(spec_path.stem)
+            if expected_mode is None:
+                return
+
+            variant = str(spec_shared_helpers.get("invoice_line_grouping") or "").strip()
+            if variant and variant.lower() != "none":
+                errors.append(
+                    f"{spec_path.name}: invoice_line_grouping remains PARKED pending source-of-truth "
+                    "confirmation, so shared_helpers.invoice_line_grouping must stay absent/'none' "
+                    "until Finance confirms the grouping key. Do not guess it from the current VBA."
+                )
+
+            if not isinstance(spec_root, dict):
+                errors.append(
+                    f"{spec_path.name}: missing top-level invoice_line_grouping_decision block. "
+                    "Known unresolved AR invoice-grouping profiles must declare their parked status "
+                    "in YAML so the ambiguity is visible to the build."
+                )
+                return
+
+            decision = spec_root.get("invoice_line_grouping_decision")
+            if not isinstance(decision, dict):
+                errors.append(
+                    f"{spec_path.name}: missing top-level invoice_line_grouping_decision block. "
+                    "Known unresolved AR invoice-grouping profiles must declare their parked status "
+                    "in YAML so the ambiguity is visible to the build."
+                )
+                return
+
+            status = str(decision.get("status") or "").strip()
+            current_behavior_mode = str(decision.get("current_behavior_mode") or "").strip()
+            if status != "pending_source_confirmation":
+                errors.append(
+                    f"{spec_path.name}: invoice_line_grouping_decision.status must be "
+                    "'pending_source_confirmation' until the grouping key is confirmed."
+                )
+            if current_behavior_mode != expected_mode:
+                errors.append(
+                    f"{spec_path.name}: invoice_line_grouping_decision.current_behavior_mode must be "
+                    f"{expected_mode!r} to document the CURRENT emitted behavior."
+                )
+
+            for required_key in ("question", "source_of_truth_needed", "next_action"):
+                if not str(decision.get(required_key) or "").strip():
+                    errors.append(
+                        f"{spec_path.name}: invoice_line_grouping_decision.{required_key} must be a "
+                        "non-blank YAML scalar so the parked ambiguity is explicit."
+                    )
 
         for _reg_concern, _reg_variants in registry_catalog.items():
             for _reg_variant, _reg_payload in _reg_variants.items():
@@ -1537,6 +1734,17 @@ def _validate_vba_source_hygiene(
                                 "config/shared_helper_registry.yaml for valid concern/variant keys."
                             )
                             spec_shared_helpers = {}
+                        _validate_invoice_line_grouping_contract(
+                            resolved_spec_path,
+                            _spec_root,
+                            module_path,
+                            spec_shared_helpers,
+                        )
+                        _validate_pending_invoice_line_grouping_decision(
+                            resolved_spec_path,
+                            _spec_root,
+                            spec_shared_helpers,
+                        )
                         module_to_spec_shared_helpers[module_path] = spec_shared_helpers
                 # (ii) every declared concern/variant must resolve in the registry catalog:
                 for _concern, _variant in (spec_shared_helpers or {}).items():

@@ -14,8 +14,8 @@
   assumption across the other invoice transforms. That doc also carries the outcome-review
   findings (`scripts/audit_outputs.py`) and the two Workday-tax/AMEX decisions gating it.
 - **Next item:** Phase 0 — build the output-diff safety harness. Nothing else starts until it exists.
-- **Read before touching code:** `docs/ARCHITECTURE.md` (Authoring model — the `.bas` is hand-authored
-  to mirror the spec; there is no spec→`.bas` generator), `docs/ADDING_A_TRANSFORM.md`, and
+- **Read before touching code:** `docs/ARCHITECTURE.md` (config-authoritative transform contract and
+  current parity model), `docs/ADDING_A_TRANSFORM.md`, and
   `config/shared_helper_registry.yaml` (the shared-helper concerns already extracted).
 - **Why:** the ~10 AP supplier-invoice `.bas` modules are near-duplicate forks (`ap_travel_places`
   is literally "a fork of `ap_taxi`"). The row loop, reject handling, and write block are copy-pasted,
@@ -81,10 +81,10 @@
 - **YAML `N`/`Y` → boolean.** PyYAML 1.1 coerces bare `N`,`Y`,`yes`,`no`,`on`,`off` to booleans; a
   bare `target: N` becomes `False`. Quote column letters in YAML, and prefer parsing spec targets
   from raw text (as the spec↔code gate does), not `yaml.safe_load`.
-- **transform_specs are NOT build-read** except the `shared_helpers:` block and (now) the `mapping:`
-  targets consumed by the spec↔code gate. Treat the rest as documentation the `.bas` mirrors by hand.
-- **The `.bas` is hand-authored** — the `' Source of truth:` comment says "mirrors by hand (no
-  auto-regen)". Don't assume a generator exists; the coding agent is the generator.
+- **transform_specs are only partially build-read today.** Shared-helper declarations, mapping targets,
+  the invoice-line grouping contract, and parked invoice-grouping decisions are enforced. The rest of
+  the transform-spec surface still needs broader parity coverage before the repo can claim full
+  repo-wide config->code proof.
 - **`ap_stationery` is the reference implementation** for the target model (one `.bas`, N config
   variants under `shell_defaults.variants`). Study it before designing the engine.
 - **Accounting-string normalisation is already centralised** in the shared resolvers

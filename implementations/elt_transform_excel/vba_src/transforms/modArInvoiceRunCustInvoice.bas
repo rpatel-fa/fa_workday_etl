@@ -23,6 +23,10 @@ Private Const TAX_CODE_STANDARD As String = "GBR_200_VAT"
 ' to WNSL (source column E is not the company driver).
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - WNSL"
 
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Direct transform: load the AR "invoice run" extract and the Workday customer extract, look up
 ' each row's customer via the customer extract's pipe-delimited "Reference ID" field, and write
 ' straight into the cloned target EIB. Company and Currency are fixed values (the source has
@@ -120,6 +124,9 @@ Public Sub RunArInvoiceRunCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MT"
     targetRow = TARGET_DATA_START_ROW
+      Set mGrpKey = New Collection
+      Set mGrpLine = New Collection
+      mGrpNextKey = 0
 
     ' Company ID is invariant across output rows (fixed SOURCE_COMPANY_CODE), so resolve it once
     ' instead of re-scanning the mapping sheet inside WriteOutputRow for every row.
@@ -226,14 +233,17 @@ Private Sub WriteOutputRow( _
     Dim netAmount As Double
     Dim taxCode As String
     Dim invoiceNumberValue As String
+      Dim spreadsheetKeyValue As Long
+      Dim lineOrderValue As Long
 
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, dateColumn))
     grossAmount = ResolveAmount(sourceTable(sourceRow, totalColumn))
     netAmount = ResolveAmount(sourceTable(sourceRow, netColumn))
     taxCode = DeriveTaxCode(sourceTable(sourceRow, taxDriverColumn))
     If invoiceNumberColumn > 0 Then invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, invoiceNumberColumn)))
+      spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+      targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("E")).Value = OUTPUT_AUTO_COMPLETE
     If LenB(invoiceNumberValue) > 0 Then _
         targetSheet.Cells(targetRow, ColumnIndex("H")).Value = invoiceNumberValue
@@ -253,7 +263,7 @@ Private Sub WriteOutputRow( _
     ' net (MJ) + calculated VAT (from the line Tax Code LW).
     targetSheet.Cells(targetRow, ColumnIndex("HA")).Value = grossAmount
     targetSheet.Cells(targetRow, ColumnIndex("HC")).Value = OUTPUT_INVOICE_TYPE
-    targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = "1"
+     targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = CStr(lineOrderValue)
     ' KE mapping default is "NULL" -> leave explicitly blank (already cleared by ClearPublishedRows).
     targetSheet.Cells(targetRow, ColumnIndex("KE")).Value = ""
     targetSheet.Cells(targetRow, ColumnIndex("KF")).Value = CStr(sourceTable(sourceRow, invoiceTypeColumn))

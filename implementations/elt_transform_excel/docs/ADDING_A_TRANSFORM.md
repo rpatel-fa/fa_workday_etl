@@ -389,7 +389,7 @@ The `.bas` is ~80% boilerplate shared verbatim across transforms and ~20% transf
      - (4) POS guard — for variants != `"none"`, the declared helper bare names are referenced at call sites in your `.bas`.
   *If you are adding a NEW shared concern or a NEW variant (not just selecting an existing one):*
   first add the new key to `config/shared_helper_registry.yaml` with vba_module/vba_public_fn/requires_columns/examples metadata, then add any new POS-guard hint entries to `scripts/build_runner.py → CONCERN_VARIANT_TO_BARE_HELPER_HINTS` inside `_validate_vba_source_hygiene`. New hint entries MUST be confirmed by grepping an existing transform `.bas` body that actually calls the helper — do NOT include transitive-called internal helpers (see ARCHITECTURE.md § Non-Obvious Gotchas #3).
-- **For AR Customer Invoice transforms:** Stage 1 AP hoisting rules do NOT apply (AR is out of scope). Write AR modules using the existing legacy Private Const pattern for WBO_* and TAX_*. Step 6 preserves the original negative guard for AR until the AR EIB template parity is reached and Tier 1 hoisting is re-run for the 5 AR files.
+- **For AR Customer Invoice transforms:** the same config-first shared-helper declaration rules apply. AR may still carry some legacy local WBO_*/TAX_* constants until the remaining constant-hoist parity work is finished, but AR transform behavior must still be declared in YAML first. Known parked invoice-grouping cases (`ar_gbe_invoice`, `ar_discipline_invoice`, `ar_multi_line_invoice`) must carry an explicit `invoice_line_grouping_decision:` block until Finance confirms their grouping key.
 
 ### Source-file hygiene (non-negotiable — Mac Excel VBA import is fussy)
 

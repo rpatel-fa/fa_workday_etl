@@ -19,6 +19,7 @@ overridden under pressure. The authoritative per-task playbooks are the module c
 ## Verify, don't assert
 - Prove results with live queries/output (e.g. before/after DuckDB row counts for ingest; the Runner's colour-coded result cells + reconcile for transform), not "the SQL/mapping looks right". *Consequence:* weak success criteria produce false "done" signals on data that is wrong.
 - For transform, the build gate is non-negotiable: a code-complete transform is **pending manual Excel import + verify** until confirmed in real Excel.
+- **Do not parrot documented operator steps back to the user.** If the required manual/build procedure is already captured in canonical docs (`docs/BUILD*.md`, `docs/RUNBOOK.md`), reference the doc/path briefly instead of re-listing the steps in status or final answers unless the user explicitly asks for the procedure. *Consequence:* repeated operator instructions add noise without new information and make the agent less useful.
 
 ## Docs currency
 - Any code/config change updates the affected module docs in the same change (README, ARCHITECTURE, CONFIGURATION, the relevant `finance-*.md`/transform doc, TODO). *Consequence:* stale docs are a bug in the change — the next cold-start agent trusts them and acts on wrong facts.

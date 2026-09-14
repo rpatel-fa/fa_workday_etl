@@ -257,6 +257,38 @@ shared_helpers:
         - ar_gbe_invoice
 
   # --------------------------------------------------------------------------
+  # INVOICE LINE GROUPING (Spreadsheet Key + Row ID / Line Order)
+  # --------------------------------------------------------------------------
+  invoice_line_grouping:
+
+    per_invoice_number:
+      description: >
+        Assign the Workday header Spreadsheet Key per source invoice number and
+        hand out a 1..N line counter within that group. Single-line invoices are
+        the N=1 degenerate case of the same rule. The helper is called once per
+        output row that passed the transform's own skip logic; blank invoice
+        numbers are treated defensively as standalone single-line rows so they
+        never merge into one header silently.
+      vba_module: modInvoiceGrouping.bas
+      vba_public_fn: AssignInvoiceLineGroup
+      requires_columns:
+        - source invoice number column or computed invoice-number value
+      examples:
+        - ap_stationery
+        - ap_taxi
+        - ap_travel_places
+        - ap_cfa_claims
+        - ap_cfa_distributions
+        - ap_commercial_invoice
+        - ap_prize_funds
+        - ap_referees
+        - ap_referees_v2
+        - ap_wnl_grants_invoice
+        - ar_invoice
+        - ar_invoice_run
+        - ar_bulk_invoice
+
+  # --------------------------------------------------------------------------
   # ACCOUNTING STRING / FINAL CODE DERIVATION
   # --------------------------------------------------------------------------
   accounting_string_derivation:

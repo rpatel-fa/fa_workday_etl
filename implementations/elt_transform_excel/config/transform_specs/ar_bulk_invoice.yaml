@@ -14,14 +14,17 @@ meta:
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
 
 parties:
   customer: {source_column: CUSTOMER ID, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
   company:  {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}
 
 notes: >
-  Bulk Customer Invoice extract - one source row = one Workday Customer Invoice with a
-  single invoice line. Source carries a COST CODE accounting string (segment format
+  Bulk Customer Invoice extract. The shared invoice-line grouping helper now keys
+  Spreadsheet Key plus Row ID / Line Order by the source `INVOICE NUMBER`, so repeated
+  invoice numbers collapse into one Workday header with 1..N lines; a unique invoice
+  number remains the single-line case. Source carries a COST CODE accounting string (segment format
   4-6-8-4, e.g. 1039-113006-00000000-0000) which is NEW for AR transforms; we run the
   same lowest-hierarchy segment lookup used by supplier invoice transforms against the
   finance Mapping MASTER to populate Revenue Category (EM), Billable Project header (BN)
@@ -39,6 +42,36 @@ derived_fields:
       - split_fixed: {seg1: 4, seg2: 6, seg3: 8, seg4: 4}
       - join: ["{seg1}", "{seg2}", "{seg3}", "{seg4}"]
         separator: "-"
+
+fields:
+  invoice_number:
+    source_column: INVOICE NUMBER
+    note: >
+      Source invoice reference used both for Workday printed invoice number (target BO)
+      and for invoice-line grouping. Repeated values collapse under one Spreadsheet Key.
+  spreadsheet_key_group_id:
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: INVOICE NUMBER
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      Spreadsheet Key B is assigned once per distinct `INVOICE NUMBER` in first-seen row order.
+  line_row_id_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: INVOICE NUMBER
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DS is the grouped row id emitted from the shared invoice-line helper.
+  line_order_within_group:
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: INVOICE NUMBER
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+    note: >
+      Target DV is the grouped line order emitted from the shared invoice-line helper.
 
 worktag_business_objects:
   revenue_category: "Revenue Category"
@@ -68,11 +101,10 @@ accounting_string:
   final_code_key: derived_cost_code_final_code
   resolution: lowest_hierarchy_segment_via_Mapping_Master
   note: >
-    Bulk Customer Invoice (one source row = one single-line Workday invoice).
-    v46.1 layout: 9-slot FX..GF account-string worktags, mirroring
+    Bulk Customer Invoice v46.1 layout: 9-slot FX..GF account-string worktags, mirroring
     ar_multi_line_invoice and ap_amex_trains_v2 flows. One source row = one
-    invoice, so BN (Billable Project) and line Project GF are the same value
-    per row; each row writes exactly one invoice with one line.
+    output line, so BN (Billable Project) and line Project GF are the same value
+    per row even when repeated `INVOICE NUMBER` values collapse under one Workday header.
 
 skip_rule:
   drop_when:
@@ -85,7 +117,11 @@ skip_rule:
 
 mapping:
 - target: b
-  function: sequence
+  function: invoice_group_spreadsheet_key
+  note: >
+    Populated by AssignInvoiceLineGroup keyed by `INVOICE NUMBER`. Repeated source
+    invoice numbers therefore share one Spreadsheet Key; a single-line invoice is the
+    N=1 case of the same rule.
 - target: h
   default: "Y"
 - target: i
@@ -134,8 +170,16 @@ mapping:
   default: Standard
 - target: db
   source_column: DESCRIPTION LINE BOTTOM OF INVOICE
+- target: ds
+  function: invoice_group_line_order
+  note: >
+    Bulk AR writes the line Row ID from the same AssignInvoiceLineGroup call as target
+    `b`, so repeated source invoice numbers write a 1..N row id within the grouped invoice.
 - target: dv
-  default: "1"
+  function: invoice_group_line_order
+  note: >
+    Bulk AR writes Line Order from the same AssignInvoiceLineGroup call as target `b`,
+    so repeated source invoice numbers write a 1..N line order within the grouped invoice.
 - target: ej
   source_column: SALES ITEM CODE
 - target: em

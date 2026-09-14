@@ -16,6 +16,18 @@ meta:
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
 
+invoice_line_grouping_decision:
+  status: pending_source_confirmation
+  current_behavior_mode: per_row_sequence_single_line
+  question: >
+    Is `Document Number` the true invoice grouping key for discipline uploads, or does the
+    source/business process require a different grouped invoice reference?
+  source_of_truth_needed: Finance confirmation of the real invoice grouping key for discipline uploads
+  next_action: >
+    Keep B as per-row sequence and DV as `1` until Finance confirms the grouping key. Only
+    then add shared_helpers.invoice_line_grouping: per_invoice_number plus the grouping-source
+    contract fields.
+
 parties:
   customer: {source_column: Customer Number, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
   company: {fixed: THE FA GROUP - FA}
