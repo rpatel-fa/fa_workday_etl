@@ -28,6 +28,14 @@ Public Const WBO_PROJECT_CAPEX As String = "Projects (Capex)"
 Public Const TAX_APPLICABILITY_ZERO As String = "GBR_Outside_of_Scope"
 Public Const TAX_CODE_ZERO As String = "GBR_Zero_Rated"
 Public Const TAX_RECOVERABILITY_ZERO As String = "Nonrecoverable_Allocate"
+' Shared standard-rated triple. This is the CUSTOMER-INVOICE (AR) value -- GBR_Standard_Rated is
+' a Sale/Customer ref-id. AR transforms (bulk, GBE, invoice_run, multi_line) resolve their
+' standard-rated lines against these. AP SUPPLIER-INVOICE standard-rated lines use the Domestic
+' PURCHASE triple instead (GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard /
+' Fully_Recoverable); each AP module carries that as a LOCAL Private Const shadow of the same
+' name (see ap_travel_places / ap_taxi / ap_stationery / ap_cfa_distributions / ap_amex_trains*).
+' Centralising this split under an AP-specific shared constant is a build_runner tax-gate change
+' tracked in docs/todo/unify-invoice-line-grouping.md -- do NOT change these shared AR values.
 Public Const TAX_APPLICABILITY_STANDARD As String = "GBR_Standard_Rated"
 Public Const TAX_CODE_STANDARD As String = "GBR_Standard_Rated"
 Public Const TAX_RECOVERABILITY_STANDARD As String = "Recoverable_Allocate"

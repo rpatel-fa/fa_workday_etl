@@ -100,7 +100,7 @@
 #   Rule 11 — TaxAmount: Finance Master I AS IS (informational; tax DS/DT/DY driven by TaxAmount>0).
 #   Rule 12 — TaxDetailID: Finance Master J AS IS (informational marker; not used in tax-code split).
 #   Rule 13 — Tax applicability per-row (conditional_on_tax_amount):
-#              If TaxAmount (Finance Master I) > 0  → Standard_Rated / Standard_Rated / Recoverable_Allocate
+#              If TaxAmount (Finance Master I) > 0  → GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard / Fully_Recoverable  (AP Supplier std-rated; changed 2026-09-14)
 #              Otherwise (TaxAmount == 0/blank) → Outside_of_Scope / Zero_Rated / Nonrecoverable_Allocate
 #   Rule 14 — Memo (EIB EO): DocNo + " " + Distribution/Cost Code (col A + " " + col G).
 #             Row traceability without reopening the source Excel.
@@ -290,9 +290,12 @@ tax:
     code: GBR_Zero_Rated
     recoverability: Nonrecoverable_Allocate
   standard_rated:
-    applicability: GBR_Standard_Rated
-    code: GBR_Standard_Rated
-    recoverability: Recoverable_Allocate
+    # CHANGED 2026-09-14: AP Supplier-Invoice standard-rated uses the domestic PURCHASE ref-ids
+    # (was GBR_Standard_Rated / GBR_Standard_Rated / Recoverable_Allocate, which is the AR
+    # Customer-Invoice value). AP confirmed; matches ap_taxi / ap_stationery / ap_travel_places.
+    applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
   note: >
     Tax code is per-row conditional based on Finance Master I (Tax amount):
       TaxAmount > 0     → Standard Rated / Standard / Recoverable
@@ -346,7 +349,11 @@ open_questions:
 
 mapping:
 - target: B
-  function: sequence
+  function: invoice_line_grouping
+  note: >
+    Spreadsheet Key via modInvoiceGrouping.AssignInvoiceLineGroup -- increments per NEW Invoice
+    Number (K); shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED
+    2026-09-14 from per-row sequence). One uniform mechanism, no single/multi-line distinction.
 - target: I
   default: "Y"
 - target: K
@@ -381,7 +388,11 @@ mapping:
   source_column: DocNo / Row Key (A)
   note: Rule 7 — SuppliersInvoiceNumber = Finance Master col A (per-row unique key).
 - target: EK
-  default: 1
+  function: invoice_line_grouping
+  note: Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line rows get 1 (CHANGED 2026-09-14 from hardcoded 1).
+- target: EM
+  function: invoice_line_grouping
+  note: Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14.
 - target: EP
   function: upper_trim
   source_column: Description - remittance (F)

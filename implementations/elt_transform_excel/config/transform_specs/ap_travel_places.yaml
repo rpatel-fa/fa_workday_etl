@@ -356,7 +356,7 @@ mapping:
   #   EIB data starts row 6; clear-range ends col EX.
   #   House defaults applied by runner (constants): f=Y, dd=1, dv=INVOICE/ADJUSTMENT_DATE,
   #   dz=CALC_TAX_DUE.
-  "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1 (rowsProcessed+1; skips not counted; matches modApTravelPlacesSupInv WriteOutputRow ColumnIndex B write)" }
+  "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED 2026-09-14 from per-row sequenceNumber)" }
   "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
   "K":  { source: InvoiceNumber, rule: "Rule 3 (col C DIRECT)" }
   "R":  { source: company_resolved_reference_id, rule: "parties.company constant FA via mapping entity=company; fallback = THE FA GROUP - FA (same ResolveMappedCompany('FA') path as single-company batches)" }
@@ -371,9 +371,11 @@ mapping:
   # EIB "ap" (PO Number) intentionally NOT written -- Rule 13 (col I is the coding string, not a PO ref).
   # EM Line Order not explicitly written → default blank matches Will's Aug EIB (EM=None all rows;
   #    Workday derives from B Spreadsheet Key group + row position) — CHANGED 2026-09-09 documented.
-  "EK": { source: "HOUSE DEFAULT line_item_count_constant", value: "1",
-          rule: "Rule 19 (CHANGED 2026-09-09: hardcoded literal '1' every row; matches Will's Aug file
-                 14/14 EK=1. EM is blank so mirror counter logic inapplicable.)" }
+  "EK": { source: invoice_line_grouping (line order),
+          rule: "Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line rows get 1
+                 (CHANGED 2026-09-14 from hardcoded 1 -- now the same shared grouping as every transform)" }
+  "EM": { source: invoice_line_grouping (line order),
+          rule: "Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14" }
   "EP": { source: Description, rule: Rule 8 (col O; UCase(Trim(...))) }
   "FE": { source: per_row_tax.*.applicability, rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Outside_of_Scope; P20->GBR_Domestic_Purchase_Of_Goods_And_Services — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }
   "FF": { source: per_row_tax.*.code,          rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Zero_Rated; P20->GBR_Standard — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }

@@ -66,9 +66,11 @@ transform_constants:
     code: GBR_Zero_Rated
     recoverability: Nonrecoverable_Allocate
   tax_standard_rated:
-    applicability: GBR_Standard_Rated
-    code: GBR_Standard_Rated
-    recoverability: Recoverable_Allocate
+    # CHANGED 2026-09-14: AP Supplier-Invoice standard-rated = domestic PURCHASE ref-ids (was
+    # GBR_Standard_Rated / Recoverable_Allocate = the AR Customer-Invoice value). AP confirmed.
+    applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
   company_fallback: THE FA GROUP - FA
   mapping_sheet: MAPPING MASTER
   worktag_business_objects:

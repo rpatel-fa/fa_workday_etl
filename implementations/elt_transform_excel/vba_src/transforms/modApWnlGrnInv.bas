@@ -218,6 +218,16 @@ Public Sub RunApWnlGrnInv(ByVal runnerWorkbook As Workbook, ByVal controlSheet A
     Dim consecutiveEmptyRows As Long
     consecutiveEmptyRows = 0
 
+    ' Invoice-line grouping (shared modInvoiceGrouping): rows sharing one Invoice Number (K)
+    ' collapse to one Workday header. Spreadsheet Key (B) increments per NEW Invoice Number;
+    ' Line Order (EM) / Row ID (EK) count 1..N within the group. Fixes the duplicate-reference
+    ' rejection when a WNL grant creditor recurs across rows of a batch (2026-09-14). Assigned
+    ' lazily at write time, in source-file order, for rows that pass the skip gate.
+    Dim grpKey As New Collection
+    Dim grpLine As New Collection
+    Dim grpNextKey As Long
+    grpNextKey = 0
+
     For rowIndex = dataStartRowIndex To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then _
             UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, _
@@ -297,7 +307,7 @@ Public Sub RunApWnlGrnInv(ByVal runnerWorkbook As Workbook, ByVal controlSheet A
                             invoiceDateColumn, receiptDateColumn, docNoColumn, _
                             distributionRefCodeColumn, purchasesAmountColumn, _
                             costCenterId, spendCategoryId, supplierId, _
-                            optionalWorktagBlankRows) _
+                            optionalWorktagBlankRows, grpKey, grpLine, grpNextKey) _
                         Then
                             rowsProcessed = rowsProcessed + 1
                             targetRow = targetRow + 1
@@ -396,7 +406,8 @@ End Sub
 '        -- 1-based column indices into sourceTable (Integration tab).
 '  OUTPUT COLUMN MAPPING (matches mapping: in transform_specs/ap_wnl_grants_invoice.yaml
 '     -- Submit_Supplier_Invoice_v46.2):
-'     B  seq                           (sequenceNumber, 1..N rowsProcessed+1)
+'     B  Spreadsheet Key               (per Invoice Number group via AssignInvoiceLineGroup;
+'                                        increments on each NEW K value, shared across a group's rows)
 '     I  submit                        (Y)
 '     K  InvoiceNumber                 (Rule 8 -- WNLGRNTS DEC 25-{CreditorID};
 '                                        DocNo is constant, batch+cred required for
@@ -407,7 +418,8 @@ End Sub
 '     AF InvoiceDate                   (per-row Int E via NormalizeSourceDate)
 '     AG ReceiptDate                   (per-row Int F via NormalizeSourceDate)
 '     BG SuppliersInvoiceNumber        (Rule 7 -- DocNo + "-" + CreditorID)
-'     EK Row ID                        (1 -- single-line invoice per Rule 19)
+'     EK Row ID / EM Line Order        (1..N within the Invoice Number group; mirror each other.
+'                                        Single-line creditors trivially get EK=EM=1.)
 '     EP ItemDescription               (UPPER(TRIM(Int D Decscription));
 '                                        typo 'c' preserved, matches spec header)
 '     EW Spend Category                (DistributionRefCode low-hierarchy match;
@@ -443,7 +455,10 @@ Private Function WriteOutputRow( _
     ByVal costCenterId As String, _
     ByVal spendCategoryId As String, _
     ByVal supplierId As String, _
-    ByRef optionalWorktagBlankRows As Long _
+    ByRef optionalWorktagBlankRows As Long, _
+    ByRef grpKey As Collection, _
+    ByRef grpLine As Collection, _
+    ByRef grpNextKey As Long _
 ) As Boolean
     Dim amount As Double
     Dim distributionRefCodeValue As Variant
@@ -480,6 +495,13 @@ Private Function WriteOutputRow( _
     '  Rule 7 -- Suppliers Invoice Number (BG / voucher no) = {DocNo}-{CreditorID}.
     suppliersInvoiceNumberValue = docNoValue & "-" & creditorIdValue
 
+    '  Invoice-line grouping (shared): B increments per NEW Invoice Number (K); Line Order (EM)
+    '  and Row ID (EK) count 1..N within the group. Single-line creditors trivially get B=next,
+    '  EM=EK=1 (identical to the previous per-row output); recurring creditors now share one B.
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(grpKey, grpLine, invoiceNumberValue, grpNextKey, lineOrderValue)
+
     eventId = ResolveLowestHierarchyLookupAcrossFinalCodeSegments( _
         mEventLookup, distributionRefCodeValue)
     campId = ResolveLowestHierarchyLookupAcrossFinalCodeSegments( _
@@ -503,7 +525,7 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = mCompanyId
@@ -514,7 +536,8 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = receiptDateValue
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = suppliersInvoiceNumberValue
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group (was hardcoded 1)
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK; was not written)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     targetSheet.Cells(targetRow, ColumnIndex("FE")).Value = OUTPUT_TAX_APPLICABILITY

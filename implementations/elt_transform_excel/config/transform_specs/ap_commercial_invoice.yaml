@@ -101,9 +101,12 @@ invoice_number_derivation:
 eib_constants:
   output_submit: Y
   output_default_currency: GBP
-  line_order_eib_em: 1
-  row_id_eib_ek: 1
-  control_amount_eib_as: PurchasesAmount + TaxAmount   # Net + Tax (tax is 0 everywhere)
+  line_order_eib_em: per_invoice_group_1_to_n   # 1..N within the Invoice Number group (was constant 1)
+  row_id_eib_ek: per_invoice_group_1_to_n       # mirror of EM (was constant 1)
+  # Control Amount Total (EIB col AS) is DELIBERATELY NOT populated (Workday computes it
+  # on load). The module never writes AS and the shipped output has AS blank; the prior
+  # "control_amount_eib_as: PurchasesAmount + TaxAmount" line was stale documentation and
+  # was removed 2026-09-14 to stop a future author re-introducing an AS write.
   header_consistency_guard_rule_18: true
   note: >
     Single-line invoices (each supplier = one row per batch = one EIB row).
@@ -121,7 +124,7 @@ mapping:
   #   listed here because the pipeline intentionally leaves them blank /
   #   does not touch them (Workday defaults). If future needs arise, add
   #   them both here AND in the .bas ColumnIndex() writes together.
-  "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1 (B=1..N unique; row counter passed from rowsProcessed+1)" }
+  "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED 2026-09-14 from per-row sequenceNumber -- one uniform mechanism, no single/multi-line distinction)" }
   "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
   "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}; DocNo constant 'EFAC 2RP 2526' across all 8 exemplar rows, so batch+creditor is required to produce a per-supplier-per-batch unique K value within Workday" }
   "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company (fallback THE FA GROUP - FA)" }
@@ -130,7 +133,8 @@ mapping:
   "AF": { source: InvoiceDate, rule: "Integration col E coerced @ text format via NormalizeSourceDate" }
   "AG": { source: ReceiptDate, rule: "Integration col F coerced @ text via NormalizeSourceDate; v46.2 AP Invoice Received Date" }
   "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; bare DocNo repeats across batch; creditor suffix disambiguates per Workday per-supplier uniqueness rule" }
-  "EK": { source: "HOUSE DEFAULT line_item_rowid_constant", value: "1", rule: "line Row ID = 1 for single-line shared invoice (per Rule 19; EM LineOrder also 1)" }
+  "EK": { source: invoice_line_grouping (line order), rule: "Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line invoices get 1 (CHANGED 2026-09-14 from hardcoded 1)" }
+  "EM": { source: invoice_line_grouping (line order), rule: "Line Order = 1..N within the Invoice Number group (mirror of EK). Single-line invoices get 1 (ADDED 2026-09-14; was not written)" }
   "EP": { source: item_description, rule: "UCase(Trim(Int D Decscription)); header typo 'Decscription' with extra 'c' preserved to match GP INTEGRATION export" }
   "EW": { source: spend_category, rule: "fields.spend_category - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if no-hit)" }
   "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }

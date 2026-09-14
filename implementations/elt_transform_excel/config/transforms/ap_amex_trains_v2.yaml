@@ -69,9 +69,10 @@ transform_constants:
       code: GBR_Zero_Rated
       recoverability: Nonrecoverable_Allocate
     rate_20:
-      applicability: GBR_Standard_Rated
-      code: GBR_Standard_Rated
-      recoverability: Recoverable_Allocate
+      # CHANGED 2026-09-14: AP standard-rated = domestic PURCHASE ref-ids (was the AR value).
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
   company_fallback: THE FA GROUP - FA
   mapping_sheet: MAPPING MASTER
   worktag_business_objects:

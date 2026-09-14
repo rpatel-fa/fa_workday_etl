@@ -337,7 +337,7 @@ mapping:
   # Standard Supplier Invoice EIB v46.2 columns (sheet = Submit Supplier Invoice):
   #   EIB data starts row 6; clear-range ends col HH.
   #   House defaults: I=Y, EK=1, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
-  "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1" }
+  "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED 2026-09-14 from per-row sequenceNumber)" }
   "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
   "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}" }
   "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company" }
@@ -346,7 +346,8 @@ mapping:
   "AF": { source: InvoiceDate, rule: "Rule 5 = Integration col E coerced @ text format via NormalizeSourceDate" }
   "AG": { source: ReceiptDate, rule: "Rule 6 = Integration col F coerced @ text; Invoice Received Date (NOT v46.1 AR=Hold Reason)" }
   "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; bare DocNo constant across batch; creditor suffix disambiguates per Workday per-supplier uniqueness" }
-  "EK": { source: "HOUSE DEFAULT line_item_count_constant", value: "1", rule: "line Row ID (NOT v46.1 DD=Manual Override Percent)" }
+  "EK": { source: invoice_line_grouping (line order), rule: "Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line invoices get 1 (CHANGED 2026-09-14 from hardcoded 1)" }
+  "EM": { source: invoice_line_grouping (line order), rule: "Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14" }
   "EP": { source: item_description, rule: "Rule 4 = UCase(Trim(Int D Decscription)); note header typo with extra c preserved" }
   "EW": { source: spend_category, rule: "fields.spend_category — lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if no-hit)" }
   "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }

@@ -8,6 +8,11 @@
 ## Resume (start here)
 
 - **Status:** NOT STARTED. Plan only; no code moved yet.
+- **First concrete slice split out:** `docs/todo/unify-invoice-line-grouping.md` (2026-09-14) —
+  promote the `ap_stationery`/`ap_taxi` multi-line grouping (Spreadsheet Key / Line Order /
+  Row ID) into one shared, config-driven concern and retire the per-row single-line
+  assumption across the other invoice transforms. That doc also carries the outcome-review
+  findings (`scripts/audit_outputs.py`) and the two Workday-tax/AMEX decisions gating it.
 - **Next item:** Phase 0 — build the output-diff safety harness. Nothing else starts until it exists.
 - **Read before touching code:** `docs/ARCHITECTURE.md` (Authoring model — the `.bas` is hand-authored
   to mirror the spec; there is no spec→`.bas` generator), `docs/ADDING_A_TRANSFORM.md`, and

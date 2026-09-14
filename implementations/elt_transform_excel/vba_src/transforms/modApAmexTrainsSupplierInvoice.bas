@@ -14,6 +14,15 @@ Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 
 Private Const OUTPUT_TAX_POINT_DATE_TYPE As String = "INVOICE/ADJUSTMENT_DATE"
 Private Const OUTPUT_TAX_OPTION As String = "CALC_TAX_DUE"
+
+'  --- Profile-local Tax Triple override (shadows modFinanceCommon shared standard-rated) ---
+'  AP Supplier-Invoice standard-rated lines use the domestic PURCHASE ref-IDs, NOT the shared
+'  GBR_Standard_Rated (which is the Customer-Invoice / AR value). Same local-shadow pattern as
+'  ap_travel_places / ap_taxi / ap_stationery. AP confirmed 2026-09-14. Zero-rated + tax point/
+'  option defaults still resolve from the shared modFinanceCommon constants.
+Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Purchase_Of_Goods_And_Services"
+Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
+Private Const TAX_RECOVERABILITY_STANDARD As String = "Fully_Recoverable"
 Private Const OUTPUT_COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 
 Private mSupplierId As String

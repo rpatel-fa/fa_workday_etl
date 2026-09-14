@@ -1,6 +1,11 @@
 Attribute VB_Name = "modApTravelPlacesSupInv"
 Option Explicit
 
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Source of truth: config/transform_specs/ap_travel_places.yaml -- mapping SOT the .bas mirrors BY HAND (no auto-regen); build_runner.py enforces spec<->code column agreement -- edit both together
 
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
@@ -221,6 +226,10 @@ Public Sub RunApTravelPlacesSupplierInvoice(ByVal runnerWorkbook As Workbook, By
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     For rowIndex = dataStartRowIndex To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
@@ -487,7 +496,10 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue       ' Rule 3
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = resolvedCompanyId        ' Rule 1
@@ -498,7 +510,8 @@ Private Function WriteOutputRow( ByVal targetSheet As Worksheet, ByVal targetRow
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = Empty                   ' Rule 5 (CHANGED 2026-09-09: Leave BLANK per Will's Aug EIB. AG=None all rows. Do NOT write receiptDateValue fallback)
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = invoiceNumberValue      ' Rule 6
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1                       ' Rule 19 hardcoded '1' constant (CHANGED 2026-09-09: matches Stationery Will's Aug file 14/14=EK=1; no counter; EM is not written so mirror logic is inapplicable)
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group (CHANGED 2026-09-14: shared grouping; single-line rows get 1)
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK; ADDED 2026-09-14)
     '  Rule 16 EM (Line Order col 143) not explicitly written — default BLANK matches Will's Aug EIB (EM=None all rows, Workday derives from B Spreadsheet Key group) (CHANGED 2026-09-09 documented match)
     '  Rule 17 AS (Control Amount Total col 45) not explicitly written — default BLANK matches AP confirmed rule (no per-group SUM)
     '  Supplier Invoice Line ID stub EL not written — default BLANK (Workday auto-assigns)
