@@ -342,10 +342,13 @@ mapping:
   # explicitly here so the spec<->.bas hygiene gate cross-checks them 1:1.  Deltas
   # from the archetype are called out with notes.
   - target: B
-    function: fixed_literal_sequence
+    function: invoice_line_grouping
     note: >
-      Spreadsheet Key / per-row sequential integer starting 1.  Code writes
-      ColumnIndex('B') = rowsProcessed + 1; skips not counted.
+      Spreadsheet Key via modInvoiceGrouping.AssignInvoiceLineGroup -- increments per NEW Invoice
+      Number (K). CFA Claims synthesises a per-row-unique K ({Naming}_{PaymentRun}_{YYYY}_{counter}),
+      so every row is its own group and B is 1,2,3... -- byte-identical to the previous per-row
+      sequence. Same shared mechanism as every transform; single vs multi-line is decided purely by
+      whether the Invoice Number (K) repeats (CHANGED 2026-09-14).
   - target: I
     function: fixed_literal_Y
     constant: "Y"
@@ -396,9 +399,11 @@ mapping:
       mirror_invoice_number_value_from_target_column_k; any future author attempting to restore
       the legacy formula will need to update this spec function first.
   - target: EK
-    function: fixed_literal_1
-    constant: "1"
-    note: "Line number = 1 house default (single-line invoice per claim row)"
+    function: invoice_line_grouping
+    note: "Row ID = 1..N within the Invoice Number group (mirror of EM). K is per-row-unique here so this is 1 (CHANGED 2026-09-14 from hardcoded 1)."
+  - target: EM
+    function: invoice_line_grouping
+    note: "Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14."
   - target: EP
     function: upper_trim_source_column
     source_column: Budget Code Naming

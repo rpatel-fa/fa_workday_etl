@@ -157,7 +157,14 @@ derived_fields:
                 ResolveReportingTypeFromFinalCode. Uniform 4xxxxxx segment = same RT for the
                 whole Dec-25 batch, but code runs per-row for generality.
   line_order_row_id:
-    derivation: Rule 19 — EM=1, EK=1, single-line submitted invoice per supplier.
+    derivation: >
+      CHANGED 2026-09-14 — invoice-line grouping via shared modInvoiceGrouping
+      (AssignInvoiceLineGroup). Spreadsheet Key B increments per NEW Invoice Number (K =
+      {BATCH_ID_TOKEN}-{CreditorID}); Line Order EM and Row ID EK count 1..N within the group
+      and mirror each other. A creditor appearing on ONE row still gets EM=EK=1 (byte-identical
+      to the old per-row output); a creditor recurring across rows now shares one B (was the
+      duplicate-reference bug: same K, different per-row B — confirmed in the shipped Dec-25
+      output, 15 mis-keyed groups). Single-line is the N=1 degenerate case of the same rule.
 
 shared_helpers:
   supplier_resolution: direct_gp_creditor_id_via_extract
@@ -213,7 +220,7 @@ target_eib:
   template: Submit_Supplier_Invoice_v46.2.xlsx
   variant: Supplier Invoice Standard
   mapping:
-    "B":  { source: "HOUSE DEFAULT sequence_start", rule: "per-row sequenceNumber starting 1 (rowsProcessed+1; skips not counted)" }
+    "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows (CHANGED 2026-09-14 from per-row sequenceNumber, which mis-keyed recurring creditors -> Workday duplicate-ref rejection)" }
     "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
     "K":  { source: invoice_number, rule: "Rule 8 = {BATCH_ID_TOKEN}-{CreditorID}; CreditorID unique per 63-row batch => 63 distinct K" }
     "R":  { source: company_resolved_reference_id, rule: "parties.company constant SOURCE_COMPANY_CODE=FA via mapping entity=company (fallback THE FA GROUP - FA)" }
@@ -222,7 +229,8 @@ target_eib:
     "AF": { source: InvoiceDate, rule: "Integration col E coerced to text via NormalizeSourceDate" }
     "AG": { source: ReceiptDate, rule: "Integration col F coerced to text via NormalizeSourceDate" }
     "BG": { source: suppliers_invoice_number, rule: "Rule 7 = {DocNo}-{CreditorID}; DocNo constant per batch, suffix disambiguates" }
-    "EK": { source: "HOUSE DEFAULT line_item_rowid_constant", value: "1", rule: "EK=1 + EL=1 single-line submitted invoice (Rule 19)" }
+    "EK": { source: invoice_line_grouping (line order), rule: "Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line creditors get 1 (CHANGED 2026-09-14 from hardcoded 1)" }
+    "EM": { source: invoice_line_grouping (line order), rule: "Line Order = 1..N within the Invoice Number group (mirror of EK). Single-line creditors get 1 (ADDED 2026-09-14; was not written)" }
     "EP": { source: item_description, rule: "UCase(Trim(Int D Decscription)); 'c' typo preserved in source layout token" }
     "EW": { source: spend_category, rule: "fields.spend_category - lowest-hierarchy via DistributionReferenceCode across Mapping MASTER Spend Category hierarchy (reject if blank)" }
     "FE": { source: "tax uniform applicability", value: "GBR_Outside_of_Scope" }

@@ -731,40 +731,9 @@ Private Function ConcatFieldsWithSep(ByVal separator As String, ParamArray field
     ConcatFieldsWithSep = result
 End Function
 
-Private Function CollectionKeyExists( _
-    ByRef coll As Collection, _
-    ByVal key As String _
-) As Boolean
-    On Error Resume Next
-    Dim dummy As Variant
-    dummy = coll(key)
-    If Err.Number = 0 Then
-        CollectionKeyExists = True
-    ElseIf Err.Number = 5 Then
-        CollectionKeyExists = False
-    Else
-        Err.Raise Err.Number, Err.Source, Err.Description
-    End If
-    On Error GoTo 0
-End Function
+' Keyed-Collection primitives (CollectionKeyExists / *SetItemLong / *GetItemLong /
+' *SetItemDouble / *GetItemDouble) are shared in modHelpers -- no per-module copy (2026-09-14).
 
-Private Sub CollectionSetItemLong( _
-    ByRef coll As Collection, _
-    ByVal key As String, _
-    ByVal value As Long _
-)
-    If CollectionKeyExists(coll, key) Then
-        coll.Remove key
-    End If
-    coll.Add CStr(value), key
-End Sub
-
-Private Function CollectionGetItemLong( _
-    ByRef coll As Collection, _
-    ByVal key As String _
-) As Long
-    CollectionGetItemLong = CLng(coll(key))
-End Function
 
 Private Function SafeCellStr(ByVal cellValue As Variant) As String
     If IsError(cellValue) Then

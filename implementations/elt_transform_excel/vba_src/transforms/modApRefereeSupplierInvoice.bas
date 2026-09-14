@@ -1,6 +1,11 @@
 Attribute VB_Name = "modApRefereeSupplierInvoice"
 Option Explicit
 
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Source of truth: config/transform_specs/ap_referees.yaml -- mapping SOT the .bas mirrors BY HAND (no auto-regen); build_runner.py enforces spec<->code column agreement -- edit both together
 
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
@@ -255,6 +260,10 @@ Public Sub RunApRefereeSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal c
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     Dim consecutiveEmptyRows As Long
     consecutiveEmptyRows = 0
@@ -516,7 +525,10 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = resolvedCompanyId
@@ -527,7 +539,8 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = m_receiptDateValue
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = invNumberValue
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     targetSheet.Cells(targetRow, ColumnIndex("FE")).Value = OUTPUT_TAX_APPLICABILITY

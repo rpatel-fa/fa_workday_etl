@@ -938,3 +938,70 @@ Private Function Slugify(ByVal value As String) As String
 
     Slugify = result
 End Function
+
+' =================================================================
+'  Keyed-Collection primitives (Mac-safe Scripting.Dictionary stand-ins).
+'  VBA Collection has no .Exists and no in-place item replace; these wrap the
+'  On-Error existence probe and the Remove-then-Add update. Hoisted here
+'  (2026-09-14) from per-transform Private copies that were duplicated verbatim
+'  across modApTaxi / modApStationery / modApCfaClaims / modArIntegration and
+'  modInvoiceGrouping -- ONE shared copy now. Domain-free plumbing, so it lives
+'  in modHelpers. Used INSTEAD OF Scripting.Dictionary because Mac Excel ships no
+'  Scripting Runtime ActiveX (CreateObject("Scripting.Dictionary") raises 429).
+' =================================================================
+Public Function CollectionKeyExists( _
+    ByRef coll As Collection, _
+    ByVal key As String _
+) As Boolean
+    On Error Resume Next
+    Dim dummy As Variant
+    dummy = coll(key)
+    If Err.Number = 0 Then
+        CollectionKeyExists = True
+    ElseIf Err.Number = 5 Then
+        CollectionKeyExists = False
+    Else
+        Err.Raise Err.Number, Err.Source, Err.Description
+    End If
+    On Error GoTo 0
+End Function
+
+' Replace-or-insert a keyed Long item (Remove existing key if present, then Add).
+Public Sub CollectionSetItemLong( _
+    ByRef coll As Collection, _
+    ByVal key As String, _
+    ByVal value As Long _
+)
+    If CollectionKeyExists(coll, key) Then
+        coll.Remove key
+    End If
+    coll.Add CStr(value), key
+End Sub
+
+' Retrieve a keyed Long item. Caller MUST have verified existence first (missing key raises Err 5).
+Public Function CollectionGetItemLong( _
+    ByRef coll As Collection, _
+    ByVal key As String _
+) As Long
+    CollectionGetItemLong = CLng(coll(key))
+End Function
+
+' Double variant of CollectionSetItemLong (2dp-rounded on store for net-sum accumulation).
+Public Sub CollectionSetItemDouble( _
+    ByRef coll As Collection, _
+    ByVal key As String, _
+    ByVal value As Double _
+)
+    If CollectionKeyExists(coll, key) Then
+        coll.Remove key
+    End If
+    coll.Add CStr(Round(value, 2)), key
+End Sub
+
+' Retrieve a keyed Double item (2dp rounded on store).
+Public Function CollectionGetItemDouble( _
+    ByRef coll As Collection, _
+    ByVal key As String _
+) As Double
+    CollectionGetItemDouble = CDbl(coll(key))
+End Function

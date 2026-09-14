@@ -1,6 +1,11 @@
 Attribute VB_Name = "modApCfaClaimsSupplierInvoice"
 Option Explicit
 
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Source of truth: config/transform_specs/ap_cfa_claims.yaml -- mapping SOT the .bas mirrors BY HAND (no auto-regen); build_runner.py enforces spec<->code column agreement -- edit both together
 
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
@@ -241,6 +246,10 @@ Public Sub RunApCfaClaimsSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     '  -- Read BATCH-LEVEL constants / derived tokens from Claims + CONSTANTS --
     '  sourceCompanyCode = CONSTANT "FA".
@@ -663,7 +672,10 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue          ' Rule 8
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = mCompanyId
@@ -674,7 +686,8 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = receiptDateValue             ' Rule 6 (= per-row H)
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = suppliersInvoiceNumberValue   ' Rule 7 (mirror K: Suppliers Invoice Number == Invoice Number)
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue            ' Rule 4 -- UPPER()
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     ' Rule 13 -- Tax DS/DT/DY ALWAYS OUTSIDE / ZERO / NONRECOVERABLE (Claims source has NO Tax columns).
@@ -763,60 +776,6 @@ Private Function RowIsSkippable( _
         LenB(Trim$(CStr(tableData(rowIndex, workdayIdColumn)))) = 0
 End Function
 
-' -----------------------------------------------------------------
-'  CollectionKeyExists -- Mac-safe replacement for Scripting.Dictionary.Exists().
-'  VBA Collection has no native .Exists method; attempting to retrieve an item by a
-'  missing key raises error 5 "Invalid procedure call or argument".  We swallow ONLY
-'  that specific error so unrelated runtime errors still surface.
-'  This helper (plus the CollectionItemSet / CollectionItemGet pair below) is used
-'  INSTEAD OF Scripting.Dictionary because Mac Excel does NOT ship the Scripting
-'  Runtime ActiveX library and throws run-time 429 "ActiveX component can't create
-'  object" on CreateObject("Scripting.Dictionary").
-' -----------------------------------------------------------------
-Private Function CollectionKeyExists( _
-    ByRef coll As Collection, _
-    ByVal key As String _
-) As Boolean
-    On Error Resume Next
-    Dim dummy As Variant
-    dummy = coll(key)
-    If Err.Number = 0 Then
-        CollectionKeyExists = True
-    ElseIf Err.Number = 5 Then
-        CollectionKeyExists = False
-    Else
-        ' Unexpected error -- re-raise so caller / global error handler sees it.
-        Err.Raise Err.Number, Err.Source, Err.Description
-    End If
-    On Error GoTo 0
-End Function
+' Keyed-Collection primitives (CollectionKeyExists / *SetItemLong / *GetItemLong /
+' *SetItemDouble / *GetItemDouble) are shared in modHelpers -- no per-module copy (2026-09-14).
 
-' -----------------------------------------------------------------
-'  Replace-or-insert a keyed item into a VBA Collection.
-'  VBA Collections can't do in-place item replacement by key; to update we must
-'  first Remove() the existing key (if present), then Add() the new value.
-'  Value is stored as a Variant-stringified Long (counter), so the caller always
-'  CLng()s on read to be safe.
-' -----------------------------------------------------------------
-Private Sub CollectionSetItemLong( _
-    ByRef coll As Collection, _
-    ByVal key As String, _
-    ByVal value As Long _
-)
-    If CollectionKeyExists(coll, key) Then
-        coll.Remove key
-    End If
-    coll.Add CStr(value), key
-End Sub
-
-' -----------------------------------------------------------------
-'  Retrieve a keyed Long item from a VBA Collection.  Caller MUST have
-'  verified existence with CollectionKeyExists() first; a missing key raises
-'  Err 5 (let it bubble -- the caller's logic is wrong).
-' -----------------------------------------------------------------
-Private Function CollectionGetItemLong( _
-    ByRef coll As Collection, _
-    ByVal key As String _
-) As Long
-    CollectionGetItemLong = CLng(coll(key))
-End Function

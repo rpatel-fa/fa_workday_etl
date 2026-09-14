@@ -1,6 +1,11 @@
 Attribute VB_Name = "modApCfaDistribSupplierInvoice"
 Option Explicit
 
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
+
 ' Source of truth: config/transform_specs/ap_cfa_distributions.yaml -- mapping SOT the .bas mirrors BY HAND (no auto-regen); build_runner.py enforces spec<->code column agreement -- edit both together
 
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
@@ -27,6 +32,15 @@ Private Const OUTPUT_DEFAULT_CURRENCY As String = "GBP"
 
 Private Const OUTPUT_TAX_POINT_DATE_TYPE As String = "INVOICE/ADJUSTMENT_DATE"
 Private Const OUTPUT_TAX_OPTION As String = "CALC_TAX_DUE"
+
+'  --- Profile-local Tax Triple override (shadows modFinanceCommon shared standard-rated) ---
+'  AP Supplier-Invoice standard-rated lines use the domestic PURCHASE ref-IDs, NOT the shared
+'  GBR_Standard_Rated (which is the Customer-Invoice / AR value). Same local-shadow pattern as
+'  ap_travel_places / ap_taxi / ap_stationery. AP confirmed 2026-09-14. Zero-rated + tax point/
+'  option defaults still resolve from the shared modFinanceCommon constants.
+Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Purchase_Of_Goods_And_Services"
+Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
+Private Const TAX_RECOVERABILITY_STANDARD As String = "Fully_Recoverable"
 Private Const OUTPUT_COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 
@@ -235,6 +249,10 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     '  -- Read BATCH-LEVEL constants / derived tokens from Finance Master + CONSTANTS --
     '  sourceCompanyCode = CONSTANT "FA" (CFA always = THE FA GROUP).
@@ -579,7 +597,10 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue          ' Rule 8
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = mCompanyId
@@ -590,7 +611,8 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = receiptDateValue             ' Rule 6 (=K, same as U)
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = docNoValue                   ' Rule 7 -- DocNo/colA
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue            ' Rule 4 -- UPPER()
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     ' Rule 13 -- Tax DS/DT/DY per-row conditional_on_tax_amount (FM col I)

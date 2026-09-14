@@ -43,6 +43,10 @@ Private mCommercialPartnerLookup As Collection
 Private mGrantLookup As Collection
 Private mProgramLookup As Collection
 Private mProjectLookup As Collection
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+Private mGrpKey As Collection
+Private mGrpLine As Collection
+Private mGrpNextKey As Long
 
 Public Sub RunApCommInvSupInv(ByVal runnerWorkbook As Workbook, ByVal controlSheet As Worksheet)
     Dim sourceDataPath As String
@@ -210,6 +214,11 @@ Public Sub RunApCommInvSupInv(ByVal runnerWorkbook As Workbook, ByVal controlShe
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
     ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "HH"
     targetRow = TARGET_DATA_START_ROW
+
+    ' Fresh invoice-line grouping state for this run (Runner persists across runs).
+    Set mGrpKey = New Collection
+    Set mGrpLine = New Collection
+    mGrpNextKey = 0
 
     companyId = ResolveMappedCompany(runnerWorkbook, SOURCE_COMPANY_CODE, OUTPUT_COMPANY_DEFAULT_FALLBACK)
     mCompanyId = companyId
@@ -502,7 +511,11 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = sequenceNumber
+    ' Invoice-line grouping: B increments per NEW Invoice Number; EM/EK count 1..N within group.
+    Dim spreadsheetKeyValue As Long
+    Dim lineOrderValue As Long
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue
     targetSheet.Cells(targetRow, ColumnIndex("R")).Value = mCompanyId
@@ -513,7 +526,8 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("AG")).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex("AG")).Value = receiptDateValue
     targetSheet.Cells(targetRow, ColumnIndex("BG")).Value = suppliersInvoiceNumberValue
-    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = 1
+    targetSheet.Cells(targetRow, ColumnIndex("EK")).Value = lineOrderValue    ' Row ID = 1..N within invoice group (was hardcoded 1)
+    targetSheet.Cells(targetRow, ColumnIndex("EM")).Value = lineOrderValue    ' Line Order = 1..N within invoice group (mirror of EK; was not written)
     targetSheet.Cells(targetRow, ColumnIndex("EP")).Value = descriptionValue
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = spendCategoryId
     targetSheet.Cells(targetRow, ColumnIndex("FE")).Value = OUTPUT_TAX_APPLICABILITY
