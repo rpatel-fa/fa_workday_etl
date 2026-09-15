@@ -1,0 +1,198 @@
+# Transform spec - ar_manual_invoice
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors.
+#
+# Operational facts — identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) — live in the build profile
+# config/transforms/ar_manual_invoice.yaml. Not restated here.
+
+meta:
+  key: ar_manual_invoice
+  label: AR Manual Invoice
+  requester: Chika Etheridge (Finance AR)
+  date_confirmed: 2026-09-15
+  exemplar_to_fork: ar_bulk_invoice   # closest live v46.1 flat "one source row = one invoice" AR profile;
+                                       # this profile strips the COST CODE / Mapping MASTER account-string
+                                       # pipeline entirely (this source has no accounting string) and the
+                                       # Customer lookup (Workday Customer ID is already resolved in source).
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  customer:
+    source_column: Workday ID
+    resolved_via: direct_passthrough
+    note: >
+      Source column O ("Workday ID") already carries the resolved Workday Customer
+      Reference ID (e.g. "C-001517"). Unlike every other AR profile, this is written
+      straight to AJ with NO Customer Spreadsheet lookup -- confirmed by the requester
+      as a deliberate simplification for this manually-curated CRM export.
+  company:
+    fixed: "THE FA GROUP - WNSL"
+    resolved_via: fixed_literal
+    note: >
+      No company lookup. Written verbatim to J on every row -- confirmed by the
+      requester (this source is WNSL-specific, unlike the FA-default AR profiles).
+
+notes: >
+  Source: "Manual EBW Invoices - 26-27 1.xlsx", worksheet "Sales CRM Post 270726" (a
+  manually-maintained CRM export of season-ticket / hospitality licence sales -- NOT a
+  finance-system extract). Header row 1, data starts row 2; real data ends row 84 (rows
+  85-141 are trailing blank template rows, filtered by the standard skip rule). Columns
+  used: A "Created On" (date), C "Licence Ref No", D "FAN#" (often blank), I "Start Date"
+  (in practice holds an event/product label e.g. "England vs. Spain 2026", not a date),
+  K "Invoice Amount (Net)", O "Workday ID" (pre-resolved Workday Customer Reference ID).
+  One source row = one single-line Workday Customer Invoice: there is no invoice-number
+  column to group repeats under, so every row is its own invoice (see
+  derived_fields.invoice_number_not_present). No COST CODE / accounting-string column
+  exists in this source, so Revenue Category (EM) and the FX..GF worktag run are NOT
+  populated mechanically, except Cost Centre (FX) which the requester fixed to a single
+  literal value for every row.
+
+open_questions: []
+# Resolved during authoring (see AskUserQuestion record for this session):
+#   - Invoice Date (BR) source column: "Created On" (col A) -- "Start Date"/"End Date"
+#     headers do not hold usable invoice dates in this source.
+#   - Invoice grouping: one row = one invoice (no repeating invoice-number column).
+#   - Invoice Number (BO): left blank (Workday auto-numbers).
+
+derived_fields:
+  invoice_number_not_present:
+    derivation: none_every_row_is_its_own_invoice
+    group_key_source_column: null
+    note: >
+      No source invoice-number column exists in this source (confirmed with requester).
+      AssignInvoiceLineGroup (shared invoice_line_grouping helper) is called with an
+      empty-string key on every row, which is its documented defensive behaviour for
+      "no invoice number to group on": each row gets its own Spreadsheet Key and Row
+      ID/Line Order = 1. This entry is the explicit CONFIG-FIRST contract for that
+      grouping-key decision (see docs/AGENT_COLD_START_PROMPT_CONTRACT.md 0.6 guard (v)
+      analogue enforced by build_runner.py's invoice_line_grouping contract check).
+  derived_header_memo:
+    inputs: [Licence Ref No, "FAN#"]
+    join: "{Licence Ref No}_{FAN#}"
+    note: >
+      Header Memo (DB) = source C concatenated with source D using a literal "_"
+      separator, verbatim per requester instruction. FAN# is frequently blank in this
+      source (only ~38% of rows populated), which yields a trailing-underscore memo
+      (e.g. "CEN0126112964_") -- accepted as-is, not treated as an error.
+
+fields:
+  invoice_date: {source_column: Created On, format: Excel date serial or dd.mm.yy text}
+  amount_due:   {source_column: Invoice Amount (Net), basis: net}
+  line_item_description: {source_column: Start Date}
+  cost_centre:
+    value: CC04001
+    derivation: fixed_literal
+    note: >
+      Single fixed Cost Centre reference for every row -- confirmed by requester, no
+      Mapping MASTER lookup involved.
+
+eib_house_defaults:
+  submit_flag: "Y"
+  auto_complete: "Y"
+  default_currency: GBP
+  payment_status: Unpaid
+  document_status: Approved
+  invoice_type: Standard
+  company_fixed: "THE FA GROUP - WNSL"
+
+accounting_string:
+  driver: none
+  note: >
+    No COST CODE / accounting-string column in this source. Revenue Category (EM) and
+    the FX..GF worktag run are left blank/unpopulated EXCEPT Cost Centre (FX), which is
+    a fixed literal ("CC04001") per requester instruction, written directly -- not via
+    the Mapping MASTER hierarchy lookup pipeline used by ar_bulk_invoice /
+    ar_multi_line_invoice. Finance may add Revenue Category coding manually pre-upload
+    if a specific batch requires it (same accepted gap as the pre-v46 ar_invoice profile).
+
+skip_rule:
+  drop_when:
+    - Licence Ref No blank
+    - Created On blank
+    - Invoice Amount (Net) blank or zero
+    - Workday ID blank
+  note: >
+    Filters the 57 trailing blank template rows (85-141) in the reference source file.
+    All four driver columns are blank together on every dropped row in the sample data.
+
+mapping:
+- target: b
+  function: invoice_group_spreadsheet_key
+  note: Every row is its own invoice (see derived_fields.invoice_number_not_present) -- Spreadsheet Key is a plain 1..N sequence over kept rows.
+- target: c
+  default: "Y"
+  note: Add Only flag -- fixed "Y" for an insert-only EIB (never update existing), matching every other AR profile.
+- target: d
+  source_column: Licence Ref No
+  note: Customer Invoice (Ref ID) -- direct source column, per requester instruction.
+- target: h
+  default: "Y"
+- target: i
+  default: ""
+  note: Locked in Workday -- left blank, matching ar_bulk_invoice.
+- target: j
+  default: "THE FA GROUP - WNSL"
+  note: Fixed literal, no mapping-tab lookup (see parties.company above).
+- target: ai
+  default: GBP
+- target: aj
+  source_column: Workday ID
+  note: Direct passthrough -- no Customer Spreadsheet lookup (see parties.customer above).
+- target: br
+  source_column: Created On
+  source_format: Excel date serial or dd.mm.yy text
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  source_column: Invoice Amount (Net)
+- target: co
+  default: Standard
+- target: db
+  derivation: derived_header_memo
+  note: "{Licence Ref No}_{FAN#} -- see derived_fields.derived_header_memo above."
+- target: ds
+  function: invoice_group_line_order
+  note: Always 1 (single-line invoice); see derived_fields.invoice_number_not_present.
+- target: du
+  default: ""
+  note: Line Reference intentionally blank, matching ar_multi_line_invoice.
+- target: dv
+  function: invoice_group_line_order
+  note: Always 1 (single-line invoice); see derived_fields.invoice_number_not_present.
+- target: en
+  source_column: Start Date
+  note: >
+    Despite the header name, this source column holds the event/product label (e.g.
+    "England vs. Spain 2026") that Finance uses as the line item description.
+- target: fh
+  default: "1"
+  note: Quantity -- no source Quantity/UoM column, fixed 1 per line (matches ar_bulk_invoice's no-UoM fallback).
+- target: fl
+  source_column: Invoice Amount (Net)
+  note: >
+    Unit Cost -- mirrors CM. This source carries only one amount column (no separate
+    net/gross split), so the same value populates the header total (CM) and the single
+    line's Unit Cost/Extended Amount, matching the ar_bulk_invoice/ar_multi_line_invoice
+    pattern for one-row-one-line profiles. Not an explicit requester instruction; flagged
+    for requester confirmation on first real run.
+- target: fo
+  source_column: Invoice Amount (Net)
+  note: Extended Amount -- mirrors CM/FL, see note on target fl above.
+- target: fa
+  default: GBR_Domestic_Sale_of_Goods_and_Services
+- target: fb
+  default: GBR_200_VAT
+- target: fx
+  default: CC04001
+  note: Fixed literal Cost Centre, written directly (no Mapping MASTER lookup) -- see accounting_string note above.
+- target: em
+  derivation: blank_no_accounting_string
+  note: Revenue Category (EM) intentionally left blank -- no COST CODE driver in this source (see accounting_string above).
