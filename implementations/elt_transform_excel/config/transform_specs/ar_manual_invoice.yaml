@@ -42,9 +42,11 @@ notes: >
   manually-maintained CRM export of season-ticket / hospitality licence sales -- NOT a
   finance-system extract). Header row 1, data starts row 2; real data ends row 84 (rows
   85-141 are trailing blank template rows, filtered by the standard skip rule). Columns
-  used: A "Created On" (date), C "Licence Ref No", D "FAN#" (often blank), I "Start Date"
-  (in practice holds an event/product label e.g. "England vs. Spain 2026", not a date),
+  used: A "Created On" (date), C "Licence Ref No", D "FAN#" (often blank),
   K "Invoice Amount (Net)", O "Workday ID" (pre-resolved Workday Customer Reference ID).
+  Column I "Start Date" (in practice holds an event/product label e.g. "England vs. Spain
+  2026", not a date) is no longer used -- Line Item Description (EN) was changed to a
+  fixed literal per requester instruction (2026-09-15), see fields.line_item_description.
   One source row = one single-line Workday Customer Invoice: there is no invoice-number
   column to group repeats under, so every row is its own invoice (see
   derived_fields.invoice_number_not_present). No COST CODE / accounting-string column
@@ -83,13 +85,29 @@ derived_fields:
 fields:
   invoice_date: {source_column: Created On, format: Excel date serial or dd.mm.yy text}
   amount_due:   {source_column: Invoice Amount (Net), basis: net}
-  line_item_description: {source_column: Start Date}
+  line_item_description:
+    value: "EBW Membership Season 26/27"
+    derivation: fixed_literal
+    note: >
+      Was source_column Start Date (the source column's event/product label, e.g.
+      "England vs. Spain 2026"). Changed to a fixed literal per requester instruction
+      (2026-09-15) -- EN is now the same string on every row regardless of source data.
   cost_centre:
     value: CC04001
     derivation: fixed_literal
     note: >
       Single fixed Cost Centre reference for every row -- confirmed by requester, no
       Mapping MASTER lookup involved.
+  line_tax_applicability:
+    derivation: blank_intentional
+    note: >
+      Was fixed literal GBR_Domestic_Sale_of_Goods_and_Services. Changed to blank per
+      requester instruction (2026-09-15) -- FA is left empty on every row.
+  line_tax_code:
+    derivation: blank_intentional
+    note: >
+      Was fixed literal GBR_200_VAT. Changed to blank per requester instruction
+      (2026-09-15) -- FB is left empty on every row.
 
 eib_house_defaults:
   submit_flag: "Y"
@@ -168,10 +186,11 @@ mapping:
   function: invoice_group_line_order
   note: Always 1 (single-line invoice); see derived_fields.invoice_number_not_present.
 - target: en
-  source_column: Start Date
+  default: "EBW Membership Season 26/27"
   note: >
-    Despite the header name, this source column holds the event/product label (e.g.
-    "England vs. Spain 2026") that Finance uses as the line item description.
+    Fixed literal per requester instruction (2026-09-15) -- see fields.line_item_description
+    above. Was source_column Start Date (the event/product label, e.g. "England vs. Spain
+    2026"); no longer read from the source.
 - target: fh
   default: "1"
   note: Quantity -- no source Quantity/UoM column, fixed 1 per line (matches ar_bulk_invoice's no-UoM fallback).
@@ -187,9 +206,15 @@ mapping:
   source_column: Invoice Amount (Net)
   note: Extended Amount -- mirrors CM/FL, see note on target fl above.
 - target: fa
-  default: GBR_Domestic_Sale_of_Goods_and_Services
+  derivation: blank_intentional
+  note: >
+    Left blank per requester instruction (2026-09-15) -- see fields.line_tax_applicability
+    above. Was fixed literal GBR_Domestic_Sale_of_Goods_and_Services.
 - target: fb
-  default: GBR_200_VAT
+  derivation: blank_intentional
+  note: >
+    Left blank per requester instruction (2026-09-15) -- see fields.line_tax_code above.
+    Was fixed literal GBR_200_VAT.
 - target: fx
   default: CC04001
   note: Fixed literal Cost Centre, written directly (no Mapping MASTER lookup) -- see accounting_string note above.

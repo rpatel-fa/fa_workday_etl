@@ -12,9 +12,11 @@ transform:
     Workday Customer Invoice; there is no invoice-number column to group repeats under
     so every row is its own invoice. No COST CODE / accounting-string column exists in
     this source: Company (J), Currency (AI), Payment/Document Status (CK/CL), Invoice
-    Type (CO), Tax Applicability/Code (FA/FB), and Cost Centre (FX) are all fixed
-    literals. Customer (AJ) is a direct passthrough of the source's pre-resolved Workday
-    Customer ID column -- no Customer Spreadsheet lookup, unlike every other AR profile.
+    Type (CO), and Cost Centre (FX) are all fixed literals. Tax Applicability/Code
+    (FA/FB) are intentionally left blank on every row (requester instruction,
+    2026-09-15). Customer (AJ) is a direct passthrough of the source's pre-resolved
+    Workday Customer ID column -- no Customer Spreadsheet lookup, unlike every other
+    AR profile.
   # NOTE (2026-09-15): shell_defaults.target_eib below deliberately points at
   # "FA Submit Customer Invoice.xlsx", NOT the "Submit_Customer_Invoice_v46.1.xlsx"
   # filename every other AR profile references. On this machine, that other file is a
@@ -48,7 +50,10 @@ transform_constants:
   fixed_invoice_type: Standard
   fixed_currency: GBP
   fixed_company: "THE FA GROUP - WNSL"
+  fixed_line_item_description: "EBW Membership Season 26/27"
   unmapped_handling: silent_blank
+  # line_tax_applicability (FA) / line_tax_code (FB) intentionally have no fixed_* constant --
+  # both columns are left blank on every row (see customer_invoice_eib_columns below).
   customer_invoice_eib_columns:
     # --- HEADER fields (Submit Customer Invoice v46.1 Row5 field names) ---
     spreadsheet_key: B                # Spreadsheet Key* (1..N, one per row -- see runtime.step_list_macro)
@@ -70,9 +75,9 @@ transform_constants:
     line_reference: DU                # intentionally blank
     line_order: DV
     # --- LINE fields ---
-    line_item_description: EN         # source Start Date column (holds event/product label)
-    line_tax_applicability: FA        # fixed GBR_Domestic_Sale_of_Goods_and_Services
-    line_tax_code: FB                 # fixed GBR_200_VAT
+    line_item_description: EN         # fixed "EBW Membership Season 26/27" (no longer sourced from Start Date)
+    line_tax_applicability: FA        # intentionally left blank on every row
+    line_tax_code: FB                 # intentionally left blank on every row
     line_quantity: FH                 # fixed 1
     line_unit_cost: FL                # mirrors amount_due
     line_extended_amount: FO          # mirrors amount_due

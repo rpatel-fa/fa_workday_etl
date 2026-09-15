@@ -14,8 +14,10 @@ Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
 Private Const OUTPUT_INVOICE_TYPE As String = "Standard"
 Private Const OUTPUT_LINE_QUANTITY As Double = 1#
-Private Const OUTPUT_LINE_TAX_APPLICABILITY As String = "GBR_Domestic_Sale_of_Goods_and_Services"
-Private Const OUTPUT_LINE_TAX_CODE As String = "GBR_200_VAT"
+Private Const OUTPUT_LINE_ITEM_DESCRIPTION As String = "EBW Membership Season 26/27"
+' Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
+' per requester instruction (2026-09-15) -- see config/transform_specs/ar_manual_invoice.yaml
+' fields.line_tax_applicability / fields.line_tax_code.
 Private Const OUTPUT_COST_CENTRE As String = "CC04001"
 
 '  ============================================================================
@@ -67,7 +69,7 @@ Public Sub RunArManualInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, B
     Dim rowsSkipped As Long
     Dim missingFieldRows As Long
     Dim createdOnColumn As Long, licenceRefColumn As Long, fanColumn As Long
-    Dim startDateColumn As Long, invoiceAmountColumn As Long, workdayIdColumn As Long
+    Dim invoiceAmountColumn As Long, workdayIdColumn As Long
     Dim issues As Collection
     Dim outputPath As String
     Dim failureMessage As String
@@ -145,7 +147,6 @@ Public Sub RunArManualInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, B
     createdOnColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Created On")
     licenceRefColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Licence Ref No")
     fanColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "FAN#")
-    startDateColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Start Date")
     invoiceAmountColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Amount (Net)")
     workdayIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Workday ID")
 
@@ -169,7 +170,7 @@ Public Sub RunArManualInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, B
         Else
             rowsProcessed = rowsProcessed + 1
             WriteOutputRow runnerWorkbook, targetSheet, targetRow, sourceTable, rowIndex, _
-                createdOnColumn, licenceRefColumn, fanColumn, startDateColumn, invoiceAmountColumn, workdayIdColumn
+                createdOnColumn, licenceRefColumn, fanColumn, invoiceAmountColumn, workdayIdColumn
             targetRow = targetRow + 1
         End If
     Next rowIndex
@@ -228,14 +229,13 @@ Private Sub WriteOutputRow( _
     ByVal sourceTable As Variant, _
     ByVal sourceRow As Long, _
     ByVal createdOnColumn As Long, ByVal licenceRefColumn As Long, ByVal fanColumn As Long, _
-    ByVal startDateColumn As Long, ByVal invoiceAmountColumn As Long, ByVal workdayIdColumn As Long _
+    ByVal invoiceAmountColumn As Long, ByVal workdayIdColumn As Long _
 )
     Dim invoiceDate As String
     Dim invoiceAmount As Double
     Dim licenceRefValue As String
     Dim fanValue As String
     Dim headerMemoValue As String
-    Dim lineDescValue As String
     Dim workdayCustomerId As String
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
@@ -245,7 +245,6 @@ Private Sub WriteOutputRow( _
     licenceRefValue = Trim$(CStr(sourceTable(sourceRow, licenceRefColumn)))
     fanValue = Trim$(CStr(sourceTable(sourceRow, fanColumn)))
     headerMemoValue = licenceRefValue & "_" & fanValue
-    lineDescValue = Trim$(CStr(sourceTable(sourceRow, startDateColumn)))
     workdayCustomerId = Trim$(CStr(sourceTable(sourceRow, workdayIdColumn)))
 
     ' No source invoice-number column exists: every row is its own single-line invoice
@@ -277,9 +276,9 @@ Private Sub WriteOutputRow( _
     ' in this source (see config/transform_specs/ar_manual_invoice.yaml accounting_string).
     targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = ""
 
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescValue
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = OUTPUT_LINE_TAX_APPLICABILITY
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = OUTPUT_LINE_TAX_CODE
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = OUTPUT_LINE_ITEM_DESCRIPTION
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = OUTPUT_LINE_QUANTITY
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = invoiceAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = invoiceAmount
