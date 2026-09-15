@@ -44,6 +44,7 @@ active_profiles:
   - ar_gbe_invoice
   - ar_integration_invoice
   - ar_multi_line_invoice
+  - ar_manual_invoice
 
 defunct_profiles:
   # Discipline, Single Invoice, Invoice Run — declared defunct 2026-08-19.

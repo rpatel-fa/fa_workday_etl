@@ -1,0 +1,90 @@
+version: 1
+
+transform:
+  key: ar_manual_invoice
+  label: AR Manual Invoice
+  source_type: AR Manual Invoice
+  eib_population_type: Customer Invoice
+  start_row: 6
+  description: >
+    Manual EBW (season-ticket / hospitality licence) invoice extracts transformed into
+    the Workday Customer Invoice EIB workbook v46.1. One source row = one single-line
+    Workday Customer Invoice; there is no invoice-number column to group repeats under
+    so every row is its own invoice. No COST CODE / accounting-string column exists in
+    this source: Company (J), Currency (AI), Payment/Document Status (CK/CL), Invoice
+    Type (CO), Tax Applicability/Code (FA/FB), and Cost Centre (FX) are all fixed
+    literals. Customer (AJ) is a direct passthrough of the source's pre-resolved Workday
+    Customer ID column -- no Customer Spreadsheet lookup, unlike every other AR profile.
+  # NOTE (2026-09-15): shell_defaults.target_eib below deliberately points at
+  # "FA Submit Customer Invoice.xlsx", NOT the "Submit_Customer_Invoice_v46.1.xlsx"
+  # filename every other AR profile references. On this machine, that other file is a
+  # raw/unexpanded Workday Studio export -- the D/G/J/AI/AJ/CK/CL/CM/CO/DB/EN/FA/FB/FX
+  # column contract this profile (and ar_bulk_invoice/ar_gbe_invoice/ar_integration_invoice/
+  # ar_multi_line_invoice) assumes does not exist in it; e.g. Cost Centre has no dedicated
+  # column there, only a generic repeating "Worktags+" slot pinned to Academic Level.
+  # "FA Submit Customer Invoice.xlsx" IS the correctly-expanded v46.1 template (verified:
+  # identical row-1 banner, tab name, and all 21 column letters this profile writes to).
+  # The other 4 active AR profiles may have the same stale-file problem on this machine --
+  # not fixed here as it is out of this transform's scope; flagged to the requester.
+
+runtime:
+  step_list_macro: RunArManualInvoiceCustomerInvoice
+
+source_layout:
+  worksheet_resolution: named
+  worksheet_name: "Sales CRM Post 270726"
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  required_headers:
+    - Created On
+    - Licence Ref No
+    - "FAN#"
+    - Start Date
+    - Invoice Amount (Net)
+    - Workday ID
+
+transform_constants:
+  fixed_invoice_type: Standard
+  fixed_currency: GBP
+  fixed_company: "THE FA GROUP - WNSL"
+  unmapped_handling: silent_blank
+  customer_invoice_eib_columns:
+    # --- HEADER fields (Submit Customer Invoice v46.1 Row5 field names) ---
+    spreadsheet_key: B                # Spreadsheet Key* (1..N, one per row -- see runtime.step_list_macro)
+    add_only: C                       # Add Only flag -- fixed "Y"
+    customer_invoice_ref_id: D        # Customer Invoice (Ref ID) -- source Licence Ref No
+    submit: H                         # Submit Y/N flag -- fixed "Y"
+    locked_in_workday: I              # Locked in Workday -- left blank
+    company: J                        # Company* -- fixed "THE FA GROUP - WNSL"
+    currency: AI                      # Currency -- fixed "GBP"
+    customer: AJ                      # Customer* -- direct passthrough of source Workday ID
+    invoice_date: BR                  # Invoice Date -- source Created On
+    payment_status: CK                # Payment Status -- fixed "Unpaid"
+    document_status: CL               # Document Status -- fixed "Approved"
+    amount_due: CM                    # Amount Due -- source Invoice Amount (Net)
+    customer_invoice_type: CO         # Customer Invoice Type -- fixed "Standard"
+    header_memo: DB                   # Memo -- source Licence Ref No + "_" + FAN#
+    # --- LINE identifier and Row ID (always 1: one row = one invoice = one line) ---
+    row_id_line: DS
+    line_reference: DU                # intentionally blank
+    line_order: DV
+    # --- LINE fields ---
+    line_item_description: EN         # source Start Date column (holds event/product label)
+    line_tax_applicability: FA        # fixed GBR_Domestic_Sale_of_Goods_and_Services
+    line_tax_code: FB                 # fixed GBR_200_VAT
+    line_quantity: FH                 # fixed 1
+    line_unit_cost: FL                # mirrors amount_due
+    line_extended_amount: FO          # mirrors amount_due
+    cost_centre: FX                   # fixed literal "CC04001" -- no Mapping MASTER lookup
+    revenue_category: EM              # intentionally blank -- no accounting-string driver
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/manual/source/Manual EBW Invoices - 26-27 1.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/FA Submit Customer Invoice.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/manual/target/Submit_Customer_Invoice_v46.1_ar_manual_invoice_output.xlsx
+  # source_layout defaults -- override here to change which sheet/rows the transform uses at build time
+  source_worksheet_resolution: named
+  source_worksheet_name: "Sales CRM Post 270726"
+  source_header_row: 1
+  source_data_start_row: 2

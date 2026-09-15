@@ -669,7 +669,7 @@ if __name__ == "__main__":
     # Load transform bindings first to surface any build-gate schema error BEFORE we start
     # (expensive) workbook scanning. Any schema error here => immediate exit.
     try:
-        _ = _load_transform_bindings(ROOT / "config" / "transforms")
+        _ = _load_transform_bindings(ROOT / "config" / "transforms", ROOT / "config" / "build_manifest.yaml")
     except Exception as exc:
         print(f"[reconcile] BUILD-GATE FAILURE before recon scan: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(2)
