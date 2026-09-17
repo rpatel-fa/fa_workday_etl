@@ -115,7 +115,7 @@ eib_house_defaults:
   default_currency: GBP
   payment_status: Unpaid
   document_status: Approved
-  invoice_type: Standard
+  invoice_type: EBW
   company_fixed: "THE FA GROUP - WNSL"
 
 accounting_string:
@@ -172,7 +172,10 @@ mapping:
 - target: cm
   source_column: Invoice Amount (Net)
 - target: co
-  default: Standard
+  default: EBW
+  note: >
+    Was fixed literal Standard. Changed to EBW per requester instruction (2026-09-17) --
+    see eib_house_defaults.invoice_type above.
 - target: db
   derivation: derived_header_memo
   note: "{Licence Ref No}_{FAN#} -- see derived_fields.derived_header_memo above."

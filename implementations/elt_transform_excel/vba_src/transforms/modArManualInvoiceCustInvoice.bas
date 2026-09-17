@@ -12,7 +12,9 @@ Private Const OUTPUT_COMPANY As String = "THE FA GROUP - WNSL"
 Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
-Private Const OUTPUT_INVOICE_TYPE As String = "Standard"
+' Was "Standard". Changed to "EBW" per requester instruction (2026-09-17) -- see
+' config/transform_specs/ar_manual_invoice.yaml eib_house_defaults.invoice_type.
+Private Const OUTPUT_INVOICE_TYPE As String = "EBW"
 Private Const OUTPUT_LINE_QUANTITY As Double = 1#
 Private Const OUTPUT_LINE_ITEM_DESCRIPTION As String = "EBW Membership Season 26/27"
 ' Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
