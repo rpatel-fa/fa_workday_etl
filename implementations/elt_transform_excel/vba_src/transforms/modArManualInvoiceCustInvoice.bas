@@ -12,7 +12,9 @@ Private Const OUTPUT_COMPANY As String = "THE FA GROUP - WNSL"
 Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
-Private Const OUTPUT_INVOICE_TYPE As String = "Standard"
+' Was "Standard". Changed to "EBW" per requester instruction (2026-09-17) -- see
+' config/transform_specs/ar_manual_invoice.yaml eib_house_defaults.invoice_type.
+Private Const OUTPUT_INVOICE_TYPE As String = "EBW"
 Private Const OUTPUT_LINE_QUANTITY As Double = 1#
 Private Const OUTPUT_LINE_ITEM_DESCRIPTION As String = "EBW Membership Season 26/27"
 ' Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
@@ -245,7 +247,7 @@ Private Sub WriteOutputRow( _
     licenceRefValue = Trim$(CStr(sourceTable(sourceRow, licenceRefColumn)))
     fanValue = Trim$(CStr(sourceTable(sourceRow, fanColumn)))
     headerMemoValue = licenceRefValue & "_" & fanValue
-    workdayCustomerId = Trim$(CStr(sourceTable(sourceRow, workdayIdColumn)))
+    workdayCustomerId = TrimWhitespaceAndControlChars(CStr(sourceTable(sourceRow, workdayIdColumn)))
 
     ' No source invoice-number column exists: every row is its own single-line invoice
     ' (AssignInvoiceLineGroup's documented defensive behaviour for an empty-string key).
@@ -284,6 +286,28 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = invoiceAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COST_CENTRE)).Value = OUTPUT_COST_CENTRE
 End Sub
+
+' Source Workday ID (O) values occasionally carry a leading/trailing tab or newline
+' (manual-CRM data entry artifact) -- Trim$ only strips plain spaces (chr 32), so those
+' characters would otherwise pass straight through into Customer* (AJ) and break Workday's
+' customer reference match. Portable across Windows/Mac VBA (no RegExp dependency).
+Private Function TrimWhitespaceAndControlChars(ByVal s As String) As String
+    Const WS As String = " " & vbTab & vbCr & vbLf
+    Dim i As Long, j As Long
+    i = 1
+    j = Len(s)
+    Do While i <= j And InStr(1, WS, Mid$(s, i, 1)) > 0
+        i = i + 1
+    Loop
+    Do While j >= i And InStr(1, WS, Mid$(s, j, 1)) > 0
+        j = j - 1
+    Loop
+    If i > j Then
+        TrimWhitespaceAndControlChars = vbNullString
+    Else
+        TrimWhitespaceAndControlChars = Mid$(s, i, j - i + 1)
+    End If
+End Function
 
 Private Function RowIsSkippable( _
     ByVal tableData As Variant, _

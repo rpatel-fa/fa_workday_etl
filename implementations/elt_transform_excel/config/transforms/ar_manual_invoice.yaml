@@ -47,7 +47,7 @@ source_layout:
     - Workday ID
 
 transform_constants:
-  fixed_invoice_type: Standard
+  fixed_invoice_type: EBW
   fixed_currency: GBP
   fixed_company: "THE FA GROUP - WNSL"
   fixed_line_item_description: "EBW Membership Season 26/27"
@@ -63,12 +63,12 @@ transform_constants:
     locked_in_workday: I              # Locked in Workday -- left blank
     company: J                        # Company* -- fixed "THE FA GROUP - WNSL"
     currency: AI                      # Currency -- fixed "GBP"
-    customer: AJ                      # Customer* -- direct passthrough of source Workday ID
+    customer: AJ                      # Customer* -- direct passthrough of source Workday ID, whitespace/control-char sanitized
     invoice_date: BR                  # Invoice Date -- source Created On
     payment_status: CK                # Payment Status -- fixed "Unpaid"
     document_status: CL               # Document Status -- fixed "Approved"
     amount_due: CM                    # Amount Due -- source Invoice Amount (Net)
-    customer_invoice_type: CO         # Customer Invoice Type -- fixed "Standard"
+    customer_invoice_type: CO         # Customer Invoice Type -- fixed "EBW"
     header_memo: DB                   # Memo -- source Licence Ref No + "_" + FAN#
     # --- LINE identifier and Row ID (always 1: one row = one invoice = one line) ---
     row_id_line: DS
