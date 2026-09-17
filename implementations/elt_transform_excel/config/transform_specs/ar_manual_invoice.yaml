@@ -25,11 +25,17 @@ parties:
   customer:
     source_column: Workday ID
     resolved_via: direct_passthrough
+    sanitization: trim_whitespace_and_control_chars
     note: >
       Source column O ("Workday ID") already carries the resolved Workday Customer
       Reference ID (e.g. "C-001517"). Unlike every other AR profile, this is written
       straight to AJ with NO Customer Spreadsheet lookup -- confirmed by the requester
-      as a deliberate simplification for this manually-curated CRM export.
+      as a deliberate simplification for this manually-curated CRM export. Amended
+      2026-09-17: reconciling the generated output against source found some rows carry
+      a stray leading tab/newline in this column (manual-CRM data-entry artifact, e.g.
+      "\tC-000338"), which a plain Trim$ does not strip (it only removes spaces) --
+      would have broken Workday's customer reference match. AJ is now sanitized with
+      TrimWhitespaceAndControlChars (modArManualInvoiceCustInvoice.bas) instead of Trim$.
   company:
     fixed: "THE FA GROUP - WNSL"
     resolved_via: fixed_literal
@@ -160,7 +166,9 @@ mapping:
   default: GBP
 - target: aj
   source_column: Workday ID
-  note: Direct passthrough -- no Customer Spreadsheet lookup (see parties.customer above).
+  note: >
+    Direct passthrough -- no Customer Spreadsheet lookup, sanitized of stray
+    whitespace/control characters (see parties.customer above).
 - target: br
   source_column: Created On
   source_format: Excel date serial or dd.mm.yy text

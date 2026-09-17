@@ -63,7 +63,7 @@ transform_constants:
     locked_in_workday: I              # Locked in Workday -- left blank
     company: J                        # Company* -- fixed "THE FA GROUP - WNSL"
     currency: AI                      # Currency -- fixed "GBP"
-    customer: AJ                      # Customer* -- direct passthrough of source Workday ID
+    customer: AJ                      # Customer* -- direct passthrough of source Workday ID, whitespace/control-char sanitized
     invoice_date: BR                  # Invoice Date -- source Created On
     payment_status: CK                # Payment Status -- fixed "Unpaid"
     document_status: CL               # Document Status -- fixed "Approved"
