@@ -8,7 +8,10 @@ transform:
   description: >
     Discipline (fines/payments) invoice extracts transformed into the same Workday
     Customer Invoice EIB workbook used by AR Invoice. Company and Currency are fixed
-    (FA / GBP) since the source extract has neither column. The field mapping in
+    (FA / GBP) since the source extract has neither column. Currency is a fixed default;
+    Company, Cost Centre, Reporting Type, and Revenue Category are read once from the
+    source sheet's first data row and broadcast to every output row (see
+    config/transform_specs/ar_discipline_invoice.yaml notes:). The field mapping in
     vba_src/transforms/modArDisciplineCustInvoice.bas mirrors the mapping: section in
     config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
 
@@ -16,15 +19,21 @@ runtime:
   step_list_macro: RunArDisciplineInvoiceCustomerInvoice
 
 source_layout:
-  worksheet_resolution: first_sheet
+  worksheet_resolution: named
+  worksheet_name: AUGUST 25
   header_row: 1
   data_start_row: 2
   header_detection: literal_row
   required_headers:
-    - Customer Number
-    - Document Number
-    - Document Date
-    - Original Trx Amount
+    - WORKDAY ID
+    - Date
+    - NET
+    - DESCRIPTION
+    - QTY
+    - Company
+    - Cost Centre
+    - Reporting Type
+    - Revenue Category
 
 transform_constants:
   fixed_company_code: FA
@@ -32,26 +41,15 @@ transform_constants:
   fixed_invoice_type: DSC
   fixed_dsc_indicator: "Y"
   company_fallback: THE FA GROUP - FA
-  # No COST CODE or accounting-string driver in the discipline extract;
-  # Revenue Category + worktags are left blank (Finance fill-in pre-upload
-  # for coding overrides). Kept keys here for gate parity with other AR
-  # transforms.
+  # No COST CODE or accounting-string driver in the discipline extract, and no
+  # Mapping-Master hierarchy lookup is used -- Revenue Category / Cost Centre /
+  # Reporting Type are read directly from the source sheet's first-data-row
+  # broadcast columns (M/N/O/P) instead (see mapping.j/.fx/.fy/.em in the spec).
+  # worktag_business_objects / derived_worktags are deliberately NOT declared
+  # here: declaring either activates build_runner.py's account-string mapping
+  # pipeline validation, which does not apply to this transform.
   unmapped_handling: silent_blank
   mapping_sheet: MAPPING MASTER
-  worktag_business_objects:
-    revenue_category: "Revenue Category"
-    cost_centre: "Cost Center"
-    event: "Events - Custom Org"
-    camp: "Camps - Custom Org"
-    fa_learning: "FA Learning - Custom Org"
-    commercial_partner: "Commercial Partners - Custom Worktag"
-    grant: "Grant"
-    program: "Program - Delivered Org"
-    project: "Projects (Opex)"
-    sales_item: "Sales Item"
-  derived_worktags:
-    reporting_type:
-      derivation: no cost code driver in source layout; left blank unless Finance overrides
   customer_invoice_eib_columns:
     revenue_category: EM
     billable_project_header: BN
@@ -69,11 +67,12 @@ transform_constants:
       program: GE
 
 shell_defaults:
-  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Discipline Invoices.xlsx
-  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
-  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/Submit_Customer_Invoice_v46.1_ar_discipline_invoice_output.xlsx
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/discipline/source/3. CFA Discipline Invoicing -Rolling.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/FA Submit Customer Invoice.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/discipline/target/FA_Submit_Customer_Invoice_ar_discipline_invoice_output.xlsx
   # source_layout defaults — override here to change which sheet/rows the transform uses at build time
-  source_worksheet_resolution: first_sheet
+  source_worksheet_resolution: named
+  source_worksheet_name: AUGUST 25
   source_header_row: 1
   source_data_start_row: 2
   # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are

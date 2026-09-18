@@ -18,7 +18,7 @@ shared_helpers:
   invoice_line_grouping: per_invoice_number
 
 parties:
-  customer: {source_column: Customer Number, resolved_via: Customer Spreadsheet, key_column: Reference ID, value_column: Customer ID}
+  customer: {source_column: WORKDAY ID, resolved_via: none, note: "Source column B already carries the Workday Customer ID (e.g. C-000190) -- written straight to AJ, no reference-extract lookup."}
   company: {fixed: THE FA GROUP - FA}
 
 notes: >
@@ -26,32 +26,42 @@ notes: >
   (source extract has neither column). Customer Invoice Type is DSC (discipline fine)
   with the DSC indicator Y mapped to the correct column. ALL target columns remapped
   from the pre-v46 layout; see eib_population_defaults.yaml for the canonical registry.
-  Spreadsheet Key plus line order are now grouped by source `Document Number`, so a
-  repeated document number collapses to one Workday header with 1..N lines.
-  The source extract has no COST CODE / accounting string → Revenue Category EM and
-  the 9 worktag slots FX..GF are left BLANK (Finance may code pre-upload).
+  Reworked for the new AR source file layout (`3. CFA Discipline Invoicing -Rolling.xlsx`,
+  sheet `AUGUST 25`): one row per customer per month, no `Document Number` / invoice-number
+  column. EIB Invoice Number (BO) and Memo (DB) are left blank (no source column for
+  either). Spreadsheet Key plus line order are grouped by source `WORKDAY ID`, which is
+  already unique per row on this sheet. Company (J), Cost Centre (FX), Reporting Type (FY),
+  and Revenue Category (EM) are read once from the sheet's first data row (row 2, source
+  columns M/N/O/P — populated on row 2 only, blank on every later row) and broadcast to
+  every output row.
 
 fields:
-  invoice_number:   {source_column: Document Number}
-  invoice_date:     {source_column: Document Date}
-  amount_due:       {source_column: Original Trx Amount, basis: gross}
-  line_amount:      {source_column: Original Trx Amount, basis: gross}
-  memo:             {source_column: Document Number}
+  invoice_number:
+    default: ""
+    note: No source invoice-number column on the new source layout. Left blank (see `mapping.bo`).
+  invoice_date:     {source_column: DATE, note: "Source column F -- see mapping.br landmine note: column A is also headered 'Date'."}
+  amount_due:       {source_column: NET, basis: net}
+  line_amount:      {source_column: NET, basis: net}
+  memo:
+    default: ""
+    note: No source narrative column mapped for Memo on the new source layout. Left blank (see `mapping.db`).
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
-    group_key_source_column: Document Number
+    group_key_source_column: WORKDAY ID
     id_start: 1
     id_assignment_order: source_file_row_order
     note: >
-      Spreadsheet Key B is assigned once per distinct `Document Number` in first-seen row order.
+      Spreadsheet Key B is assigned once per distinct `WORKDAY ID` in first-seen row order.
+      WORKDAY ID is already unique per row on this sheet, so this is always the N=1 case
+      (one line per header).
   line_order_within_group:
     function: per_source_invoice_number_group_1based_reset_counter
-    group_key_source_column: Document Number
+    group_key_source_column: WORKDAY ID
     counter_start: 1
     reset_on_new_group: true
     counter_assignment_order: source_file_row_order_within_group
     note: >
-      The emitted line-order field is driven from the same grouped `Document Number` key.
+      The emitted line-order field is driven from the same grouped `WORKDAY ID` key.
 
 accounting_string:
   driver: none
@@ -64,67 +74,143 @@ mapping:
 - target: b
   function: invoice_group_spreadsheet_key
   note: >
-    Populated by AssignInvoiceLineGroup keyed by `Document Number`. Repeated source
-    document numbers therefore share one Spreadsheet Key; a unique document number is
-    the N=1 case.
+    Populated by AssignInvoiceLineGroup keyed by source `WORKDAY ID`. The source sheet is
+    one row per customer per month with no repeat-invoice case, so every group is the N=1
+    case.
+- target: c
+  default: "Y"
+  note: >
+    Add Only flag -- fixed "Y" for an insert-only EIB (never update existing), matching
+    every other active AR Customer Invoice profile's house default.
 - target: h
   default: "Y"
 - target: i
   default: "Y"
 - target: bo
-  source_column: Document Number
-  note: Legacy GP Invoice Number (carried on the source as `Document Number`). Written
-        verbatim to EIB BO (Invoice Number on the printed invoice header); the earlier
-        v46-pre fixup routed this into MT (Memo) alone — DB now carries the narrative
-        as well, for display continuity on the EIB upload sheet.
+  default: ""
+  optional: true
+  note: >
+    The new source layout (`AUGUST 25` sheet) has no `Document Number` / invoice-number
+    column. Invoice Number is left blank rather than fabricating one -- Workday/Finance
+    assigns it downstream.
 - target: j
-  default: THE FA GROUP - FA
-  lookup:
-    file: this
-    tab: mapping
-    filter_column: entity
-    filter_value: company
-    input_column: source
-    output_column: target
+  source_column: Company
+  note: >
+    Source column M ("Company") on the AUGUST 25 sheet is populated on the first data row
+    (row 2) only; every later row is blank. Read once and broadcast that value to EIB
+    Company (J) on every output row (same first-data-row-broadcast idiom used for BO on
+    ar_multi_line_invoice).
 - target: ai
   default: GBP
 - target: aj
-  source_column: Customer Number
-  lookup:
-    file: Customer Spreadsheet
-    tab: Sheet1
-    input_column: Reference ID
-    output_column: Customer ID
-    equality: exact
-    nested: "|"
-    on_fail: reject
+  source_column: WORKDAY ID
+  note: >
+    Source column B already carries the Workday Customer ID (e.g. `C-000190`) -- written
+    directly, no Customer Spreadsheet lookup (unlike the pre-rework `Customer Number`
+    column, which needed one). Rows with a blank WORKDAY ID are skipped upstream of this
+    write (see the .bas RowIsSkippable check).
 - target: br
-  source_column: Document Date
-  source_format: dd/mm/yyyy
+  source_column: DATE
   target_format: YYYY-MM-DD
+  note: >
+    LANDMINE: the source sheet has two columns headered "Date" -- column A (text, not a
+    real invoice date) and column F (a real Date-typed cell, the invoice month). A plain
+    header-text lookup for "Date" would resolve to column A (first match). The `.bas`
+    must read column F positionally (`ColumnIndex("F")`), not via a header-text search,
+    to avoid silently reading the wrong column.
 - target: ck
   default: Unpaid
 - target: cl
   default: Approved
 - target: cm
-  source_column: Original Trx Amount
+  source_column: NET
 - target: co
   default: DSC
 - target: cy
-  default: "Y"
-  note: Include Customer Worktags (CY) — discipline fines are typically coded to the
-        customer's inherited default worktags; the DSC indicator in customer_invoice_type=DSC
-        drives the statutory discriminator.
+  default: ""
+  optional: true
+  note: >
+    Include Customer Worktags -- left blank per requester instruction (2026-09-18): the
+    interaction between CY=Y (customer default-worktag inheritance) and the explicit
+    FX/FY/EM values this transform writes per row (broadcast from the source sheet's
+    first data row) is not verifiable from this codebase alone; leaving CY blank avoids
+    any risk of Workday overriding those explicit values. Matches ar_bulk_invoice /
+    ar_gbe_invoice / ar_manual_invoice / ar_multi_line_invoice, none of which set CY
+    either.
+- target: ds
+  function: invoice_group_line_order
+  note: >
+    Row ID* (line-level) -- Required in the target template. Populated by the same
+    AssignInvoiceLineGroup call as target `b`/`dv`; always `1` on this sheet since
+    `WORKDAY ID` is unique per row (N=1 case). Same value as `dv`, matching the
+    ar_bulk_invoice / ar_gbe_invoice / ar_integration_invoice / ar_manual_invoice /
+    ar_multi_line_invoice convention.
 - target: dv
   function: invoice_group_line_order
   note: >
-    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
-    source document numbers write a 1..N line order within the grouped invoice.
+    Populated by the same AssignInvoiceLineGroup call as target `b`; always `1` on this
+    sheet since `WORKDAY ID` is unique per row (N=1 case).
+- target: fa
+  default: GBR_Standard_Rated
+  note: >
+    Tax Applicability. Fixed -- discipline fines are always standard-rated (source VAT
+    column I is consistently ~20% of NET). Reuses the shared AR Customer-Invoice constant
+    `TAX_APPLICABILITY_STANDARD` in modFinanceCommon.bas (also used by ar_gbe_invoice /
+    ar_bulk_invoice / etc. for their standard-rated case), rather than a per-row VAT-rate
+    derivation -- discipline has no zero-rated case to switch on.
+- target: fb
+  default: GBR_Standard_Rated
+  note: >
+    Tax Code. Fixed, same rationale as `fa`. Reuses the shared `TAX_CODE_STANDARD`
+    constant in modFinanceCommon.bas.
+- target: fp
+  mirrors: br
+  note: >
+    Transaction Date. Mirrors `br` (Invoice Date) -- same value, same format, matching
+    the ar_bulk_invoice / ar_gbe_invoice / ar_integration_invoice / ar_multi_line_invoice
+    convention of writing the invoice date into both the header Invoice Date and the
+    line-level Transaction Date.
 - target: em
-  derivation: blank_no_accounting_string
+  source_column: Revenue Category
+  note: >
+    Source column P ("Revenue Category") on the AUGUST 25 sheet is populated on the first
+    data row (row 2) only; every later row is blank. Read once and broadcast that value to
+    EIB Revenue Category (EM) on every output row (same first-data-row-broadcast idiom used
+    for BO on ar_multi_line_invoice).
 - target: en
-  default: "NULL"
+  source_column: DESCRIPTION
+  note: Line Item Description. Source column D (e.g. "CFA DISCIPLINE").
+- target: fv
+  mirrors: en
+  note: >
+    Line Memo. Mirrors `en` (Line Item Description) -- same value, matching
+    ar_gbe_invoice, which writes the same line-description string to both EN and FV.
+- target: fh
+  source_column: QTY
+  note: >
+    Quantity. Source column G ("QTY"), value 1 on every row on this sheet. Matches the
+    ar_bulk_invoice / ar_integration_invoice / ar_multi_line_invoice convention of reading
+    a real source quantity column (discipline has one, unlike ar_manual_invoice which
+    fixes FH=1 only because its source has no quantity column at all).
+- target: fl
+  source_column: NET
 - target: fo
-  source_column: Original Trx Amount
+  source_column: NET
+- target: fx
+  source_column: Cost Centre
+  note: >
+    Source column N ("Cost Centre") on the AUGUST 25 sheet is populated on the first data
+    row (row 2) only; every later row is blank. Read once and broadcast that value to EIB
+    Cost Centre (FX) on every output row (same first-data-row-broadcast idiom used for BO
+    on ar_multi_line_invoice).
+- target: fy
+  source_column: Reporting Type
+  note: >
+    Source column O ("Reporting Type") on the AUGUST 25 sheet is populated on the first
+    data row (row 2) only; every later row is blank. Read once and broadcast that value to
+    EIB Reporting Type (FY) on every output row (same first-data-row-broadcast idiom used
+    for BO on ar_multi_line_invoice).
 - target: db
-  source_column: Document Number
+  default: ""
+  optional: true
+  note: No source narrative column mapped for Memo on the new source layout. Left blank.

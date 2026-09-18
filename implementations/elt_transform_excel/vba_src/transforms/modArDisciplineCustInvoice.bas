@@ -3,51 +3,88 @@ Option Explicit
 
 Private Const TARGET_SHEET_NAME As String = "Submit Customer Invoice"
 Private Const TARGET_DATA_START_ROW As Long = 6
-Private Const SOURCE_COMPANY_CODE As String = "FA"
 Private Const OUTPUT_CURRENCY As String = "GBP"
-Private Const OUTPUT_AUTO_COMPLETE As String = "Y"
 Private Const OUTPUT_SUBMIT As String = "Y"
+Private Const OUTPUT_LOCKED_IN_WORKDAY As String = "Y"
 Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
 Private Const OUTPUT_INVOICE_TYPE As String = "DSC"
-Private Const OUTPUT_DSC_INDICATOR As String = "Y"
-' The "k" (Company) row default in config/transform_specs/ar_discipline_invoice.yaml's
-' mapping -- the fallback used when the live "company" mapping lookup has no match.
+Private Const OUTPUT_ADD_ONLY As String = "Y"
+' The "j" (Company) row in config/transform_specs/ar_discipline_invoice.yaml's mapping --
+' the fallback used only if the source sheet's first-data-row Company cell (col M) is blank.
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
+
+' Source column F holds the real invoice-month date; source column A is ALSO headered
+' "Date" (a non-date batch label), so a header-text lookup would collide. Read F
+' positionally via this named constant instead of a header search. See mapping.br.
+Private Const SRC_COL_INVOICE_DATE As String = "F"
+
+' ============================================================================
+' Target EIB column letters -- Submit_Customer_Invoice_v46.1.xlsx (Submit Customer Invoice).
+' 1:1 mirror of config/transform_specs/ar_discipline_invoice.yaml mapping: section.
+' BO (Invoice Number) and DB (Memo) are intentionally NOT declared -- left blank, no
+' source column for either (see mapping.bo / mapping.db).
+' ============================================================================
+Private Const TGT_SPREADSHEET_KEY As String = "B"
+Private Const TGT_ADD_ONLY As String = "C"
+Private Const TGT_SUBMIT As String = "H"
+Private Const TGT_LOCKED_IN_WORKDAY As String = "I"
+Private Const TGT_COMPANY As String = "J"
+Private Const TGT_CURRENCY As String = "AI"
+Private Const TGT_CUSTOMER As String = "AJ"
+Private Const TGT_INVOICE_DATE As String = "BR"
+Private Const TGT_PAYMENT_STATUS As String = "CK"
+Private Const TGT_DOCUMENT_STATUS As String = "CL"
+Private Const TGT_AMOUNT_DUE As String = "CM"
+Private Const TGT_CUSTOMER_INVOICE_TYPE As String = "CO"
+Private Const TGT_ROW_ID_LINE As String = "DS"
+Private Const TGT_LINE_ORDER As String = "DV"
+Private Const TGT_LINE_TAX_APPLICABILITY As String = "FA"
+Private Const TGT_LINE_TAX_CODE As String = "FB"
+Private Const TGT_LINE_TRANSACTION_DATE As String = "FP"
+Private Const TGT_LINE_QUANTITY As String = "FH"
+Private Const TGT_LINE_MEMO As String = "FV"
+Private Const TGT_REVENUE_CATEGORY As String = "EM"
+Private Const TGT_LINE_ITEM_DESCRIPTION As String = "EN"
+Private Const TGT_LINE_UNIT_COST As String = "FL"
+Private Const TGT_LINE_EXTENDED_AMOUNT As String = "FO"
+Private Const TGT_COST_CENTRE As String = "FX"
+Private Const TGT_REPORTING_TYPE As String = "FY"
+Private Const TARGET_LAST_COLUMN_LETTERS As String = TGT_REPORTING_TYPE
 
 Private mGrpKey As Collection
 Private mGrpLine As Collection
 Private mGrpNextKey As Long
 
-' Direct transform: load the Discipline (fines/payments) invoice extract and the
-' Workday customer extract, look up each row's customer via the customer extract's
-' pipe-delimited "Reference ID" field, and write straight into the cloned target EIB.
-' Company and Currency are fixed values (the source extract has neither column). The
-' field mapping mirrors the mapping: section in
+' Direct transform: load the Discipline (fines/payments) invoice extract (one row per
+' customer per month, "AUGUST 25"-style sheet) and write straight into the cloned target
+' EIB. Company, Cost Centre, Reporting Type, and Revenue Category are read ONCE from the
+' sheet's first data row (source columns M/N/O/P, populated on that row only) and
+' broadcast to every output row. The Customer ID is read directly from source column B
+' ("WORKDAY ID") -- no reference-extract lookup. The source has no invoice/document-number
+' column, so EIB Invoice Number (BO) and Memo (DB) are left blank. Line grouping (Spreadsheet
+' Key / Line Order) is keyed directly by source `WORKDAY ID`, which is already unique per row
+' on this sheet. The field mapping mirrors the mapping: section in
 ' config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
 Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVal controlSheet As Worksheet)
     Dim sourceDataPath As String
     Dim targetEibPath As String
     Dim outputFilePath As String
-    Dim customerSpreadsheetPath As String
     Dim selectionKey As String
-    Dim customerWorkbook As Workbook
     Dim sourceWorkbook As Workbook
     Dim outputWorkbook As Workbook
-    Dim customerLookup As Collection
     Dim sourceTable As Variant
-    Dim customerNumberColumn As Long, documentNumberColumn As Long, documentDateColumn As Long, amountColumn As Long
+    Dim workdayIdColumn As Long, invoiceDateColumn As Long, netColumn As Long, descriptionColumn As Long, qtyColumn As Long
+    Dim companyColumn As Long, costCentreColumn As Long, reportingTypeColumn As Long, revenueCategoryColumn As Long
+    Dim companyBroadcast As String, costCentreBroadcast As String
+    Dim reportingTypeBroadcast As String, revenueCategoryBroadcast As String
     Dim targetSheet As Worksheet
     Dim targetRow As Long
     Dim rowIndex As Long
     Dim rowsProcessed As Long
     Dim rowsSkipped As Long
     Dim missingFieldRows As Long
-    Dim sourceCustomerId As String
-    Dim workdayCustomerId As String
     Dim issues As Collection
-    Dim unresolvedCounts As Collection
-    Dim unresolvedKeys As Collection
     Dim outputPath As String
     Dim failureMessage As String
     Dim failureNumber As Long
@@ -63,8 +100,6 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
     selectionKey = ResolveSelectedTransformKey(runnerWorkbook, controlSheet)
 
     Set issues = New Collection
-    Set unresolvedCounts = New Collection
-    Set unresolvedKeys = New Collection
 
     On Error GoTo HandleFailure
 
@@ -75,7 +110,6 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
     targetEibPath = ReadControlValue(controlSheet, CONTROL_LABEL_TARGET_EIB)
     outputFilePath = ReadControlValue(controlSheet, CONTROL_LABEL_OUTPUT_FILE_PATH)
     EnsureNonBlank outputFilePath, CONTROL_LABEL_OUTPUT_FILE_PATH
-    customerSpreadsheetPath = ReadControlValue(controlSheet, CONTROL_LABEL_CUSTOMER_SPREADSHEET)
     worksheetNameStr = ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_WORKSHEET_NAME)
     worksheetResolutionStr = ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_WORKSHEET_RESOLUTION)
     sourceHeaderRow = CLng(Val(ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_HEADER_ROW)))
@@ -86,24 +120,37 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
         sheetToResolve = worksheetNameStr
     End If
 
-    Set customerWorkbook = OpenWorkbookReadOnly(customerSpreadsheetPath)
-    Set customerLookup = BuildReferenceLookupFromWorkbook(customerWorkbook, "Customer")
-    customerWorkbook.Close SaveChanges:=False
-    Set customerWorkbook = Nothing
-
     Set sourceWorkbook = OpenWorkbookReadOnly(sourceDataPath)
     sourceTable = ReadWorksheetTable(ResolveSourceWorksheet(sourceWorkbook, sheetToResolve))
     sourceWorkbook.Close SaveChanges:=False
     Set sourceWorkbook = Nothing
 
-    customerNumberColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Customer Number")
-    documentNumberColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Document Number")
-    documentDateColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Document Date")
-    amountColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Original Trx Amount")
+    workdayIdColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "WORKDAY ID")
+    netColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "NET")
+    descriptionColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "DESCRIPTION")
+    qtyColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "QTY")
+    companyColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Company")
+    costCentreColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Cost Centre")
+    reportingTypeColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Reporting Type")
+    revenueCategoryColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Revenue Category")
+    ' LANDMINE: the source sheet has TWO columns headered "Date" (col A, a non-date batch
+    ' label) and "DATE" (col F, the real invoice-month date) -- NormalizeToken lower-cases
+    ' both to "date", so a header-text lookup would silently resolve to col A (first
+    ' match). Read col F positionally instead. See mapping.br in the transform spec.
+    invoiceDateColumn = ColumnIndex(SRC_COL_INVOICE_DATE)
+
+    ' Company / Cost Centre / Reporting Type / Revenue Category are populated on the
+    ' sheet's first data row ONLY (every later row is blank) -- read once here and
+    ' broadcast the same value to every output row (mapping.j / .fx / .fy / .em).
+    companyBroadcast = Trim$(CStr(sourceTable(sourceDataStartRow, companyColumn)))
+    If LenB(companyBroadcast) = 0 Then companyBroadcast = COMPANY_DEFAULT_FALLBACK
+    costCentreBroadcast = Trim$(CStr(sourceTable(sourceDataStartRow, costCentreColumn)))
+    reportingTypeBroadcast = Trim$(CStr(sourceTable(sourceDataStartRow, reportingTypeColumn)))
+    revenueCategoryBroadcast = Trim$(CStr(sourceTable(sourceDataStartRow, revenueCategoryColumn)))
 
     Set outputWorkbook = CloneTemplateWorkbook(targetEibPath, outputFilePath)
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
-    ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, "MT"
+    ClearPublishedRows targetSheet, TARGET_DATA_START_ROW, TARGET_LAST_COLUMN_LETTERS
     targetRow = TARGET_DATA_START_ROW
     Set mGrpKey = New Collection
     Set mGrpLine = New Collection
@@ -111,40 +158,24 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
 
     For rowIndex = sourceDataStartRow To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
-        If RowIsSkippable(sourceTable, rowIndex, customerNumberColumn, documentDateColumn, amountColumn) Then
+        If RowIsSkippable(sourceTable, rowIndex, workdayIdColumn, invoiceDateColumn, netColumn) Then
             rowsSkipped = rowsSkipped + 1
             missingFieldRows = missingFieldRows + 1
             AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                "Missing required field (Customer Number / Document Date / Amount)", _
+                "Missing required field (WORKDAY ID / Invoice Date / NET) or trailer/totals row", _
                 vbNullString, _
-                Trim$(CStr(sourceTable(rowIndex, customerNumberColumn)))
+                Trim$(CStr(sourceTable(rowIndex, workdayIdColumn)))
         Else
-            sourceCustomerId = Trim$(CStr(sourceTable(rowIndex, customerNumberColumn)))
-            workdayCustomerId = LookupCollectionValue(customerLookup, sourceCustomerId)
-            If LenB(workdayCustomerId) = 0 Then
-                ' on_fail = "reject" on the "cq" (Customer ID) row of the ar_discipline_invoice
-                ' spec mapping: an unresolved customer lookup rejects the source row entirely
-                ' rather than writing a placeholder value.
-                rowsSkipped = rowsSkipped + 1
-                IncrementCount unresolvedCounts, unresolvedKeys, sourceCustomerId
-                AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                    "Customer Number not found in customer extract", _
-                    sourceCustomerId, _
-                    Trim$(CStr(sourceTable(rowIndex, documentNumberColumn)))
-            Else
-                rowsProcessed = rowsProcessed + 1
-                WriteOutputRow runnerWorkbook, targetSheet, targetRow, rowsProcessed, sourceTable, rowIndex, _
-                    documentNumberColumn, documentDateColumn, amountColumn, workdayCustomerId
-                targetRow = targetRow + 1
-            End If
+            rowsProcessed = rowsProcessed + 1
+            WriteOutputRow targetSheet, targetRow, sourceTable, rowIndex, _
+                workdayIdColumn, invoiceDateColumn, netColumn, descriptionColumn, qtyColumn, _
+                companyBroadcast, costCentreBroadcast, reportingTypeBroadcast, revenueCategoryBroadcast
+            targetRow = targetRow + 1
         End If
     Next rowIndex
 
     If missingFieldRows > 0 Then
-        issues.Add "Skipped " & CStr(missingFieldRows) & " source row(s) with missing Customer Number, Document Date, or Original Trx Amount."
-    End If
-    If unresolvedKeys.Count > 0 Then
-        issues.Add BuildRejectedLookupIssue(unresolvedCounts, unresolvedKeys, "Customer ID")
+        issues.Add "Skipped " & CStr(missingFieldRows) & " source row(s) with missing WORKDAY ID, Invoice Date, or NET (includes the sheet's trailer/totals row)."
     End If
 
     outputPath = outputWorkbook.FullName
@@ -171,7 +202,6 @@ HandleFailure:
     failureNumber = Err.Number
     failureMessage = Err.Description
     On Error Resume Next
-    If Not customerWorkbook Is Nothing Then customerWorkbook.Close SaveChanges:=False
     If Not sourceWorkbook Is Nothing Then sourceWorkbook.Close SaveChanges:=False
     If Not outputWorkbook Is Nothing Then outputWorkbook.Close SaveChanges:=False
     On Error GoTo 0
@@ -190,61 +220,86 @@ HandleFailure:
     On Error GoTo 0
     Err.Raise failureNumber, "modArDisciplineCustInvoice.RunArDisciplineInvoiceCustomerInvoice", failureMessage
 End Sub
+
 Private Sub WriteOutputRow( _
-    ByVal runnerWorkbook As Workbook, _
     ByVal targetSheet As Worksheet, _
     ByVal targetRow As Long, _
-    ByVal sequenceNumber As Long, _
     ByVal sourceTable As Variant, _
     ByVal sourceRow As Long, _
-    ByVal documentNumberColumn As Long, ByVal documentDateColumn As Long, ByVal amountColumn As Long, _
-    ByVal outputCustomerId As String _
+    ByVal workdayIdColumn As Long, ByVal invoiceDateColumn As Long, ByVal netColumn As Long, ByVal descriptionColumn As Long, ByVal qtyColumn As Long, _
+    ByVal companyBroadcast As String, ByVal costCentreBroadcast As String, _
+    ByVal reportingTypeBroadcast As String, ByVal revenueCategoryBroadcast As String _
 )
-    Dim companyId As String
+    Dim workdayId As String
     Dim invoiceDate As String
-    Dim amount As Double
-    Dim documentNumberValue As String
+    Dim netAmount As Double
+    Dim qtyValue As Double
+    Dim descriptionValue As String
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
 
-    companyId = ResolveMappedCompany(runnerWorkbook, SOURCE_COMPANY_CODE, COMPANY_DEFAULT_FALLBACK)
-    invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, documentDateColumn))
-    amount = ResolveAmount(sourceTable(sourceRow, amountColumn))
-    documentNumberValue = Trim$(CStr(sourceTable(sourceRow, documentNumberColumn)))
-    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, documentNumberValue, mGrpNextKey, lineOrderValue)
+    workdayId = Trim$(CStr(sourceTable(sourceRow, workdayIdColumn)))
+    invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, invoiceDateColumn))
+    netAmount = ResolveAmount(sourceTable(sourceRow, netColumn))
+    qtyValue = ResolveAmount(sourceTable(sourceRow, qtyColumn))
+    descriptionValue = Trim$(CStr(sourceTable(sourceRow, descriptionColumn)))
+    ' Grouping keyed directly by WORKDAY ID, which is already unique per row on this sheet.
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, workdayId, mGrpNextKey, lineOrderValue)
 
-    targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
-    targetSheet.Cells(targetRow, ColumnIndex("E")).Value = OUTPUT_AUTO_COMPLETE
-    targetSheet.Cells(targetRow, ColumnIndex("H")).Value = CStr(sourceTable(sourceRow, documentNumberColumn))
-    targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
-    targetSheet.Cells(targetRow, ColumnIndex("K")).Value = companyId
-    targetSheet.Cells(targetRow, ColumnIndex("CP")).Value = OUTPUT_CURRENCY
-    targetSheet.Cells(targetRow, ColumnIndex("CQ")).Value = outputCustomerId
-    ' Force Text format before assigning: the target template's GF cell is formatted
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_ADD_ONLY
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LOCKED_IN_WORKDAY)).Value = OUTPUT_LOCKED_IN_WORKDAY
+    ' BO (Invoice Number) intentionally left blank -- no source invoice-number column;
+    ' Workday/Finance assigns it downstream. See mapping.bo.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyBroadcast
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CURRENCY)).Value = OUTPUT_CURRENCY
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER)).Value = workdayId
+    ' Force Text format before assigning: the target template's BR cell is formatted
     ' General, so assigning a "yyyy-mm-dd" string straight to .Value lets Excel
     ' auto-detect it as a date and silently re-render it in the system's default
     ' short-date format -- overriding the ar_discipline_invoice spec mapping's
     ' target_format = YYYY-MM-DD.
-    targetSheet.Cells(targetRow, ColumnIndex("GF")).NumberFormat = "@"
-    targetSheet.Cells(targetRow, ColumnIndex("GF")).Value = invoiceDate
-    targetSheet.Cells(targetRow, ColumnIndex("GY")).Value = OUTPUT_PAYMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex("GZ")).Value = OUTPUT_DOCUMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex("HA")).Value = amount
-    targetSheet.Cells(targetRow, ColumnIndex("HC")).Value = OUTPUT_INVOICE_TYPE
-    targetSheet.Cells(targetRow, ColumnIndex("HL")).Value = OUTPUT_DSC_INDICATOR
-    targetSheet.Cells(targetRow, ColumnIndex("IH")).Value = CStr(lineOrderValue)
-    targetSheet.Cells(targetRow, ColumnIndex("MJ")).Value = amount
-    targetSheet.Cells(targetRow, ColumnIndex("MT")).Value = documentNumberValue
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).Value = invoiceDate
+    ' Transaction Date (FP) mirrors Invoice Date (BR) -- same convention as
+    ' ar_bulk_invoice / ar_gbe_invoice / ar_integration_invoice / ar_multi_line_invoice.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).Value = invoiceDate
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
+    ' CY (Include Customer Worktags) intentionally left blank -- see mapping.cy.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
+    ' Fixed standard-rated tax triple -- discipline fines have no zero-rated case, so this
+    ' reuses the shared AR Customer-Invoice constants in modFinanceCommon.bas (same values
+    ' ar_gbe_invoice / ar_bulk_invoice use for their standard-rated lines) rather than a
+    ' per-row VAT-rate derivation. See mapping.fa / mapping.fb.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = TAX_APPLICABILITY_STANDARD
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = TAX_CODE_STANDARD
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
+    If LenB(revenueCategoryBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategoryBroadcast
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = descriptionValue
+    ' Line Memo (FV) mirrors Line Item Description (EN) -- same convention as ar_gbe_invoice.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_MEMO)).Value = descriptionValue
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
+    If LenB(costCentreBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_COST_CENTRE)).Value = costCentreBroadcast
+    If LenB(reportingTypeBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REPORTING_TYPE)).Value = reportingTypeBroadcast
+    ' DB (Memo) intentionally left blank -- no source narrative column mapped. See mapping.db.
 End Sub
+
 Private Function RowIsSkippable( _
     ByVal tableData As Variant, _
     ByVal rowIndex As Long, _
-    ByVal customerNumberColumn As Long, _
-    ByVal documentDateColumn As Long, _
-    ByVal amountColumn As Long _
+    ByVal workdayIdColumn As Long, _
+    ByVal invoiceDateColumn As Long, _
+    ByVal netColumn As Long _
 ) As Boolean
     RowIsSkippable = _
-        LenB(Trim$(CStr(tableData(rowIndex, customerNumberColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, documentDateColumn)))) = 0 Or _
-        ResolveAmount(tableData(rowIndex, amountColumn)) = 0#
+        LenB(Trim$(CStr(tableData(rowIndex, workdayIdColumn)))) = 0 Or _
+        LenB(Trim$(CStr(tableData(rowIndex, invoiceDateColumn)))) = 0 Or _
+        ResolveAmount(tableData(rowIndex, netColumn)) = 0#
 End Function
