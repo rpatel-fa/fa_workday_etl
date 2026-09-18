@@ -14,14 +14,28 @@
 # The one-transform-many-sources pattern mirrors ap_stationery; here the "many sources" are
 # two tabs of one file, selected per-variant via source_worksheet_name.
 #
-# Source layout (both tabs, header row 1, data rows 2..N; col A is blank, data starts col B):
-#   B Date | C Club | D Player | E Type | F Gross | G VAT | H Net | I Reference
-#   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col G (the data is still
+# Source layout (both tabs, header row 1, data rows 2..N), AS OF 2026-09-17 (AR-supplied
+# "22. GBE - August 26.xlsx"):
+#   A WORKDAY ID|Customer ID | B Date | C Club|Customer Name | D Gross | E VAT | F Net |
+#   G Invoice Line Description | H Invoice line part 2|Invoice Line Description 2 |
+#   I Invoice Memo | J (blank) | K Company | L Cost Centre | M Reporting Type | N Revenue Category
+#   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col E (the data is still
 #   present). VAT is therefore read as OPTIONAL and the VAT rate is derived from
 #   (Gross - Net) / Net, which is present on both tabs regardless of the VAT header.
+#   NOTE: col A's header differs by tab ("WORKDAY ID" Mens / "Customer ID" Womens) but both
+#   carry a ready-made Workday Customer ID per row (e.g. "C-000102").
+#   NOTE: K/L/M/N (Company / Cost Centre / Reporting Type / Revenue Category) are BATCH
+#   CONSTANTS - only row 2 carries a value; it applies to every row in the run.
+#   NOTE: DECIDED 2026-09-17 - Player and Reference are no longer separate columns; both are
+#   embedded in col G ("Invoice Line Description"), e.g.
+#   "Romain Jordan Faivre-FOOT01/22/S-2024-1669". Split at runtime on the literal "-FOOT"
+#   anchor token: verified against all 584 rows of this file (435 Mens + 149 Womens, 100%
+#   match), including hyphenated surnames (e.g. "Peyraud-Magnin-FOOT01/###/S-2024-0795" still
+#   splits correctly since the anchor is the literal substring "-FOOT", not "first/last dash").
+#   Mirrors ap_travel_places' inline SupplierID split (InStr + Left$/Mid$, no shared helper).
 #
 # Data shape = one source row = one single-line Workday Customer Invoice. Each row is one
-# club/player GBE line with its own unique Reference (e.g. FOOT01/67/S-2024-1649).
+# club/player GBE line, keyed by the Reference extracted from col G.
 
 meta:
   key: ar_gbe_invoice
@@ -31,91 +45,84 @@ meta:
   exemplar_to_fork: ar_bulk_invoice   # one-row-one-invoice v46.1 Customer Invoice
   note: >
     Structural fork of ar_bulk_invoice with three deliberate differences:
-    (1) CUSTOMER RESOLVED BY CLUB NAME (two-level cascade with SQL-migration L2).
-        GBE carries only the club name (col C "Club"), not a GP Reference ID or a
-        Workday Customer ID. The .bas matches it against the Workday customer extract
-        "Customer" (name) column via a shared helper (customer_name_resolution =
-        two_level_l1_l2_sql_migration). Precision-first at every level:
-          L1 = exact normalised name match (upper/collapse-whitespace, WFC->WOMEN FC, WOMENS->WOMEN).
-               L1 ambiguous -> REJECT immediately (no fallback).
-          L2 = source name transformed by the SAME rules as the GP data-migration SQL
-               (elt_ingest_excel/.../src_fin_customer_raw.sql lines 105-128) first, then L1-normalised.
-               L2 rules: strip dots, WOMEN'S/WOMENS->WOMEN, FOOTBALL CLUB->FC, strip parenthetical content,
-               UNITED->UTD (word boundary), AND->& (word boundary), peel trailing legal suffixes
-               LIMITED/LTD/COMPANY/PLC/LLP/INC. Only tried on L1 MISS (not on L1 ambiguous).
-               L2 ambiguous -> REJECT immediately.
-        A miss after both L1+L2 -> REJECT. Never guess.
-        This two-level cascade fixes the 2026-09-02 class of rejects where the GP migration SQL
-        had shortened the customer's display name in the extract but GBE's source carried the
-        long form (e.g. source "Oxford United FC" matches extract "OXFORD UTD FC" at L2).
-    (2) NO COST CODE. GBE has no accounting-string column, so Revenue Category (EM) and the
-        9-slot FX..GF worktags stay blank (Finance codes pre-upload). The worktag pipeline is
-        declared + wired inert for Customer-Invoice archetype parity (costCodeColumn resolves
-        to 0 -> every Mapping-MASTER lookup is guard-skipped).
+    (1) CUSTOMER RESOLVED BY DIRECT PASSTHROUGH (as of 2026-09-17). AR now delivers a
+        ready-made Workday Customer ID per row in source col A ("WORKDAY ID" on the Mens
+        tab / "Customer ID" on the Womens tab, e.g. "C-000102"). That value is copied
+        straight to target AJ; a blank col A rejects the row. This SUPERSEDES the
+        earlier two-level club-name cascade (customer_name_resolution =
+        two_level_l1_l2_sql_migration, described in open_questions.gbe_customer_id_from_ar
+        below for history) - the shared helper is untouched in shared_helper_registry.yaml
+        / modFinanceCommon.bas and remains available to other transforms, it is simply no
+        longer called here.
+    (2) NO PER-ROW COST CODE, BUT BATCH-CONSTANT WORKTAGS. GBE still has no per-row
+        accounting-string column, so Event/Camp/FA Learning/Commercial Partner/Grant/
+        Programme/Project stay blank (Mapping-MASTER hierarchy lookup remains inert:
+        costCodeColumn resolves to 0). However Company (J), Cost Centre (FX), Reporting
+        Type (FY) and Revenue Category (EM) are now supplied by AR as BATCH CONSTANTS in
+        source columns K/L/M/N: only row 2 carries a value; it is read once and applied to
+        every output row (as of 2026-09-17).
     (3) VAT rate derived from (Gross - Net) / Net rather than a VAT column, so the Womens tab
         (missing the VAT header) is handled identically.
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
-  customer_name_resolution: two_level_l1_l2_sql_migration
   invoice_line_grouping: per_invoice_number
+  # customer_name_resolution (two_level_l1_l2_sql_migration) is NO LONGER called by this
+  # transform as of 2026-09-17 - see parties.customer below. The helper itself is untouched
+  # in shared_helper_registry.yaml / modFinanceCommon.bas for other transforms to use.
 
 parties:
   customer:
-    source_column: Club
-    resolved_via: Customer Spreadsheet
-    key_column: Customer            # the extract NAME column header (col A), NOT "Reference ID"
-    value_column: Customer ID
-    match: two_level_cascade_l1_exact_l2_sql_migration
-    normalisation_level_1_exact:
-      - upper_case
-      - collapse_whitespace
-      - "WFC -> WOMEN FC"
-      - "WOMENS -> WOMEN"
-    normalisation_level_2_sql_migration:
-      - strip_dots
-      - "WOMEN'S -> WOMEN"
-      - "WOMENS -> WOMEN (idempotent)"
-      - "FOOTBALL CLUB -> FC"
-      - strip_parenthetical_content
-      - "UNITED -> UTD (word boundary)"
-      - "AND -> & (word boundary)"
-      - strip_trailing_legal_suffixes LIMITED LTD COMPANY PLC LLP INC
-    cascade_order: L1_then_L2_on_miss
-    on_ambiguous: reject_at_level
-    on_unresolved: reject_after_both_levels
+    source_column: WORKDAY ID|Customer ID
+    source_column_letter: A
+    source_code: per_row_direct_passthrough
+    on_blank: reject
     note: >
-      Unlike every other AR transform (which keys on the pipe-delimited "Reference ID"
-      column), GBE keys on the club name. Resolved via shared customer_name_resolution
-      helper (two_level_l1_l2_sql_migration). Ambiguous at L1 or L2 -> rejected.
-  company: {fixed: FA, resolved_via: mapping tab, entity: company, fallback: THE FA GROUP - FA}
+      DECIDED 2026-09-17: AR now delivers a ready-made Workday Customer ID per row (col A;
+      header "WORKDAY ID" on the Mens tab / "Customer ID" on the Womens tab). Direct
+      passthrough to target AJ, mirroring the ap_cfa_claims supplier-ID pattern. This
+      supersedes the earlier two-level club-name cascade match (history retained in
+      open_questions.gbe_customer_id_from_ar below).
+  company: {source_column: Company, source_column_letter: K, mode: batch_constant_first_data_row, fallback: THE FA GROUP - FA}
 
 notes: >
   GBE (Governing Body Endorsement) invoices bill football clubs for player-registration
-  endorsement panels/extensions. The emitted invoice identifier is the source `Reference`
-  value, written to D / G / BO and used as the shared invoice-line grouping key for
-  Spreadsheet Key plus Row ID / Line Order. A repeated `Reference` therefore collapses
-  to one Workday header with 1..N lines; a unique `Reference` remains the single-line case.
-  v46.1 layout. Amounts + tax mirror ar_bulk_invoice / ar_multi_line_invoice: GROSS (col F)
-  -> Amount Due (CM), Unit Cost (FL) and Extended Amount (FO); Line Tax Applicability (FA)
-  and Line Tax Code (FB) driven by the derived VAT rate (20% -> GBR_Standard_Rated, else
-  GBR_Outside_of_Scope / GBR_Zero_Rated). The GBE Reference (col I) is written verbatim to
-  the three header identifier columns D / G / BO and to the header Memo (DB). Line Item
-  Description (EN) + line Memo (FV) = Player + " - " + Type.
+  endorsement panels/extensions. The emitted invoice identifier is the Reference extracted
+  from col G ("Invoice Line Description", split on the literal "-FOOT" anchor token - see
+  parties / mapping target `d` below), written to D / G / BO and used as the shared
+  invoice-line grouping key for Spreadsheet Key plus Row ID / Line Order. A repeated
+  `Reference` therefore collapses to one Workday header with 1..N lines; a unique `Reference`
+  remains the single-line case. v46.1 layout. Amounts mirrored ar_bulk_invoice /
+  ar_multi_line_invoice's GROSS-into-amounts convention originally; DECIDED 2026-09-17: Amount
+  Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from NET (col F) instead of
+  GROSS. Line Tax Applicability (FA) and Line Tax Code (FB) driven by the derived VAT rate
+  (20% -> GBR_Standard_Rated, else
+  GBR_Outside_of_Scope / GBR_Zero_Rated). The extracted
+  Reference is written verbatim to the three header identifier columns D / G / BO and to the
+  header Memo (DB). Line Item Description (EN) + line Memo (FV) = Player + " - " + Type,
+  where Player is the text before the "-FOOT" split and Type comes from col H.
 
 fields:
   invoice_number:
-    source_column: Reference
+    source_column: Invoice Line Description
+    source_column_letter: G
+    function: split_on_anchor_token
+    split_anchor_token: "-FOOT"
+    split_part: after_anchor
     note: >
-      The GBE `Reference` is the canonical emitted invoice identifier. It is written
-      verbatim to D / G / BO and is also the grouping key for the shared invoice-line helper.
+      DECIDED 2026-09-17: Reference is no longer its own column - it is the part of col G
+      ("Invoice Line Description") from the literal "-FOOT" anchor token onward (e.g.
+      "FOOT01/22/S-2024-1669" out of "Romain Jordan Faivre-FOOT01/22/S-2024-1669"). Verified
+      against all 584 rows of the 2026-09-17 AR file. It is written verbatim to D / G / BO
+      and is also the grouping key for the shared invoice-line helper. A row whose col G has
+      no "-FOOT" token is rejected (never guessed) - see skip_rule.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
     group_key_source_column: Reference
     id_start: 1
     id_assignment_order: source_file_row_order
     note: >
-      Spreadsheet Key B is assigned once per distinct source `Reference` in first-seen row order.
+      Spreadsheet Key B is assigned once per distinct extracted `Reference` in first-seen row order.
   line_row_id_within_group:
     function: per_source_invoice_number_group_1based_reset_counter
     group_key_source_column: Reference
@@ -135,7 +142,7 @@ fields:
 
 tax:
   mode: per_row_derived
-  driver: (Gross - Net) / Net           # VAT rate derived; col G "VAT" header is optional/absent on Womens tab
+  driver: (Gross - Net) / Net           # VAT rate derived; col E "VAT" header is optional/absent on Womens tab
   rate_20:
     applicability: GBR_Standard_Rated
     code: GBR_Standard_Rated
@@ -148,17 +155,20 @@ tax:
 accounting_string:
   driver: none
   note: >
-    GBE has no COST CODE / accounting-string column. Revenue Category (EM) and the 9-slot
-    FX..GF worktags are left blank; Finance codes pre-upload. Pipeline retained inert for
-    archetype parity (see meta.note item 2).
+    GBE still has no per-row COST CODE / accounting-string column, so the Mapping-MASTER
+    hierarchy lookup and 6 of the 9 worktag slots (event, camp, FA Learning, commercial
+    partner, grant, programme, project) stay blank; Finance codes pre-upload. As of
+    2026-09-17, Revenue Category (EM), Cost Centre (FX) and Reporting Type (FY) are no
+    longer part of that inert pipeline - they are BATCH CONSTANTS read from source columns
+    N/L/M row 2 (see meta.note item 2 and mapping targets em/fx/fy above).
 
 skip_rule:
   drop_when:
     - Date blank
     - Club blank
     - Gross == 0
-    - customer unresolved (club name not matched in customer extract)
-    - customer ambiguous (club name maps to >1 Customer ID)
+    - Invoice Line Description (col G) has no "-FOOT" anchor token (Reference unparseable)
+    - Workday Customer ID (col A) blank
 
 mapping:
 # EIB-level + line-level columns for one-row-one-invoice. House defaults: submit=Y,
@@ -173,35 +183,60 @@ mapping:
 - target: i
   default: ""
 - target: d
-  source_column: Reference
-  note: Customer Invoice Reference ID = GBE Reference (col I), verbatim. Same value to D/G/BO.
+  source_column: Invoice Line Description
+  source_column_letter: G
+  function: split_on_anchor_token
+  split_anchor_token: "-FOOT"
+  split_part: after_anchor
+  note: >
+    DECIDED 2026-09-17: Customer Invoice Reference ID = Reference extracted from col G (the
+    part from "-FOOT" onward), verbatim. Same value to D/G/BO. See fields.invoice_number.
 - target: g
-  source_column: Reference
+  source_column: Invoice Line Description
+  source_column_letter: G
+  function: split_on_anchor_token
+  split_anchor_token: "-FOOT"
+  split_part: after_anchor
 - target: bo
-  source_column: Reference
+  source_column: Invoice Line Description
+  source_column_letter: G
+  function: split_on_anchor_token
+  split_anchor_token: "-FOOT"
+  split_part: after_anchor
 - target: j
-  derivation: fixed_company_code_via_mapping
-  source_value: FA
-  lookup:
-    file: this
-    tab: mapping
-    filter_column: entity
-    filter_value: company
-    input_column: source
-    output_column: target
-    on_fail_default: THE FA GROUP - FA
+  source_column: Company
+  source_column_letter: K
+  function: batch_constant_first_data_row
+  fallback: THE FA GROUP - FA
+  note: >
+    DECIDED 2026-09-17: Company is now a BATCH CONSTANT from source col K - only row 2
+    carries a value; it is read once and written to every output row. Supersedes the
+    earlier fixed_company_code_via_mapping lookup via the internal mapping tab.
 - target: ai
   default: GBP
 - target: aj
-  source_column: Club
-  lookup:
-    file: Customer Spreadsheet
-    tab: Sheet1
-    input_column: Customer          # NAME column, matched on two-level cascade (L1 exact norm, L2 SQL-migration-transforms-then-norm)
-    output_column: Customer ID
-    equality: two_level_cascade_l1_exact_l2_sql_migration
-    on_fail: reject_after_L1_and_L2
-    on_ambiguous: reject_at_matching_level
+  source_column: WORKDAY ID|Customer ID
+  source_column_letter: A
+  source_code: per_row_direct_passthrough
+  on_blank: reject
+  note: >
+    DECIDED 2026-09-17: direct passthrough of the AR-supplied Workday Customer ID.
+    Supersedes the earlier two-level club-name cascade lookup.
+- target: fx
+  source_column: Cost Centre
+  source_column_letter: L
+  function: batch_constant_first_data_row
+  note: Cost Centre (FX) is a BATCH CONSTANT from source col L (row 2), added 2026-09-17.
+- target: fy
+  source_column: Reporting Type
+  source_column_letter: M
+  function: batch_constant_first_data_row
+  note: Reporting Type (FY) is a BATCH CONSTANT from source col M (row 2), added 2026-09-17.
+- target: em
+  source_column: Revenue Category
+  source_column_letter: N
+  function: batch_constant_first_data_row
+  note: Revenue Category (EM) is a BATCH CONSTANT from source col N (row 2), added 2026-09-17.
 - target: br
   source_column: Date
   source_format: Excel date serial or dd/mm/yyyy
@@ -211,12 +246,20 @@ mapping:
 - target: cl
   default: Approved
 - target: cm
-  source_column: Gross
+  source_column: Net
+  source_column_letter: F
+  note: >
+    DECIDED 2026-09-17: Amount Due CM = NET (col F), not GROSS - matches FL/FO (mapping
+    targets fl/fo above).
 - target: co
   default: Standard
 - target: db
-  source_column: Reference
-  note: Header Memo (DB) = GBE Reference for traceability.
+  source_column: Invoice Line Description
+  source_column_letter: G
+  function: split_on_anchor_token
+  split_anchor_token: "-FOOT"
+  split_part: after_anchor
+  note: Header Memo (DB) = extracted GBE Reference for traceability.
 - target: ds
   function: invoice_group_line_order
   note: >
@@ -229,30 +272,40 @@ mapping:
     source references write a 1..N line order within the grouped invoice.
 - target: en
   derivation: player_dash_type
-  source_columns: [Player, Type]
-  note: Line Item Description = Player + " - " + Type (e.g. "Boubacar Kamara - Extension").
+  source_columns: [Invoice Line Description, Invoice line part 2|Invoice Line Description 2]
+  note: >
+    Line Item Description = Player + " - " + Type. Player is the part of "Invoice Line
+    Description" (col G) BEFORE the "-FOOT" split token (see fields.invoice_number); Type is
+    col H verbatim (e.g. "Boubacar Kamara - Extension").
 - target: fa
   derivation: applicability_from_derived_vat_rate
 - target: fb
   derivation: tax_code_from_derived_vat_rate
 - target: fl
-  source_column: Gross
-  note: Unit Cost FL = GROSS (mirrors ar_bulk / ar_multi_line gross-into-amounts convention).
+  source_column: Net
+  source_column_letter: F
+  note: >
+    DECIDED 2026-09-17: Unit Cost FL = NET (col F), not GROSS - matches CM/FO (mapping
+    target cm above).
 - target: fo
-  source_column: Gross
-  note: Extended Amount FO = GROSS.
+  source_column: Net
+  source_column_letter: F
+  note: >
+    DECIDED 2026-09-17: Extended Amount FO = NET (col F), not GROSS - matches CM/FL (mapping
+    target cm above).
 - target: fp
   source_column: Date
   source_format: Excel date serial or dd/mm/yyyy
   target_format: YYYY-MM-DD
 - target: fv
   derivation: player_dash_type
-  source_columns: [Player, Type]
+  source_columns: [Invoice Line Description, Invoice line part 2|Invoice Line Description 2]
 
 unused_source_columns:
   # Columns present in the source that are NOT written to the EIB output.
   - VAT:   # NOT written directly; only used (as Gross-Net cross-check) to derive the VAT rate. Header absent on Womens tab.
-  - Net:   # Used only to derive the VAT rate ((Gross-Net)/Net); the line/header amounts use GROSS.
+  # NOTE: Net (col F) is NO LONGER unused as of 2026-09-17 - it is written directly to FL/FO
+  # (see mapping targets fl/fo above) in addition to still driving the VAT-rate derivation.
 
 open_questions:
   - id: gbe_customer_id_from_ar
@@ -269,13 +322,41 @@ open_questions:
       pre-allocated Customer IDs — but the name-match path is no longer a stub.
     parked_pending_ar:
       - >-
-        If/when AR delivers an inline Workday Customer ID column, add a third
-        precedence tier: INLINE ID wins highest, then fall back to name cascade.
-      - >-
-        If AR delivers GP Reference IDs (not Workday IDs) inline, resolve via the
-        customer extract's "Reference ID" column rather than the name column.
+        SUPERSEDED 2026-09-17: AR's "22. GBE - August 26.xlsx" now carries the inline
+        Workday Customer ID column anticipated here (col A, "WORKDAY ID"/"Customer ID").
+        parties.customer switched to source_code: per_row_direct_passthrough with no
+        cascade fallback. The two-level name cascade is left wired in modFinanceCommon.bas
+        for other transforms but is no longer called by ar_gbe_invoice.
     interim_behaviour: >
-      Two-level name cascade (shared helper). Ambiguous at L1/L2 -> reject. Miss at
-      both -> reject. No inline-ID reading wired yet; add when AR file ships.
+      SUPERSEDED 2026-09-17 - see parties.customer. (Historical: two-level name cascade,
+      ambiguous or miss at L1/L2 -> reject.)
     owner: Finance (AR)
-    status: active_name_cascade_waiting_for_ar_inline_ids
+    status: superseded_direct_passthrough_live
+
+  - id: gbe_reference_column_removed
+    decision: >
+      DECIDED 2026-09-17. The AR source file ("22. GBE - August 26.xlsx") no longer has
+      separate "Reference" or "Player" columns; both are embedded in col G ("Invoice Line
+      Description"), e.g. "Romain Jordan Faivre-FOOT01/22/S-2024-1669" (player name + "-" +
+      the old Reference value). Col H ("Invoice line part 2" / "Invoice Line Description 2")
+      is a clean 1:1 replacement for the old "Type" column (verified identical value set:
+      Extension/Panel/Automatic/ESC (New)). VERIFIED the literal token "-FOOT" marks the
+      Player/Reference boundary on ALL 584 data rows across both tabs (435 Mens + 149 Womens,
+      100% match, zero rows with more than one "-FOOT" occurrence) - including rows where the
+      player's own surname contains a hyphen (e.g. "Pauline Camille Peyraud-Magnin-FOOT01/
+      ###/S-2024-0795" still splits correctly because the anchor is the literal substring
+      "-FOOT", not "first/last dash"). Implemented as an inline split (InStr + Left$/Mid$) in
+      modArGbeInvoiceCustInvoice.bas, PLAYER_REFERENCE_SPLIT_ANCHOR = "-FOOT" - mirrors the
+      established pattern already used for ap_travel_places' SupplierID split (per_row_split /
+      split_on_first_hyphen in ap_travel_places.yaml; no shared helper for either). A row
+      whose col G lacks the "-FOOT" anchor is rejected (never guessed) - see skip_rule. Some
+      rows also carry a stray literal "_x000D_" text artifact (a pre-existing AR export
+      encoding glitch); CleanMemoToSingleLine now strips it as a text-hygiene fix.
+    parked_pending_ar:
+      - >-
+        Some references contain a literal "###" placeholder instead of a number (e.g.
+        "FOOT01/###/S-2024-0795", observed on 3 Mens + 7 Womens rows) - a pre-existing AR
+        data-quality gap in the source, passed through verbatim (not fixed here). Confirm
+        with AR whether these need correcting at source before upload.
+    owner: Finance (AR)
+    status: decided_split_on_anchor_token_live

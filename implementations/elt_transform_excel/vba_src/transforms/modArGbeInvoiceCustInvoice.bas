@@ -4,12 +4,20 @@ Option Explicit
 Private Const TARGET_SHEET_NAME As String = "Submit Customer Invoice"
 Private Const TARGET_DATA_START_ROW As Long = 6
 
+'  DECIDED 2026-09-17: the source no longer carries separate Player/Reference columns; both
+'  are embedded in one free-text cell ("Invoice Line Description", e.g.
+'  "Romain Jordan Faivre-FOOT01/22/S-2024-1669"). Verified against every row of the 2026-09-17
+'  AR file (435 Mens + 149 Womens, 100% match, incl. hyphenated surnames like
+'  "Peyraud-Magnin"): the literal "-FOOT" token always marks the Player/Reference boundary and
+'  never occurs more than once. Mirrors the inline split-on-anchor pattern already used for
+'  ap_travel_places' SupplierID (InStr + Left$/Mid$, no shared helper - see
+'  modApTravelPlacesSupInv.bas).
+Private Const PLAYER_REFERENCE_SPLIT_ANCHOR As String = "-FOOT"
+
 '  -- source layout: header=1, data=2; worksheet is named per Runner variant --
 '  Values are read from Runner config at runtime (Source Worksheet Name / Resolution /
 '  Header Row / Data Start Row). ar_gbe_invoice ships TWO variant selections that share this
 '  ONE macro and differ only by Source Worksheet Name ("Mens GBE" / "Womens GBE") + paths.
-
-Private Const SOURCE_COMPANY_CODE As String = "FA"
 
 Private Const OUTPUT_AUTO_COMPLETE As String = "Y"
 Private Const OUTPUT_SUBMIT As String = "Y"
@@ -20,9 +28,11 @@ Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
-'  GBE has NO COST CODE column, so the Mapping-MASTER worktag lookups below never resolve
-'  (costCodeColumn is 0 -> the WriteOutputRow guards skip every lookup). The pipeline is kept
-'  wired for Customer-Invoice archetype parity + future coding-column readiness.
+'  GBE has NO per-row COST CODE column, so the Mapping-MASTER worktag lookups below never
+'  resolve (costCodeColumn is 0 -> the WriteOutputRow guards skip every lookup) for event /
+'  camp / FA Learning / commercial partner / grant / programme / project. Cost Centre (FX),
+'  Reporting Type (FY) and Revenue Category (EM) are handled separately as BATCH CONSTANTS
+'  (see ResolveBatchConstantColumnValue) - see ar_gbe_invoice.yaml transform_constants.batch_constant_columns.
 Private Const WBO_REVENUE_CATEGORY As String = "Revenue Category"
 Private Const WBO_COST_CENTER As String = "Cost Center"
 Private Const WBO_EVENT As String = "Events - Custom Org"
@@ -102,20 +112,14 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Dim sourceDataPath As String
     Dim targetEibPath As String
     Dim outputFilePath As String
-    Dim customerSpreadsheetPath As String
     Dim mappingSpreadsheetPath As String
     Dim mappingSheetName As String
     Dim selectionKey As String
-    Dim customerWorkbook As Workbook
     Dim sourceWorkbook As Workbook
     Dim mappingWorkbook As Workbook
     Dim outputWorkbook As Workbook
-    Dim customerNameToId As Collection
-    Dim customerAmbiguousNames As Collection
     Dim sourceTable As Variant
     Dim mappingTable As Variant
-    Dim revenueCategoryLookup As Collection
-    Dim costCenterLookup As Collection
     Dim eventLookup As Collection
     Dim campLookup As Collection
     Dim faLearningLookup As Collection
@@ -130,17 +134,20 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Dim rowsSkipped As Long
     Dim missingFieldRows As Long
     Dim unresolvedCustomerRows As Long
-    Dim ambiguousCustomerRows As Long
-    Dim dateColumn As Long, clubColumn As Long, playerColumn As Long, typeColumn As Long
-    Dim grossColumn As Long, netColumn As Long, referenceColumn As Long
+    Dim dateColumn As Long, clubColumn As Long, invoiceLineDescColumn As Long, typeColumn As Long
+    Dim grossColumn As Long, netColumn As Long
     Dim salesItemColumn As Long, qtyColumn As Long, costCodeColumn As Long
+    Dim customerIdColumn As Long, companyColumn As Long
+    Dim costCentreColumn As Long, reportingTypeColumn As Long, revenueCategoryColumn As Long
     Dim clubName As String
-    Dim normalizedClub As String
     Dim workdayCustomerId As String
-    Dim matchLevel As Long
-    Dim isAmbiguous As Boolean
-    Dim ambiguousLevel As Long
-    Dim levelTag As String
+    Dim playerValue As String
+    Dim referenceValue As String
+    Dim missingReferenceRows As Long
+    Dim gbeCompanyValue As String
+    Dim gbeCostCentreValue As String
+    Dim gbeReportingTypeValue As String
+    Dim gbeRevenueCategoryValue As String
     Dim issues As Collection
     Dim unresolvedCounts As Collection
     Dim unresolvedKeys As Collection
@@ -179,7 +186,6 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     targetEibPath = ReadControlValue(controlSheet, CONTROL_LABEL_TARGET_EIB)
     outputFilePath = ReadControlValue(controlSheet, CONTROL_LABEL_OUTPUT_FILE_PATH)
     EnsureNonBlank outputFilePath, CONTROL_LABEL_OUTPUT_FILE_PATH
-    customerSpreadsheetPath = ReadControlValue(controlSheet, CONTROL_LABEL_CUSTOMER_SPREADSHEET)
     mappingSpreadsheetPath = ReadControlValue(controlSheet, CONTROL_LABEL_MAPPING_SPREADSHEET)
     mappingSheetName = ReadControlValue(controlSheet, CONTROL_LABEL_MAPPING_SHEET)
     worksheetNameStr = ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_WORKSHEET_NAME)
@@ -194,22 +200,15 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     EnsureNonBlank mappingSpreadsheetPath, CONTROL_LABEL_MAPPING_SPREADSHEET
     If LenB(mappingSheetName) = 0 Then mappingSheetName = DEFAULT_MAPPING_SHEET_NAME
 
-    '  Customer resolution is BY CLUB NAME (col C), not by GP Reference ID. Build a normalised
-    '  club-name -> Customer ID lookup plus an ambiguous-name set (same name -> >1 Customer ID).
-    Set customerNameToId = New Collection
-    Set customerAmbiguousNames = New Collection
-    Set customerWorkbook = OpenWorkbookReadOnly(customerSpreadsheetPath)
-    BuildCustomerNameLookupFromWorkbook customerWorkbook, customerNameToId, customerAmbiguousNames
-    customerWorkbook.Close SaveChanges:=False
-    Set customerWorkbook = Nothing
-
     Set mappingWorkbook = OpenWorkbookReadOnly(mappingSpreadsheetPath)
     mappingTable = ReadWorksheetTable(ResolveSourceWorksheet(mappingWorkbook, mappingSheetName))
     mappingWorkbook.Close SaveChanges:=False
     Set mappingWorkbook = Nothing
 
-    Set revenueCategoryLookup = BuildBusinessObjectHierarchyLookup(mappingTable, WBO_REVENUE_CATEGORY)
-    Set costCenterLookup = BuildBusinessObjectHierarchyLookup(mappingTable, WBO_COST_CENTER)
+    '  Cost Centre (FX), Reporting Type (FY) and Revenue Category (EM) no longer come from
+    '  this Mapping-MASTER hierarchy lookup (see ResolveBatchConstantColumnValue below); the
+    '  remaining 6 worktag slots stay wired to it for archetype parity, though it never
+    '  resolves for GBE (no per-row COST CODE column).
     Set eventLookup = BuildBusinessObjectHierarchyLookup(mappingTable, WBO_EVENT)
     Set campLookup = BuildBusinessObjectHierarchyLookup(mappingTable, WBO_CAMP)
     Set faLearningLookup = BuildBusinessObjectHierarchyLookup(mappingTable, WBO_FA_LEARNING)
@@ -220,7 +219,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
 
     '  Source of truth: config/transforms/ar_gbe_invoice.yaml source_layout.required_headers,
     '  written into Config 'Required Headers Pipe Delimited' by build_runner.py.
-    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modArGbeInvoiceCustInvoice", 7)
+    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modArGbeInvoiceCustInvoice", 11)
 
     Set sourceWorkbook = OpenWorkbookReadOnly(sourceDataPath)
     Set resolvedSourceSheet = ResolveSourceWorksheet(sourceWorkbook, sheetToResolve)
@@ -252,18 +251,36 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     ValidateHeaderRow sourceTable, headerRowIndex, requiredHeaders
 
     dateColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Date")
-    clubColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Club")
-    playerColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Player")
-    typeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Type")
+    clubColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Club|Customer Name")
+    '  DECIDED 2026-09-17: the source no longer has separate Player/Reference columns; both are
+    '  embedded in one free-text cell - split at runtime, see SplitPlayerAndReference below.
+    invoiceLineDescColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Line Description")
+    typeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice line part 2|Invoice Line Description 2")
     grossColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Gross")
     netColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Net")
-    referenceColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Reference")
+    '  DECIDED 2026-09-17: AR now delivers a ready-made Workday Customer ID per row (col A;
+    '  header "WORKDAY ID" on the Mens tab / "Customer ID" on the Womens tab) - direct
+    '  passthrough to AJ, see the customer-id read in the row loop below.
+    customerIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "WORKDAY ID|Customer ID")
+    '  DECIDED 2026-09-17: Company / Cost Centre / Reporting Type / Revenue Category are BATCH
+    '  CONSTANTS - only the first data row carries a value; ResolveBatchConstantColumnValue below
+    '  reads it once and WriteOutputRow applies it to every row.
+    companyColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Company")
+    costCentreColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Cost Centre")
+    reportingTypeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Reporting Type")
+    revenueCategoryColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Revenue Category")
     '  Optional columns: GBE carries no COST CODE / SALES ITEM / QUANTITY (kept optional -> 0 ->
     '  inert). The VAT column is intentionally NOT read: its header is ABSENT on the Womens tab, so
     '  the VAT rate is derived from Gross - Net (present on both tabs) in WriteOutputRow instead.
     salesItemColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "SALES ITEM CODE")
     qtyColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "QUANTITY")
     costCodeColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "COST CODE")
+
+    gbeCompanyValue = ResolveBatchConstantColumnValue(sourceTable, dataStartRowIndex, companyColumn)
+    If LenB(gbeCompanyValue) = 0 Then gbeCompanyValue = COMPANY_DEFAULT_FALLBACK
+    gbeCostCentreValue = ResolveBatchConstantColumnValue(sourceTable, dataStartRowIndex, costCentreColumn)
+    gbeReportingTypeValue = ResolveBatchConstantColumnValue(sourceTable, dataStartRowIndex, reportingTypeColumn)
+    gbeRevenueCategoryValue = ResolveBatchConstantColumnValue(sourceTable, dataStartRowIndex, revenueCategoryColumn)
 
     Set outputWorkbook = CloneTemplateWorkbook(targetEibPath, outputFilePath)
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
@@ -284,32 +301,35 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
                 Trim$(CStr(sourceTable(rowIndex, clubColumn)))
         Else
             clubName = Trim$(CStr(sourceTable(rowIndex, clubColumn)))
-            workdayCustomerId = ResolveCustomerIdMultiLevel( _
-                clubName, customerNameToId, customerAmbiguousNames, _
-                matchLevel, isAmbiguous, ambiguousLevel)
-            If isAmbiguous Then
+            SplitPlayerAndReference CStr(sourceTable(rowIndex, invoiceLineDescColumn)), playerValue, referenceValue
+            '  DECIDED 2026-09-17: direct passthrough of the AR-supplied Workday Customer ID
+            '  (col A). No lookup, no name matching - a blank ID rejects the row.
+            workdayCustomerId = Trim$(CStr(sourceTable(rowIndex, customerIdColumn)))
+            If LenB(referenceValue) = 0 Then
+                '  Reference drives D/G/BO/DB and the invoice-line grouping key, so a row whose
+                '  Invoice Line Description does not contain the "-FOOT" anchor is rejected
+                '  rather than silently grouped under a blank key.
                 rowsSkipped = rowsSkipped + 1
-                ambiguousCustomerRows = ambiguousCustomerRows + 1
-                IncrementCount unresolvedCounts, unresolvedKeys, clubName
-                If ambiguousLevel = 1 Then levelTag = " (L1 exact normalised)" Else levelTag = " (L2 SQL-transformed)"
+                missingReferenceRows = missingReferenceRows + 1
                 AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                    "Club name ambiguous in customer extract" & levelTag & " (maps to more than one Customer ID)", _
+                    "Reference not found in Invoice Line Description (no '" & PLAYER_REFERENCE_SPLIT_ANCHOR & "' token)", _
                     clubName, _
-                    Trim$(CStr(sourceTable(rowIndex, referenceColumn)))
+                    Trim$(CStr(sourceTable(rowIndex, invoiceLineDescColumn)))
             ElseIf LenB(workdayCustomerId) = 0 Then
                 rowsSkipped = rowsSkipped + 1
                 unresolvedCustomerRows = unresolvedCustomerRows + 1
                 IncrementCount unresolvedCounts, unresolvedKeys, clubName
                 AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                    "Club name not found in customer extract (tried L1 exact normalised + L2 SQL-transformed)", _
+                    "Workday Customer ID missing in source column A", _
                     clubName, _
-                    Trim$(CStr(sourceTable(rowIndex, referenceColumn)))
+                    referenceValue
             Else
                 rowsProcessed = rowsProcessed + 1
                 WriteOutputRow runnerWorkbook, targetSheet, targetRow, rowsProcessed, sourceTable, rowIndex, _
-                    dateColumn, playerColumn, typeColumn, salesItemColumn, qtyColumn, _
-                    netColumn, grossColumn, referenceColumn, costCodeColumn, _
-                    workdayCustomerId, revenueCategoryLookup, costCenterLookup, _
+                    dateColumn, playerValue, referenceValue, typeColumn, salesItemColumn, qtyColumn, _
+                    netColumn, grossColumn, costCodeColumn, _
+                    workdayCustomerId, gbeCompanyValue, gbeCostCentreValue, _
+                    gbeReportingTypeValue, gbeRevenueCategoryValue, _
                     eventLookup, campLookup, faLearningLookup, commercialPartnerLookup, _
                     grantLookup, programLookup, projectLookup
                 targetRow = targetRow + 1
@@ -320,8 +340,8 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     If missingFieldRows > 0 Then
         issues.Add "Skipped " & CStr(missingFieldRows) & " source row(s) with missing Date / Club / Gross."
     End If
-    If ambiguousCustomerRows > 0 Then
-        issues.Add "Rejected " & CStr(ambiguousCustomerRows) & " row(s) whose Club name is ambiguous in the customer extract."
+    If missingReferenceRows > 0 Then
+        issues.Add "Rejected " & CStr(missingReferenceRows) & " row(s) whose Invoice Line Description has no '" & PLAYER_REFERENCE_SPLIT_ANCHOR & "' token."
     End If
     If unresolvedKeys.Count > 0 Then
         issues.Add BuildRejectedLookupIssue(unresolvedCounts, unresolvedKeys, "Club")
@@ -351,7 +371,6 @@ HandleFailure:
     failureNumber = Err.Number
     failureMessage = Err.Description
     On Error Resume Next
-    If Not customerWorkbook Is Nothing Then customerWorkbook.Close SaveChanges:=False
     If Not sourceWorkbook Is Nothing Then sourceWorkbook.Close SaveChanges:=False
     If Not mappingWorkbook Is Nothing Then mappingWorkbook.Close SaveChanges:=False
     If Not outputWorkbook Is Nothing Then outputWorkbook.Close SaveChanges:=False
@@ -373,26 +392,16 @@ HandleFailure:
 End Sub
 
 Private Sub WriteOutputRow( _
-    ByVal runnerWorkbook As Workbook, _
-    ByVal targetSheet As Worksheet, _
-    ByVal targetRow As Long, _
-    ByVal sequenceNumber As Long, _
-    ByVal sourceTable As Variant, _
-    ByVal sourceRow As Long, _
-    ByVal dateColumn As Long, ByVal playerColumn As Long, ByVal typeColumn As Long, _
+    ByVal runnerWorkbook As Workbook, ByVal targetSheet As Worksheet, ByVal targetRow As Long, _
+    ByVal sequenceNumber As Long, ByVal sourceTable As Variant, ByVal sourceRow As Long, _
+    ByVal dateColumn As Long, ByVal playerValue As String, ByVal referenceValue As String, ByVal typeColumn As Long, _
     ByVal salesItemColumn As Long, ByVal qtyColumn As Long, ByVal netColumn As Long, _
-    ByVal grossColumn As Long, ByVal referenceColumn As Long, _
-    ByVal costCodeColumn As Long, _
-    ByVal outputCustomerId As String, _
-    ByVal revenueCategoryLookup As Collection, _
-    ByVal costCenterLookup As Collection, _
-    ByVal eventLookup As Collection, _
-    ByVal campLookup As Collection, _
-    ByVal faLearningLookup As Collection, _
-    ByVal commercialPartnerLookup As Collection, _
-    ByVal grantLookup As Collection, _
-    ByVal programLookup As Collection, _
-    ByVal projectLookup As Collection _
+    ByVal grossColumn As Long, ByVal costCodeColumn As Long, _
+    ByVal outputCustomerId As String, ByVal companyValue As String, ByVal costCentreValue As String, _
+    ByVal reportingTypeValue As String, ByVal revenueCategoryValue As String, _
+    ByVal eventLookup As Collection, ByVal campLookup As Collection, ByVal faLearningLookup As Collection, _
+    ByVal commercialPartnerLookup As Collection, ByVal grantLookup As Collection, _
+    ByVal programLookup As Collection, ByVal projectLookup As Collection _
 )
     Dim companyId As String
     Dim invoiceDate As String
@@ -404,7 +413,6 @@ Private Sub WriteOutputRow( _
     Dim revenueCategory As String
     Dim costCenterRef As String
     Dim salesItemValue As String
-    Dim referenceValue As String
     Dim lineDescValue As String
     Dim vatRate As Long
     Dim lineTaxApplicability As String
@@ -423,7 +431,7 @@ Private Sub WriteOutputRow( _
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
 
-    companyId = ResolveMappedCompany(runnerWorkbook, SOURCE_COMPANY_CODE, COMPANY_DEFAULT_FALLBACK)
+    companyId = companyValue
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, dateColumn))
     grossAmount = ResolveAmount(sourceTable(sourceRow, grossColumn))
 
@@ -436,18 +444,27 @@ Private Sub WriteOutputRow( _
     lineTaxApplicability = TaxValueForRate(vatRate, TAX_APPLICABILITY_ZERO, TAX_APPLICABILITY_STANDARD)
     lineTaxCode = TaxValueForRate(vatRate, TAX_CODE_ZERO, TAX_CODE_STANDARD)
 
-    referenceValue = Trim$(CStr(sourceTable(sourceRow, referenceColumn)))
     spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, referenceValue, mGrpNextKey, lineOrderValue)
-    lineDescValue = BuildLineDescription(sourceTable, sourceRow, playerColumn, typeColumn)
+    lineDescValue = BuildLineDescription(playerValue, CStr(sourceTable(sourceRow, typeColumn)))
     If salesItemColumn > 0 Then salesItemValue = CStr(sourceTable(sourceRow, salesItemColumn)) Else salesItemValue = vbNullString
 
-    '  GBE has no COST CODE column, so costCodeValue is empty and every Mapping-MASTER worktag
-    '  lookup below is guard-skipped (Revenue Category + FX..GF stay blank; Finance codes pre-upload).
+    '  DECIDED 2026-09-17: Revenue Category (EM) and Cost Centre (FX) are BATCH CONSTANTS
+    '  passed in from the caller (read once from source cols N/L row 2) - no longer derived
+    '  via the Mapping-MASTER cost-code hierarchy lookup.
+    revenueCategory = revenueCategoryValue
+    costCenterRef = costCentreValue
+
+    '  GBE still has no per-row COST CODE column, so costCodeValue is empty and the remaining
+    '  Mapping-MASTER worktag lookups below stay guard-skipped (event/camp/FA Learning/
+    '  commercial partner/grant/programme/project stay blank; Finance codes pre-upload).
     If costCodeColumn > 0 Then costCodeValue = Trim$(CStr(sourceTable(sourceRow, costCodeColumn))) Else costCodeValue = vbNullString
+    '  ResolveReportingTypeFromFinalCode() is always a no-op here (costCodeValue is always
+    '  blank - GBE has no per-row COST CODE); kept as a formal call for archetype parity with
+    '  the derived_worktags.reporting_type contract. Reporting Type (FY) actually written is
+    '  the BATCH CONSTANT from source col M row 2 (DECIDED 2026-09-17), applied below.
+    reportingType = ResolveReportingTypeFromFinalCode(costCodeValue)
+    reportingType = reportingTypeValue
     If LenB(costCodeValue) > 0 Then
-        revenueCategory = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(revenueCategoryLookup, costCodeValue)
-        costCenterRef = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(costCenterLookup, costCodeValue)
-        reportingType = ResolveReportingTypeFromFinalCode(costCodeValue)
         eventRef = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(eventLookup, costCodeValue)
         campRef = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(campLookup, costCodeValue)
         faLearningRef = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(faLearningLookup, costCodeValue)
@@ -476,7 +493,8 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = grossAmount
+    '  DECIDED 2026-09-17: Amount Due (CM) also maps to source col F (NET), matching FL/FO.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = referenceValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
@@ -490,8 +508,10 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = lineTaxApplicability
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = lineTaxCode
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = grossAmount
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = grossAmount
+    '  DECIDED 2026-09-17: Unit Cost (FL) and Extended Amount (FO) map to source col F (NET),
+    '  not GROSS - matches Amount Due (CM) above, also NET as of 2026-09-17.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
 
     If LenB(invoiceDate) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"
@@ -506,7 +526,9 @@ Private Sub WriteOutputRow( _
     End If
 
     '  9-slot worktags in the canonical Submit_Customer_Invoice_v46.1 columns FX FY FZ GA GB GC GD GE GF.
-    '  Order matches ar_gbe_invoice.yaml worktags_plus_order. All slots are blank for GBE (no COST CODE).
+    '  Order matches ar_gbe_invoice.yaml worktags_plus_order. Reporting Type (FY) and Cost Centre
+    '  (FX) now carry the batch-constant values passed in; the other 6 slots stay blank for GBE
+    '  (no per-row COST CODE).
     worktagColumns = Array( _
         TGT_REPORTING_TYPE, _
         TGT_EVENT, _
@@ -542,16 +564,14 @@ End Sub
 '  Line Item Description (EN) + line Memo (FV) = Player + " - " + Type
 '  (e.g. "Boubacar Kamara - Extension"). Falls back to whichever part is present.
 Private Function BuildLineDescription( _
-    ByVal sourceTable As Variant, _
-    ByVal sourceRow As Long, _
-    ByVal playerColumn As Long, _
-    ByVal typeColumn As Long _
+    ByVal rawPlayerValue As String, _
+    ByVal rawTypeValue As String _
 ) As String
     Dim playerValue As String
     Dim typeValue As String
 
-    playerValue = CleanMemoToSingleLine(CStr(sourceTable(sourceRow, playerColumn)))
-    typeValue = CleanMemoToSingleLine(CStr(sourceTable(sourceRow, typeColumn)))
+    playerValue = CleanMemoToSingleLine(rawPlayerValue)
+    typeValue = CleanMemoToSingleLine(rawTypeValue)
 
     If LenB(playerValue) > 0 And LenB(typeValue) > 0 Then
         BuildLineDescription = playerValue & " - " & typeValue
@@ -562,14 +582,40 @@ Private Function BuildLineDescription( _
     End If
 End Function
 
+'  DECIDED 2026-09-17: split the combined "Invoice Line Description" cell on the literal
+'  "-FOOT" anchor token - everything before it is the Player name, "FOOT..." onward is the
+'  Reference. Verified against every row of the 2026-09-17 AR file (see
+'  PLAYER_REFERENCE_SPLIT_ANCHOR declaration above for the verification note). outReference is
+'  "" when the anchor is absent, which the caller treats as a reject (Reference is load-bearing
+'  for D/G/BO/DB and the invoice-line grouping key - never guessed).
+Private Sub SplitPlayerAndReference( _
+    ByVal rawDescription As String, _
+    ByRef outPlayer As String, _
+    ByRef outReference As String _
+)
+    Dim cleaned As String
+    Dim anchorPos As Long
 
-'  Normalise a club name for matching: NormalizeToken (lower-case, ASCII-only, whitespace
-'  collapsed) then reconcile the two spellings of a women's team so the GBE source ("... WFC")
-'  matches the customer extract ("... WOMEN FC"): token "wfc" -> "women fc", "womens" -> "women".
+    cleaned = CleanMemoToSingleLine(rawDescription)
+    anchorPos = InStr(cleaned, PLAYER_REFERENCE_SPLIT_ANCHOR)
 
+    If anchorPos > 0 Then
+        outPlayer = Trim$(Left$(cleaned, anchorPos - 1))
+        outReference = Trim$(Mid$(cleaned, anchorPos + 1))
+    Else
+        outPlayer = cleaned
+        outReference = vbNullString
+    End If
+End Sub
+
+'  Collapse a free-text source cell (Invoice Line Description / Type) to a single line for
+'  EN/FV. Also strips the literal "_x000D_" token that some GBE rows carry as a baked-in
+'  mis-encoded carriage-return marker (observed in the 2026-09-17 AR file, e.g. player names
+'  and one "ESC_x000D_\n(New)" Type value) - a text-hygiene fix, not a business-logic change.
 Private Function CleanMemoToSingleLine(ByVal rawText As String) As String
     Dim temp As String
-    temp = Replace$(rawText, vbCrLf, " ")
+    temp = Replace$(rawText, "_x000D_", " ")
+    temp = Replace$(temp, vbCrLf, " ")
     temp = Replace$(temp, vbCr, " ")
     temp = Replace$(temp, vbLf, " ")
     temp = Replace$(temp, vbTab, " ")
@@ -608,4 +654,33 @@ Private Function RowIsSkippable( _
         LenB(Trim$(CStr(tableData(rowIndex, dateColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, clubColumn)))) = 0 Or _
         ResolveAmount(tableData(rowIndex, grossColumn)) = 0#
+End Function
+
+'  DECIDED 2026-09-17: Company / Cost Centre / Reporting Type / Revenue Category arrive as
+'  BATCH CONSTANTS in the GBE source file - only the first data row carries a value, every
+'  other row in that column is blank. Read the first non-blank cell in the column (normally
+'  row 2) once per run and the caller applies it to every output row. Returns "" when the
+'  column is absent (columnIndex <= 0) or every data row is blank.
+Private Function ResolveBatchConstantColumnValue( _
+    ByVal sourceTable As Variant, _
+    ByVal dataStartRowIndex As Long, _
+    ByVal columnIndex As Long _
+) As String
+    Dim rowIndex As Long
+    Dim candidate As String
+
+    If columnIndex <= 0 Then
+        ResolveBatchConstantColumnValue = vbNullString
+        Exit Function
+    End If
+
+    For rowIndex = dataStartRowIndex To UBound(sourceTable, 1)
+        candidate = Trim$(CStr(sourceTable(rowIndex, columnIndex)))
+        If LenB(candidate) > 0 Then
+            ResolveBatchConstantColumnValue = candidate
+            Exit Function
+        End If
+    Next rowIndex
+
+    ResolveBatchConstantColumnValue = vbNullString
 End Function
