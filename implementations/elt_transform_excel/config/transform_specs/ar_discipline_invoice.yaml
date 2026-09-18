@@ -27,9 +27,9 @@ notes: >
   with the DSC indicator Y mapped to the correct column. ALL target columns remapped
   from the pre-v46 layout; see eib_population_defaults.yaml for the canonical registry.
   Reworked for the new AR source file layout (`3. CFA Discipline Invoicing -Rolling.xlsx`,
-  sheet `AUGUST 25`): one row per customer per month, no `Document Number` / invoice-number
-  column. EIB Invoice Number (BO) and Memo (DB) are left blank (no source column for
-  either). Spreadsheet Key plus line order are grouped by source `WORKDAY ID`, which is
+  sheet `Rolling`): one row per customer per month, no `Document Number` / invoice-number
+  column. EIB Invoice Number (BO) mirrors the generated Customer Invoice Reference ID (D);
+  Memo (DB) is left blank (no source column). Spreadsheet Key plus line order are grouped by source `WORKDAY ID`, which is
   already unique per row on this sheet. Company (J), Cost Centre (FX), Reporting Type (FY),
   and Revenue Category (EM) are read once from the sheet's first data row (row 2, source
   columns M/N/O/P — populated on row 2 only, blank on every later row) and broadcast to
@@ -37,9 +37,9 @@ notes: >
 
 fields:
   invoice_number:
-    default: ""
-    note: No source invoice-number column on the new source layout. Left blank (see `mapping.bo`).
-  invoice_date:     {source_column: DATE, note: "Source column F -- see mapping.br landmine note: column A is also headered 'Date'."}
+    mirrors: d
+    note: No source invoice-number column on the new source layout. Mirrors the generated Customer Invoice Reference ID (see `mapping.d` / `mapping.bo`).
+  invoice_date:     {source_column: Date, source_column_letter: A, note: "Source column A (dd.mm.yy text) -- see mapping.br landmine note: column F is also headered 'DATE'."}
   amount_due:       {source_column: NET, basis: net}
   line_amount:      {source_column: NET, basis: net}
   memo:
@@ -82,21 +82,37 @@ mapping:
   note: >
     Add Only flag -- fixed "Y" for an insert-only EIB (never update existing), matching
     every other active AR Customer Invoice profile's house default.
+- target: d
+  derivation: composite_reference_id
+  output_format: "{co}-{WORKDAY ID}-{YYYYMMDD of br}"
+  example: "DSC-C-000190-20250918"
+  note: >
+    Customer Invoice Reference ID -- built per requester instruction (2026-09-18) from the
+    Customer Invoice Type written to `co` (DSC), the source `WORKDAY ID`, and the Invoice
+    Date written to `br` with the hyphens removed. Deterministic (no counter), so a re-run of
+    the same source yields the same IDs. Unique as long as a customer has at most one row per
+    invoice date, which holds on this sheet (one row per customer per month). Invoice Number
+    (`bo`) mirrors this value.
 - target: h
   default: "Y"
 - target: i
-  default: "Y"
-- target: bo
   default: ""
   optional: true
   note: >
-    The new source layout (`AUGUST 25` sheet) has no `Document Number` / invoice-number
-    column. Invoice Number is left blank rather than fabricating one -- Workday/Finance
-    assigns it downstream.
+    Locked in Workday -- left blank per requester instruction (2026-09-18). Other active AR
+    Customer Invoice profiles set "Y" here (ar_bulk_invoice / ar_integration_invoice /
+    ar_multi_line_invoice); ar_gbe_invoice and ar_manual_invoice also leave it blank.
+- target: bo
+  mirrors: d
+  note: >
+    Invoice Number. Mirrors `d` (Customer Invoice Reference ID) -- same value, per requester
+    instruction (2026-09-18), matching ar_gbe_invoice and ar_integration_invoice, which both
+    write the same value to D and BO. The source layout has no `Document Number` /
+    invoice-number column of its own, so the generated reference ID is used.
 - target: j
   source_column: Company
   note: >
-    Source column M ("Company") on the AUGUST 25 sheet is populated on the first data row
+    Source column M ("Company") on the Rolling sheet is populated on the first data row
     (row 2) only; every later row is blank. Read once and broadcast that value to EIB
     Company (J) on every output row (same first-data-row-broadcast idiom used for BO on
     ar_multi_line_invoice).
@@ -110,20 +126,24 @@ mapping:
     column, which needed one). Rows with a blank WORKDAY ID are skipped upstream of this
     write (see the .bas RowIsSkippable check).
 - target: br
-  source_column: DATE
+  source_column: Date
+  source_column_letter: A
+  source_format: dd.mm.yy
   target_format: YYYY-MM-DD
   note: >
-    LANDMINE: the source sheet has two columns headered "Date" -- column A (text, not a
-    real invoice date) and column F (a real Date-typed cell, the invoice month). A plain
-    header-text lookup for "Date" would resolve to column A (first match). The `.bas`
-    must read column F positionally (`ColumnIndex("F")`), not via a header-text search,
-    to avoid silently reading the wrong column.
+    Invoice Date -- source column A ("Date", dd.mm.yy text e.g. `18.09.25` -> `2025-09-18`),
+    per requester instruction (2026-09-18). Previously read column F. LANDMINE: the source
+    sheet has two columns headered "Date"/"DATE" -- column A (this one) and column F (a
+    Date-typed invoice-month cell, now unused). Header lookups are case-insensitive, so the
+    `.bas` reads column A positionally (`ColumnIndex("A")`) rather than by header text.
 - target: ck
   default: Unpaid
 - target: cl
   default: Approved
 - target: cm
   source_column: NET
+  target_format: "0.00"
+  note: Amount Due. Displayed with 2 decimal places (cell number format only -- the stored value is not rounded), per requester instruction (2026-09-18). Same for `fl` and `fo`.
 - target: co
   default: DSC
 - target: cy
@@ -166,14 +186,14 @@ mapping:
 - target: fp
   mirrors: br
   note: >
-    Transaction Date. Mirrors `br` (Invoice Date) -- same value, same format, matching
-    the ar_bulk_invoice / ar_gbe_invoice / ar_integration_invoice / ar_multi_line_invoice
-    convention of writing the invoice date into both the header Invoice Date and the
-    line-level Transaction Date.
+    Transaction Date. Source column A ("Date", dd.mm.yy text), same as `br` (Invoice Date),
+    per requester instruction (2026-09-18). Implemented as a mirror of `br`, so both columns
+    carry the same value and format and always move together; the `.bas` writes one
+    normalised date to BR and FP.
 - target: em
   source_column: Revenue Category
   note: >
-    Source column P ("Revenue Category") on the AUGUST 25 sheet is populated on the first
+    Source column P ("Revenue Category") on the Rolling sheet is populated on the first
     data row (row 2) only; every later row is blank. Read once and broadcast that value to
     EIB Revenue Category (EM) on every output row (same first-data-row-broadcast idiom used
     for BO on ar_multi_line_invoice).
@@ -194,19 +214,21 @@ mapping:
     fixes FH=1 only because its source has no quantity column at all).
 - target: fl
   source_column: NET
+  target_format: "0.00"
 - target: fo
   source_column: NET
+  target_format: "0.00"
 - target: fx
   source_column: Cost Centre
   note: >
-    Source column N ("Cost Centre") on the AUGUST 25 sheet is populated on the first data
+    Source column N ("Cost Centre") on the Rolling sheet is populated on the first data
     row (row 2) only; every later row is blank. Read once and broadcast that value to EIB
     Cost Centre (FX) on every output row (same first-data-row-broadcast idiom used for BO
     on ar_multi_line_invoice).
 - target: fy
   source_column: Reporting Type
   note: >
-    Source column O ("Reporting Type") on the AUGUST 25 sheet is populated on the first
+    Source column O ("Reporting Type") on the Rolling sheet is populated on the first
     data row (row 2) only; every later row is blank. Read once and broadcast that value to
     EIB Reporting Type (FY) on every output row (same first-data-row-broadcast idiom used
     for BO on ar_multi_line_invoice).

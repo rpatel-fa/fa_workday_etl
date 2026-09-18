@@ -5,33 +5,35 @@ Private Const TARGET_SHEET_NAME As String = "Submit Customer Invoice"
 Private Const TARGET_DATA_START_ROW As Long = 6
 Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const OUTPUT_SUBMIT As String = "Y"
-Private Const OUTPUT_LOCKED_IN_WORKDAY As String = "Y"
 Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
 Private Const OUTPUT_INVOICE_TYPE As String = "DSC"
 Private Const OUTPUT_ADD_ONLY As String = "Y"
+' The target_format of the cm / fl / fo rows in config/transform_specs/ar_discipline_invoice.yaml.
+Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 ' The "j" (Company) row in config/transform_specs/ar_discipline_invoice.yaml's mapping --
 ' the fallback used only if the source sheet's first-data-row Company cell (col M) is blank.
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 
-' Source column F holds the real invoice-month date; source column A is ALSO headered
-' "Date" (a non-date batch label), so a header-text lookup would collide. Read F
-' positionally via this named constant instead of a header search. See mapping.br.
-Private Const SRC_COL_INVOICE_DATE As String = "F"
+' Source column A holds the invoice date (dd.mm.yy text); source column F is ALSO headered
+' "DATE" (a Date-typed invoice-month cell, unused), so a header-text lookup would collide.
+' Read A positionally via this named constant instead of a header search. See mapping.br.
+Private Const SRC_COL_INVOICE_DATE As String = "A"
 
 ' ============================================================================
 ' Target EIB column letters -- Submit_Customer_Invoice_v46.1.xlsx (Submit Customer Invoice).
 ' 1:1 mirror of config/transform_specs/ar_discipline_invoice.yaml mapping: section.
-' BO (Invoice Number) and DB (Memo) are intentionally NOT declared -- left blank, no
-' source column for either (see mapping.bo / mapping.db).
+' DB (Memo) is intentionally NOT declared -- left blank, no source column (see mapping.db).
+' I (Locked in Workday) is also left blank by requester instruction (see mapping.i).
 ' ============================================================================
 Private Const TGT_SPREADSHEET_KEY As String = "B"
 Private Const TGT_ADD_ONLY As String = "C"
+Private Const TGT_CUSTOMER_INVOICE_REFERENCE_ID As String = "D"
 Private Const TGT_SUBMIT As String = "H"
-Private Const TGT_LOCKED_IN_WORKDAY As String = "I"
 Private Const TGT_COMPANY As String = "J"
 Private Const TGT_CURRENCY As String = "AI"
 Private Const TGT_CUSTOMER As String = "AJ"
+Private Const TGT_INVOICE_NUMBER As String = "BO"
 Private Const TGT_INVOICE_DATE As String = "BR"
 Private Const TGT_PAYMENT_STATUS As String = "CK"
 Private Const TGT_DOCUMENT_STATUS As String = "CL"
@@ -57,12 +59,13 @@ Private mGrpLine As Collection
 Private mGrpNextKey As Long
 
 ' Direct transform: load the Discipline (fines/payments) invoice extract (one row per
-' customer per month, "AUGUST 25"-style sheet) and write straight into the cloned target
+' customer per month, "Rolling" sheet) and write straight into the cloned target
 ' EIB. Company, Cost Centre, Reporting Type, and Revenue Category are read ONCE from the
 ' sheet's first data row (source columns M/N/O/P, populated on that row only) and
 ' broadcast to every output row. The Customer ID is read directly from source column B
 ' ("WORKDAY ID") -- no reference-extract lookup. The source has no invoice/document-number
-' column, so EIB Invoice Number (BO) and Memo (DB) are left blank. Line grouping (Spreadsheet
+' column, so EIB Customer Invoice Reference ID (D) and Invoice Number (BO) are both the
+' generated {Invoice Type}-{WORKDAY ID}-{YYYYMMDD} value; Memo (DB) is left blank. Line grouping (Spreadsheet
 ' Key / Line Order) is keyed directly by source `WORKDAY ID`, which is already unique per row
 ' on this sheet. The field mapping mirrors the mapping: section in
 ' config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
@@ -133,10 +136,10 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
     costCentreColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Cost Centre")
     reportingTypeColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Reporting Type")
     revenueCategoryColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Revenue Category")
-    ' LANDMINE: the source sheet has TWO columns headered "Date" (col A, a non-date batch
-    ' label) and "DATE" (col F, the real invoice-month date) -- NormalizeToken lower-cases
-    ' both to "date", so a header-text lookup would silently resolve to col A (first
-    ' match). Read col F positionally instead. See mapping.br in the transform spec.
+    ' LANDMINE: the source sheet has TWO columns headered "Date" (col A, the invoice date
+    ' as dd.mm.yy text) and "DATE" (col F, an unused invoice-month cell) -- NormalizeToken
+    ' lower-cases both to "date", so a header-text lookup is ambiguous. Read col A
+    ' positionally instead. See mapping.br in the transform spec.
     invoiceDateColumn = ColumnIndex(SRC_COL_INVOICE_DATE)
 
     ' Company / Cost Centre / Reporting Type / Revenue Category are populated on the
@@ -232,6 +235,7 @@ Private Sub WriteOutputRow( _
 )
     Dim workdayId As String
     Dim invoiceDate As String
+    Dim referenceId As String
     Dim netAmount As Double
     Dim qtyValue As Double
     Dim descriptionValue As String
@@ -248,10 +252,13 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_ADD_ONLY
+    ' Customer Invoice Reference ID (D) = {Invoice Type (CO)}-{WORKDAY ID}-{YYYYMMDD of BR}.
+    ' Invoice Number (BO) mirrors it. See mapping.d / mapping.bo.
+    referenceId = OUTPUT_INVOICE_TYPE & "-" & workdayId & "-" & Replace(invoiceDate, "-", vbNullString)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).Value = referenceId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = referenceId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LOCKED_IN_WORKDAY)).Value = OUTPUT_LOCKED_IN_WORKDAY
-    ' BO (Invoice Number) intentionally left blank -- no source invoice-number column;
-    ' Workday/Finance assigns it downstream. See mapping.bo.
+    ' I (Locked in Workday) intentionally left blank -- see mapping.i.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyBroadcast
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CURRENCY)).Value = OUTPUT_CURRENCY
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER)).Value = workdayId
@@ -262,12 +269,13 @@ Private Sub WriteOutputRow( _
     ' target_format = YYYY-MM-DD.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).Value = invoiceDate
-    ' Transaction Date (FP) mirrors Invoice Date (BR) -- same convention as
-    ' ar_bulk_invoice / ar_gbe_invoice / ar_integration_invoice / ar_multi_line_invoice.
+    ' Transaction Date (FP) is also source column A, the same value as Invoice Date (BR).
+    ' See mapping.fp.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).Value = invoiceDate
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     ' CY (Include Customer Worktags) intentionally left blank -- see mapping.cy.
@@ -284,7 +292,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = descriptionValue
     ' Line Memo (FV) mirrors Line Item Description (EN) -- same convention as ar_gbe_invoice.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_MEMO)).Value = descriptionValue
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
     If LenB(costCentreBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_COST_CENTRE)).Value = costCentreBroadcast
     If LenB(reportingTypeBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REPORTING_TYPE)).Value = reportingTypeBroadcast
