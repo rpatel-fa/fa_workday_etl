@@ -105,5 +105,5 @@ SELECT t.src_agg_reference_id                                         nrm_agg_su
  GROUP BY t.src_agg_reference_id
        )
 SELECT t.*
-  FROM cte_supplier_resolution                                          t
+  FROM cte_supplier_resolution                                        t
 ;

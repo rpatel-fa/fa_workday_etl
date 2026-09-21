@@ -5,7 +5,10 @@ import re
 from phonenumbers.phonenumberutil import length_of_geographical_area_code
 import duckdb
 
-from duckdb.typing import VARCHAR
+try:
+    from duckdb.typing import VARCHAR
+except ModuleNotFoundError:
+    VARCHAR = "VARCHAR"
 
 if TYPE_CHECKING:
     import duckdb as duckdb_types

@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pandas>=3.0.0",
     "openpyxl>=3.1.5",
-    "duckdb>=1.4.4",
+    "duckdb>=1.5.0",
     "xlwings>=0.33.20",
     "phonenumbers>=8.13.0",
     "olefile>=0.47",

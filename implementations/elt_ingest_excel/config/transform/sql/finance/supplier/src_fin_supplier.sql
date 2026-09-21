@@ -18,7 +18,7 @@ SELECT t.*
      , cte_supplier_id
     AS (
 SELECT
-       'S-' || LPAD(CAST((t.rnk + 8300) AS VARCHAR), 6, '0')                supplier_id
+       'S-' || LPAD(CAST((t.rnk + 9000) AS VARCHAR), 6, '0')                supplier_id
      , t.*
   FROM cte_supplier_rnk                                  t
        )

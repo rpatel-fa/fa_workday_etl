@@ -5,7 +5,10 @@ try:
     import requests
 except Exception:
     requests = None
-from duckdb.typing import VARCHAR
+try:
+    from duckdb.typing import VARCHAR
+except ModuleNotFoundError:
+    VARCHAR = "VARCHAR"
 
 if TYPE_CHECKING:
     import duckdb as duckdb_types

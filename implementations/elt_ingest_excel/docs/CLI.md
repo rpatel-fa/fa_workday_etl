@@ -55,7 +55,7 @@ export ALLOW_HCM_CONTINGENT_WORKER_RUN=1
 
 ## Examples
 ```bash
-cd elt_ingest_excel
+cd implementations/elt_ingest_excel
 uv sync
 
 uv run python examples/fin_customer_invoice.py                  --run-to-phase PUBLISH
@@ -72,7 +72,7 @@ uv run python examples/fin_supplier_invoice.py                  --run-to-phase P
 uv run python examples/fin_supplier_purchase_order_receipt.py   --run-to-phase PUBLISH
 
 # Locked - needs force run
-uv run python examples/fin_supplier_creditor.py                 --run-to-phase PUBLISH
+uv run python examples/fin_supplier_creditor.py                 --run-to-phase INGEST
 uv run python examples/fin_customer_debtor.py                   --run-to-phase TRANSFORM
 uv run python examples/hcm_contingent_worker.py                 --run-to-phase PUBLISH
 
