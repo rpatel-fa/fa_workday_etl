@@ -13,12 +13,12 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/workday/extract",
-    "workbookFileName": "Find_Suppliers.xlsx",
+    "workbookFileName": "Extract Suppliers 2026-09-21 13_54 BST.xlsx",
     "sheets": [
       {
         "sheetName": "Sheet1",
-        "headerRow": "16",
-        "dataRow": "17",
+        "headerRow": "13",
+        "dataRow": "14",
         "targetTableName": "fin_workday_extract_supplier"
       }
     ]

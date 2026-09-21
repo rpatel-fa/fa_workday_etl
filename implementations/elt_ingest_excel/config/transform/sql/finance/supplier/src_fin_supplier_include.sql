@@ -35,7 +35,7 @@ SELECT s.src_agg_reference_id
 SELECT t.supplier_id                                                wd_supplier_id
      , t.reference_id                                               wd_agg_reference_id
      , TRIM(UNNEST(STRING_SPLIT(t.reference_id, '|')))              wd_reference_id
-     , NULLIF(REGEXP_REPLACE(UPPER(TRIM(COALESCE(t.account_number           , ''))), '[^0-9A-Z]', '', 'g'), '')   wd_bank_account_number
+     , NULLIF(REGEXP_REPLACE(UPPER(TRIM(COALESCE(t.bank_id                  , ''))), '[^0-9A-Z]', '', 'g'), '')   wd_bank_account_number
      , NULLIF(REGEXP_REPLACE(UPPER(TRIM(COALESCE(t.bank_identification_code, ''))), '[^0-9A-Z]', '', 'g'), '')   wd_bank_identification_code
   FROM fin_workday_extract_supplier                                 t
  WHERE NULLIF(TRIM(t.reference_id), '')                             IS NOT NULL
