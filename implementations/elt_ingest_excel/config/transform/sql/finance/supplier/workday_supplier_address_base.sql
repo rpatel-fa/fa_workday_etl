@@ -17,10 +17,10 @@ SELECT
      , ROW_NUMBER() OVER (
            PARTITION BY t.supplier_id
                ORDER BY u.address.nrm_address_code
-                      , u.address.nrm_address_line_1
-                      , u.address.nrm_address_line_2
-                      , u.address.nrm_address_line_3
-                      , u.address.nrm_address_line_4
+                      , fl.flat_tokens[1]
+                      , fl.flat_tokens[2]
+                      , fl.flat_tokens[3]
+                      , fl.flat_tokens[4]
                       , u.address.nrm_city
                       , u.address.nrm_region
                       , u.address.nrm_postal_code
@@ -76,50 +76,56 @@ SELECT
        END                                                                    city_subdivision
      , CASE
            WHEN u.address.nrm_country_code = 'HU'
-            AND u.address.nrm_address_line_2 IS NULL
-            AND u.address.nrm_address_line_1 IS NOT NULL
-            AND LENGTH(u.address.nrm_address_line_1) > 35
-            AND regexp_matches(u.address.nrm_address_line_1, '^.{1,35}\\s+.+$')
-           THEN TRIM(REGEXP_REPLACE(u.address.nrm_address_line_1, '^(.{1,35})\\s+.+$', '\1'))
-           ELSE u.address.nrm_address_line_1
+            AND NULLIF(TRIM(fl.flat_tokens[2]), '') IS NULL
+            AND NULLIF(TRIM(fl.flat_tokens[1]), '') IS NOT NULL
+            AND LENGTH(TRIM(fl.flat_tokens[1])) > 35
+            AND regexp_matches(TRIM(fl.flat_tokens[1]), '^.{1,35}\\s+.+$')
+           THEN TRIM(REGEXP_REPLACE(TRIM(fl.flat_tokens[1]), '^(.{1,35})\\s+.+$', '\1'))
+           ELSE NULLIF(TRIM(fl.flat_tokens[1]), '')
        END                                                                    address_line_1
      , CASE
            WHEN u.address.nrm_country_code = 'HU'
-            AND u.address.nrm_address_line_2 IS NULL
-            AND u.address.nrm_address_line_1 IS NOT NULL
-            AND LENGTH(u.address.nrm_address_line_1) > 35
-            AND regexp_matches(u.address.nrm_address_line_1, '^.{1,35}\\s+.+$')
-           THEN NULLIF(TRIM(REGEXP_REPLACE(u.address.nrm_address_line_1, '^.{1,35}\\s+(.+)$', '\1')), '')
+            AND NULLIF(TRIM(fl.flat_tokens[2]), '') IS NULL
+            AND NULLIF(TRIM(fl.flat_tokens[1]), '') IS NOT NULL
+            AND LENGTH(TRIM(fl.flat_tokens[1])) > 35
+            AND regexp_matches(TRIM(fl.flat_tokens[1]), '^.{1,35}\\s+.+$')
+           THEN NULLIF(TRIM(REGEXP_REPLACE(TRIM(fl.flat_tokens[1]), '^.{1,35}\\s+(.+)$', '\1')), '')
            WHEN u.address.nrm_country_code = 'HU'
-            AND u.address.nrm_address_line_2 IS NULL
-           THEN NULLIF(TRIM(COALESCE(u.address.nrm_city, u.address.nrm_address_line_1)), '')
+            AND NULLIF(TRIM(fl.flat_tokens[2]), '') IS NULL
+           THEN NULLIF(TRIM(COALESCE(u.address.nrm_city, TRIM(fl.flat_tokens[1]))), '')
            WHEN LOWER(TRIM(req.address_line_2)) = 'not accepted'
            THEN NULL
            WHEN LOWER(TRIM(req.postal_code)) = 'not accepted'
             AND NULLIF(TRIM(u.address.nrm_postal_code), '') IS NOT NULL
             AND UPPER(TRIM(u.address.nrm_postal_code)) NOT LIKE '%PO BOX%'
             AND LENGTH(TRIM(u.address.nrm_postal_code)) <= 35
-            AND (u.address.nrm_address_line_2 IS NULL OR TRIM(u.address.nrm_address_line_2) = '')
+            AND NULLIF(TRIM(fl.flat_tokens[2]), '') IS NULL
            THEN TRIM(u.address.nrm_postal_code)
            WHEN LOWER(TRIM(req.postal_code)) = 'not accepted'
             AND NULLIF(TRIM(u.address.nrm_postal_code), '') IS NOT NULL
             AND UPPER(TRIM(u.address.nrm_postal_code)) NOT LIKE '%PO BOX%'
             AND LENGTH(TRIM(u.address.nrm_postal_code)) <= 35
-            AND u.address.nrm_address_line_2 IS NOT NULL
-            AND TRIM(u.address.nrm_address_line_2) != ''
-            AND LENGTH(TRIM(u.address.nrm_address_line_2)) + 1 + LENGTH(TRIM(u.address.nrm_postal_code)) <= 35
-           THEN TRIM(u.address.nrm_address_line_2) || ' ' || TRIM(u.address.nrm_postal_code)
-           ELSE u.address.nrm_address_line_2
+            AND NULLIF(TRIM(fl.flat_tokens[2]), '') IS NOT NULL
+            AND LENGTH(TRIM(fl.flat_tokens[2])) + 1 + LENGTH(TRIM(u.address.nrm_postal_code)) <= 35
+           THEN TRIM(fl.flat_tokens[2]) || ' ' || TRIM(u.address.nrm_postal_code)
+           ELSE
+             CASE
+                 WHEN LOWER(TRIM(req.address_line_3)) = 'not accepted'
+                 THEN NULLIF(TRIM(array_to_string(fl.flat_tokens[2:], ', ')), '')
+                 ELSE NULLIF(TRIM(fl.flat_tokens[2]), '')
+             END
        END                                                                    address_line_2
      , CASE
            WHEN LOWER(TRIM(req.address_line_3)) = 'not accepted'
            THEN NULL
-           ELSE u.address.nrm_address_line_3
+           WHEN LOWER(TRIM(req.address_line_4)) = 'not accepted'
+           THEN NULLIF(TRIM(array_to_string(fl.flat_tokens[3:], ', ')), '')
+           ELSE NULLIF(TRIM(fl.flat_tokens[3]), '')
        END                                                                    address_line_3
      , CASE
            WHEN LOWER(TRIM(req.address_line_4)) = 'not accepted'
            THEN NULL
-           ELSE u.address.nrm_address_line_4
+           ELSE NULLIF(TRIM(fl.flat_tokens[4]), '')
        END                                                                    address_line_4
      , CASE
            WHEN LOWER(TRIM(req.postal_code)) = 'not accepted'
@@ -136,14 +142,25 @@ SELECT
      , CAST(NULL AS VARCHAR)                                                  number_of_days
      , CAST(NULL AS VARCHAR)                                                  municipality_local
   FROM src_fin_supplier                         t
-  CROSS JOIN UNNEST(nrm_array_address) u(address)
+ CROSS JOIN UNNEST(nrm_array_address) u(address)
   LEFT JOIN
        ref_workday_validate_supplier_address    req
     ON LOWER(TRIM(req.country))                 = LOWER(TRIM(u.address.nrm_country_name))
- WHERE COALESCE( NULLIF(TRIM(u.address.nrm_address_line_1), '')
-               , NULLIF(TRIM(u.address.nrm_address_line_2), '')
-               , NULLIF(TRIM(u.address.nrm_address_line_3), '')
-               , NULLIF(TRIM(u.address.nrm_address_line_4), '')
+ CROSS JOIN LATERAL (
+       SELECT list_filter(
+                  list_concat(
+                    string_split(COALESCE(TRIM(u.address.nrm_address_line_1), ''), ', '),
+                    string_split(COALESCE(TRIM(u.address.nrm_address_line_2), ''), ', '),
+                    string_split(COALESCE(TRIM(u.address.nrm_address_line_3), ''), ', '),
+                    string_split(COALESCE(TRIM(u.address.nrm_address_line_4), ''), ', ')
+                  ),
+                  x -> NULLIF(TRIM(x), '') IS NOT NULL
+                ) AS flat_tokens
+       ) fl
+ WHERE COALESCE( NULLIF(TRIM(fl.flat_tokens[1]), '')
+               , NULLIF(TRIM(fl.flat_tokens[2]), '')
+               , NULLIF(TRIM(fl.flat_tokens[3]), '')
+               , NULLIF(TRIM(fl.flat_tokens[4]), '')
                )                                      IS NOT NULL
 -- AND NULLIF(TRIM(u.address.nrm_address_line_1), '') NOT IN ('[Not Known]') 
 -- AND COALESCE(u.address.nrm_postal_code_valid, 'Y') = 'Y'

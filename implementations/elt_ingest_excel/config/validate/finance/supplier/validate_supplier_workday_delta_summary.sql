@@ -12,27 +12,9 @@ SELECT 'WNSL' entity, 3 sort_order
        )
      , cte_workday_current
     AS (
--- Supplier current-state entity counts come from the preserved CCS bridge, which
--- already carries the source business unit alongside each exploded supplier_number.
-SELECT CASE t.source_business_units
-           WHEN 'The Football Association'          THEN 'FA'
-           WHEN 'National Football Centre Limited'  THEN 'NFC'
-           WHEN 'Wembley National Stadium Ltd'      THEN 'WNSL'
-       END                                             entity
-     , COUNT(*)                                        workday_current
-  FROM reconcile_supplier_ccs_bridge                   t
- WHERE t.in_source_gp                                  = 'Y'
-   AND t.source_business_units                         IN (
-           'The Football Association'
-         , 'National Football Centre Limited'
-         , 'Wembley National Stadium Ltd'
-       )
- GROUP BY
-       CASE t.source_business_units
-           WHEN 'The Football Association'          THEN 'FA'
-           WHEN 'National Football Centre Limited'  THEN 'NFC'
-           WHEN 'Wembley National Stadium Ltd'      THEN 'WNSL'
-       END
+SELECT CAST(NULL AS VARCHAR)                              entity
+     , CAST(0 AS BIGINT)                                   workday_current
+ WHERE FALSE
        )
      , cte_workday_reference_token
     AS (
@@ -45,8 +27,6 @@ SELECT DISTINCT
        )
      , cte_delta_source
     AS (
--- Use the transformed supplier_number, not the raw vendor_id, because supplier
--- collisions can suffix '-{business_unit}' onto the authoritative key.
 SELECT DISTINCT
        CASE UPPER(TRIM(s.nrm_business_unit))
            WHEN 'THE FOOTBALL ASSOCIATION'         THEN 'FA'

@@ -172,10 +172,10 @@ SELECT t.*
     AS (
 SELECT t.*
      , LIST_REVERSE(LIST_DISTINCT(LIST_FILTER([
-         NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_1    , '[\"`<>|;{}]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
-       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_2    , '[\"`<>|;{}]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
-       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_3    , '[\"`<>|;{}]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
-       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.addressline_4, '[\"`<>|;{}]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
+         NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_1    , '[\"`<>|;{}^]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
+       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_2    , '[\"`<>|;{}^]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
+       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.address_3    , '[\"`<>|;{}^]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
+       , NULLIF(NULLIF(NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(t.addressline_4, '[\"`<>|;{}^]', '', 'g'), '\\s+', ' ', 'g'), ',+$', '')), '[Not Known]'), ''), '-')
        ], x -> x IS NOT NULL)))                                                           addr_unique_list
   FROM cte_supplier_id                       t
        )
