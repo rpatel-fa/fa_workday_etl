@@ -20,7 +20,7 @@ runtime:
 
 source_layout:
   worksheet_resolution: named
-  worksheet_name: AUGUST 25
+  worksheet_name: Rolling
   header_row: 1
   data_start_row: 2
   header_detection: literal_row
@@ -72,7 +72,7 @@ shell_defaults:
   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/discipline/target/FA_Submit_Customer_Invoice_ar_discipline_invoice_output.xlsx
   # source_layout defaults — override here to change which sheet/rows the transform uses at build time
   source_worksheet_resolution: named
-  source_worksheet_name: AUGUST 25
+  source_worksheet_name: Rolling
   source_header_row: 1
   source_data_start_row: 2
   # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are

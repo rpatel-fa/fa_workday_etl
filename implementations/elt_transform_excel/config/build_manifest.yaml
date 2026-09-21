@@ -50,7 +50,7 @@ active_profiles:
 defunct_profiles:
   # Single Invoice, Invoice Run — declared defunct 2026-08-19.
   # ar_discipline_invoice reactivated 2026-09-18 after being reworked for the
-  # new AR source file layout (AUGUST 25-style sheet); see config/transforms/
+  # new AR source file layout (`Rolling` sheet); see config/transforms/
   # and config/transform_specs/ar_discipline_invoice.yaml.
   # Still present on disk (transforms/ , .bas, transform_specs/) but no longer
   # offered in the runner dropdown and excluded from build binding.
