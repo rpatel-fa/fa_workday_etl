@@ -1,5 +1,5 @@
 SELECT * FROM fin_workday_extract_customer;
-SELECT * FROM fin_supplier_creditor_existing;
+SELECT * FROM fin_workday_extract_supplier;
 
 SELECT count(*) FROM src_fin_supplier;
 SELECT * FROM src_fin_supplier_purchase_order;

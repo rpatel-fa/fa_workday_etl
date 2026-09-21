@@ -1,10 +1,10 @@
 [
   {
-    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier/delta/delta_3",
-    "workbookFileName": "New Creditors for Workday Aug 6 2026.xlsx",
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/supplier/schools",
+    "workbookFileName": "GFSP Creditors Sept 15 2026.xlsx",
     "sheets": [
       {
-        "sheetName": "Query1",
+        "sheetName": "Creditors Activity 2 Years",
         "headerRow": "1",
         "dataRow": "2",
         "targetTableName": "fin_supplier_creditor_new"
@@ -13,13 +13,13 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/workday/extract",
-    "workbookFileName": "Extract Suppliers 2026-08-05 15_39 BST.xlsx",
+    "workbookFileName": "Find_Suppliers.xlsx",
     "sheets": [
       {
         "sheetName": "Sheet1",
-        "headerRow": "13",
-        "dataRow": "14",
-        "targetTableName": "fin_supplier_creditor_existing"
+        "headerRow": "16",
+        "dataRow": "17",
+        "targetTableName": "fin_workday_extract_supplier"
       }
     ]
   },

@@ -38,7 +38,7 @@ SELECT CASE t.source_business_units
     AS (
 SELECT DISTINCT
        UPPER(TRIM(u.reference_token))                  reference_token
-  FROM fin_supplier_creditor_existing                  t
+  FROM fin_workday_extract_supplier                  t
      , UNNEST(STRING_SPLIT(t.reference_id, '|'))       u(reference_token)
  WHERE NULLIF(TRIM(t.reference_id), '')                IS NOT NULL
    AND NULLIF(TRIM(u.reference_token), '')             IS NOT NULL

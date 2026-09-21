@@ -11,7 +11,7 @@ SELECT DISTINCT
        )
 SELECT DISTINCT
        w.*
-  FROM fin_supplier_creditor_existing                  w
+  FROM fin_workday_extract_supplier                  w
      , UNNEST(STRING_SPLIT(w.reference_id, '|'))       u(reference_token)
  WHERE NULLIF(TRIM(w.reference_id), '')                IS NOT NULL
    AND NULLIF(TRIM(u.reference_token), '')             IS NOT NULL
@@ -31,7 +31,7 @@ CREATE TABLE validate_supplier_delta_in_existing
     AS (
 SELECT DISTINCT
        UPPER(TRIM(u.reference_token))                   reference_token
-  FROM fin_supplier_creditor_existing                  w
+  FROM fin_workday_extract_supplier                  w
      , UNNEST(STRING_SPLIT(w.reference_id, '|'))       u(reference_token)
  WHERE NULLIF(TRIM(w.reference_id), '')                IS NOT NULL
    AND NULLIF(TRIM(u.reference_token), '')             IS NOT NULL

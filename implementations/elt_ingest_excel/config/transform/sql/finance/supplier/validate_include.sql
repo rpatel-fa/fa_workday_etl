@@ -2,13 +2,13 @@
     AS (
 SELECT t.nrm_agg_supplier_number                                  src_agg_reference_id
      , TRIM(UNNEST(STRING_SPLIT(t.nrm_agg_supplier_number, '|'))) src_reference_id
-  FROM src_fin_supplier_include            t
+  FROM src_fin_supplier_include        t
        )
      , cte_wd
     AS (
 SELECT t.reference_id                                               wd_agg_reference_id
      , TRIM(UNNEST(STRING_SPLIT(t.reference_id, '|')))              wd_reference_id
-  FROM fin_supplier_creditor_existing    t
+  FROM fin_workday_extract_supplier    t
        )
      , cte_ccs_match
     AS (
