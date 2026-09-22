@@ -213,9 +213,9 @@ shell_defaults:
       profile_label: AR Invoice GBE Mens
       source_worksheet_name: Mens GBE
       source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/source/22. GBE - August 26.xlsx
-      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/Submit_Customer_Invoice_v46.1_ar_gbe_invoice_mens_output.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/FA_Submit_Customer_Invoice_ar_gbe_invoice_mens_output.xlsx
     - profile_key: ar_gbe_invoice_womens
       profile_label: AR Invoice GBE Womens
       source_worksheet_name: Womens GBE
       source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/source/22. GBE - August 26.xlsx
-      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/Submit_Customer_Invoice_v46.1_ar_gbe_invoice_womens_output.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/gbe/target/FA_Submit_Customer_Invoice_ar_gbe_invoice_womens_output.xlsx
