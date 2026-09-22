@@ -9,17 +9,29 @@ transform:
   description: >
     National Football Centre (NFC) Learning Integration tab invoices transformed into
     the Workday Customer Invoice EIB workbook v46.1. One source row = one single-line
-    Workday Customer Invoice (mirrors ar_bulk_invoice archetype). DEPARTS FROM THE
-    CANONICAL ACCOUNTING-STRING PIPELINE: Finance users have pre-populated a SECOND
-    source tab ("Codes") containing the complete Workday hierarchy mapping keyed by
-    Course Name. There is NO COST CODE / FINAL CODE column and NO Mapping MASTER
-    lowest-hierarchy lookup. Instead, each row's Course Name (Integration col D) is
-    looked up against Codes!A (Course) and the matched row's Cost Centre, Reporting
-    Type, FA Learning Course, Camp, Commercial Partners, Events, Grant, Program,
-    Revenue Category, and Company values are written DIRECTLY to the corresponding
-    EIB worktag slots (FX..GF + EM + J). The Codes tab is the Single Source of Truth
-    for worktag assignment; unresolved Course Names are flagged but the row is still
-    written with blank worktags (per AR archetype: silent blanks, not row rejection).
+    Workday Customer Invoice (mirrors ar_bulk_invoice archetype).
+    2026-09-22 (Combined 30-34 workbook) REWORK: the Integration tab now carries a
+    two-row header (row 1 = field names / "Required Fields" / "Optional Fields"
+    group labels; row 2 = the actual sub-headers under those two groups), and data
+    starts on ROW 3, not row 2. Revenue Category (Integration col Q), Cost Centre
+    (col O), and Reporting Type (col P) are now read DIRECTLY per row from that
+    group (no lookup) and written to EIB EM / FX / FY respectively. Customer
+    AJ is now read DIRECTLY from the new Integration col C ("WORKDAY ID"),
+    replacing the old Customer ID (col B) -> Customer Spreadsheet extract
+    lookup, which was rejecting rows with "CUSTOMER ID not found in customer
+    extract" once the source's Customer ID values stopped lining up with the
+    extract.
+    Company still goes through the legacy Course-Name -> "Codes" tab hierarchy
+    lookup, which the Combined 30-34 workbook's Codes tab NO LONGER SUPPORTS
+    (it's now a plain 3-column dropdown reference list with no "Course" key
+    column) -- that lookup is coded to fail soft rather than crash the run,
+    so Company always falls back to company_fallback ("THE FA GROUP - NFC").
+    FA Learning Course (GC) is read DIRECTLY from Integration col S, same
+    pattern as Revenue Category/Cost Centre/Reporting Type. Camp, Event,
+    Commercial Partner, Grant, and Programme are, per 2026-09-22 Finance
+    instruction, no longer read from Codes at all and are intentionally
+    always blank. Project and Sales Item have never had a source column and
+    stay blank too.
     Tax is determined per-row from the source Net/VAT split: rows with zero VAT use
     the domestic-out-of-scope zero-rated set; rows with positive VAT use the
     domestic 20% standard-rated set.
@@ -31,21 +43,20 @@ source_layout:
   worksheet_name: Integration
   worksheet_resolution: named
   header_row: 1
-  data_start_row: 2
+  data_start_row: 3
   header_detection: literal_row
   required_headers:
     - Date
     - Customer ID
+    - WORKDAY ID
     - Organisation Name
     - Course Name
-    - Course Code
-    - Order Date
+    - "Description|Course Code"
     - Quantity
     - "Net \u00A3"
     - "Vat \u00A3"
     - "Gross Price \u00A3"
     - PO Number
-    - Email Address
 
 transform_constants:
   fixed_currency: GBP
@@ -94,36 +105,43 @@ transform_constants:
       lookup_key_source_column: Course Name
       lookup_key_lookup_column: Course
       description: >
-        Direct course-to-hierarchy lookup authored by Finance on the source workbook's
-        "Codes" tab. Replaces the canonical COST CODE -> Final Code segmentation ->
-        Mapping MASTER lowest-hierarchy pipeline. Each row's Course Name (Integration
-        col D) is matched case-insensitively to Codes!A. The matched row's values for
-        Company, Cost centre, Reporting Type, FA Learning courses, Camp, Commerical
-        Partners, Events, Grant, Program, and Revenue Cat are written verbatim into
-        the EIB. Values are Finance-curated Workday display names or Reference IDs;
-        the VBA does NOT re-lookup these through the Mapping MASTER.
+        LEGACY, MOSTLY DEFUNCT as of 2026-09-22 (Combined 30-34 workbook):
+        this was originally a direct course-to-hierarchy lookup authored by
+        Finance on the source workbook's "Codes" tab, matching each row's
+        Course Name (Integration col E) case-insensitively against Codes!A
+        and writing the matched row's Company/Cost centre/Reporting Type/
+        FA Learning courses/Camp/Commerical Partners/Events/Grant/Program/
+        Revenue Cat verbatim into the EIB. The Combined 30-34 workbook's
+        Codes tab no longer has a "Course" column at all (it's now a plain
+        3-column dropdown reference list), so this lookup can never resolve
+        against it. Company (target J) is the ONLY field still wired to
+        attempt this lookup; it fails soft and always falls back to
+        company_fallback. Cost Centre / Reporting Type / Revenue Category /
+        FA Learning Course are now read DIRECTLY per row from the Integration
+        sheet's own row-2 sub-headers (cols O / P / Q / S) instead - see
+        transform_specs targets fx/fy/em/gc. Camp / Event / Commercial
+        Partner / Grant / Programme are, per Finance instruction, no longer
+        derived from anywhere and are intentionally always blank - see
+        transform_specs targets fz/ga/gb/gd/ge.
       return_columns:
         company: Company
-        cost_centre: Cost centre
-        reporting_type: Reporting Type
-        fa_learning_course: FA Learning courses
-        camp: Camp
-        commercial_partner: Commerical Partners
-        event: Events
-        grant: Grant
-        programme: Program
-        revenue_category: Revenue Cat
 
   worktag_resolution:
     driver: Course Name
     resolution: course_name_direct_from_source_lookup_sheet
     lookup_ref: course_hierarchy
     note: >
-      NON-CANONICAL RESOLUTION PIPELINE for this profile only. All worktag values come
-      directly from the source workbook's "Codes" lookup sheet, matched on Course Name.
-      There is NO account-string derivation and NO Mapping MASTER lowest-hierarchy scan.
-      The Mapping MASTER file is NOT opened at runtime for this transform (it is still
-      registered in the shell config for archetype parity but the macro skips it).
+      NON-CANONICAL RESOLUTION PIPELINE for this profile only, and now LARGELY
+      SUPERSEDED as of 2026-09-22 (see source_lookups.course_hierarchy above):
+      Company is the only field still attempting this Codes-lookup pipeline
+      (fails soft, falls back to company_fallback). Cost Centre / Reporting
+      Type / Revenue Category / FA Learning Course are read directly off the
+      Integration sheet's own row 2. Camp / Event / Commercial Partner /
+      Grant / Programme are intentionally always blank. There is NO
+      account-string derivation and NO Mapping MASTER lowest-hierarchy scan.
+      The Mapping MASTER file is NOT opened at runtime for this transform (it
+      is still registered in the shell config for archetype parity but the
+      macro skips it).
 
   worktag_business_objects:
     revenue_category: "Revenue Category"
@@ -138,7 +156,7 @@ transform_constants:
     sales_item: "Sales Item"
   derived_worktags:
     reporting_type:
-      derivation: "direct_from_source_lookup_sheet_Codes (not via Final Code seg2). Matched on Course Name -> Codes!Reporting Type column (col F)."
+      derivation: "2026-09-22: read directly from Integration col P (row-2 sub-header 'Reporting Type'), not via Codes tab or Final Code seg2."
   unmapped_handling: silent_blank
 
   tax_triple_per_row:
@@ -224,9 +242,9 @@ transform_constants:
       cost_centre: FX
 
 shell_defaults:
-  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/integration/source/Invoice Integration 07.08.2026.xlsx
-  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Customer_Invoice_v46.1.xlsx
-  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/integration/target/Submit_Customer_Invoice_v46.1_ar_integration_invoice_output.xlsx
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/integration/source/Combined 30-34 Invoice Integration 17.09.26.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/FA Submit Customer Invoice.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/integration/target/FA Submit Customer Invoice_ar_integration_invoice_output.xlsx
   source_worksheet_resolution: named
   source_header_row: 1
-  source_data_start_row: 2
+  source_data_start_row: 3

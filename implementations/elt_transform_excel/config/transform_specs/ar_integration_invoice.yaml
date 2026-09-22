@@ -25,15 +25,20 @@ shared_helpers:
 
 parties:
   customer:
-    source_column: Customer ID
-    resolved_via: Customer Spreadsheet
-    key_column: Reference ID
-    value_column: Customer ID
+    source_column: WORKDAY ID
+    resolved_via: none
     note: >
-      Integration col B = NFC customer reference (NFCxxx). Resolve exact-match via
-      the Workday Customer Extract's Reference ID column. NFCxxx values are NOT
-      pipe-delimited (no nested lookup); pass them through as-is. A blank or
-      #N/A Customer ID on the source row = unresolved customer = row rejected.
+      2026-09-22 amendment (Combined 30-34 workbook): Customer AJ is resolved
+      DIRECTLY from the new Integration col C ("WORKDAY ID") - Finance now
+      pre-resolves the Workday customer reference per row. This REPLACES the
+      previous Customer Spreadsheet extract lookup (Integration col B
+      "Customer ID" -> Reference ID -> Customer ID exact match), which was
+      producing "CUSTOMER ID not found in customer extract" rejects because
+      the extract lookup and this source's Customer ID values no longer line
+      up. Customer ID (col B) is still read (skip/grouping/reject-message use
+      only) but no longer drives AJ. A blank WORKDAY ID on a source row that
+      wasn't already skipped (see skip_rule) = unresolved customer = row
+      rejected, same as before, just keyed off a different column.
   company:
     derivation: course_lookup_priority_with_fallback
     primary:
@@ -50,25 +55,40 @@ parties:
       entity lookup is used for this profile.
 
 notes: >
-  AR Integration Invoice - NFC Learning system. Source workbook has TWO relevant
-  tabs:
-    (1) "Integration" - the invoice line data, 12 columns A..L, row 1 = headers.
+  AR Integration Invoice - NFC Learning system. As of the 2026-09-22 "Combined
+  30-34" source workbook rework, source workbook has TWO relevant tabs:
+    (1) "Integration" - the invoice line data. TWO-ROW HEADER: row 1 = field
+        names (cols A..M) plus "Required Fields"/"Optional Fields" group labels
+        (cols N.. / R..); row 2 = the real sub-headers for the fields grouped
+        under those two labels (Ledger, Cost Centre, Reporting Type, Revenue
+        Category | Event, FA Learning Course, Camp, Programme, Grant,
+        Commercial Partner, Project, Sales Item). DATA STARTS ON ROW 3.
         One source row = one Workday Customer Invoice with a single line.
-    (2) "Codes" - the Finance-authored course-to-hierarchy mapping, 8 rows x 16 cols,
-        row 1 = headers, data rows 2..8. Course = column A, matches Integration!D
-        ("Course Name") case-insensitively. The matched row's columns C..M provide
-        ALL worktag values directly (Company, Cost centre, Reporting Type, FA Learning
-        courses, Camp, Commerical Partners, Events, Grant, Program, Revenue Cat).
+        Cost Centre (col O), Reporting Type (col P), and Revenue Category
+        (col Q) are read DIRECTLY per row from this sheet -> EIB FX / FY / EM.
+    (2) "Codes" - as of the "Combined 30-34" workbook this is now a plain
+        3-column dropdown reference list (Cost Centres / Reporting Type /
+        Revenue Category, no Course key column) used for Excel data-validation
+        only. It NO LONGER supports the old Course-Name -> full-hierarchy
+        lookup this transform originally relied on. The VBA lookup is coded
+        to fail soft against a Codes tab shaped like this (rather than crash).
+        Company still attempts this lookup and falls back to company_fallback
+        when it (always) misses. FA Learning Course (target gc) is read
+        DIRECTLY from Integration col S, same pattern as Cost Centre/
+        Reporting Type/Revenue Category. Camp, Event, Commercial Partner,
+        Grant, and Programme (targets fz/ga/gb/gd/ge) are, per 2026-09-22
+        Finance instruction, no longer read from Codes at all and are
+        intentionally always blank -- not "pending a fix."
   There is NO COST CODE column, NO Final Code 4-6-8-4 segmentation, and NO
-  Mapping MASTER lowest-hierarchy lookup. The Codes tab IS the complete hierarchy
-  mapping. Values in the Codes tab are written VERBATIM into the corresponding EIB
-  cells; the VBA does NOT re-parse or re-lookup them through Mapping MASTER.
-  An unresolved Course Name (no match in Codes) writes ALL worktags as BLANK (AR
-  archetype rule: silent_blank, not row rejection) and increments a flag counter
-  shown in the run results. Tax is per-row: compute VAT_rate = source_VAT/Net,
-  then pick the tax triple: VAT_rate ~= 0% -> zero-rated (Outside Scope),
-  VAT_rate ~= 20% -> standard-rated (Domestic 200_VAT). The source Gross column
-  is the authoritative Amount Due and line Extended Amount.
+  Mapping MASTER lowest-hierarchy lookup.
+  An unresolved Course Name (no match in Codes) writes the Codes-tab-sourced
+  worktags as BLANK (AR archetype rule: silent_blank, not row rejection) and
+  increments a flag counter shown in the run results. Tax is per-row: compute
+  VAT_rate = source_VAT/Net, then pick the tax triple: VAT_rate ~= 0% ->
+  zero-rated (Outside Scope), VAT_rate ~= 20% -> standard-rated (Domestic
+  200_VAT). 2026-09-22 amendment: the source Net column (not Gross) is now
+  the authoritative Amount Due (CM), Unit Cost (FL), and line Extended
+  Amount (FO).
   Shared invoice-line grouping is keyed by the same derived invoice identifier that
   the build profile writes to D / G / BO. That makes the shared helper contract
   explicit in YAML even though the identifier itself is assembled from PO / customer /
@@ -120,16 +140,24 @@ source_lookup_sheets:
       match: case_insensitive_exact
       on_unresolved: flag_and_blank_worktags
     semantic_columns:
-      - {source_col: "Company",            eib_role: "company_code_display",   eib_target: "J",  note: "Written to EIB col J (Company*). Fallback = THE FA GROUP - NFC if blank."}
-      - {source_col: "Cost centre",        eib_role: "cost_centre_ref",       eib_target: "FX", note: "Worktag slot 1 = Cost Centre FX."}
-      - {source_col: "Reporting Type",     eib_role: "reporting_type_ref",    eib_target: "FY", note: "Worktag slot 2 = Reporting Type FY. Overrides any seg2 char map."}
-      - {source_col: "FA Learning courses",eib_role: "fa_learning_course_ref",eib_target: "GC", note: "Worktag slot 6 = FA Learning Course GC. Blank for non-FA-Learning courses."}
-      - {source_col: "Camp",               eib_role: "camp_ref",              eib_target: "FZ", note: "Worktag slot 3 = Camp FZ. Blank for non-camp courses."}
-      - {source_col: "Commerical Partners",eib_role: "commercial_partner_ref",eib_target: "GB", note: "Worktag slot 5 = Commercial Partner GB. Spelling note: source uses 'Commerical' (typo in header) - match header verbatim."}
-      - {source_col: "Events",             eib_role: "event_ref",             eib_target: "GA", note: "Worktag slot 4 = Event GA. Blank for non-event courses."}
-      - {source_col: "Grant",              eib_role: "grant_ref",             eib_target: "GD", note: "Worktag slot 7 = Grant GD. Blank for non-grant-funded courses."}
-      - {source_col: "Program",            eib_role: "programme_ref",         eib_target: "GE", note: "Worktag slot 8 = Programme GE."}
-      - {source_col: "Revenue Cat",        eib_role: "revenue_category_ref",  eib_target: "EM", note: "EIB Revenue Category EM. If Codes value is blank = silent blank (do NOT infer from Final Code - there is none)."}
+      # 2026-09-22 (Combined 30-34 workbook): the Codes tab no longer has a "Course"
+      # column, so this lookup can never resolve. Company is the ONLY target still
+      # wired to attempt it (fails soft -> company_fallback). Cost Centre / Reporting
+      # Type / Revenue Category / FA Learning Course now come DIRECTLY from the
+      # Integration sheet's own row 2 (see mapping targets fx/fy/em/gc below). Camp /
+      # Event / Commercial Partner / Grant / Programme are intentionally always blank
+      # (see mapping targets fz/ga/gb/gd/ge below) - this list below is legacy/kept
+      # for history, not a live pipeline for those seven.
+      - {source_col: "Company",            eib_role: "company_code_display",   eib_target: "J",  note: "Written to EIB col J (Company*). Fallback = THE FA GROUP - NFC if blank. Still attempted (always misses on Combined 30-34)."}
+      - {source_col: "Cost centre",        eib_role: "cost_centre_ref",       eib_target: "FX", note: "SUPERSEDED - FX now reads Integration col O directly (target fx)."}
+      - {source_col: "Reporting Type",     eib_role: "reporting_type_ref",    eib_target: "FY", note: "SUPERSEDED - FY now reads Integration col P directly (target fy)."}
+      - {source_col: "FA Learning courses",eib_role: "fa_learning_course_ref",eib_target: "GC", note: "SUPERSEDED - GC now reads Integration col S directly (target gc)."}
+      - {source_col: "Camp",               eib_role: "camp_ref",              eib_target: "FZ", note: "SUPERSEDED - FZ is intentionally always blank (target fz)."}
+      - {source_col: "Commerical Partners",eib_role: "commercial_partner_ref",eib_target: "GB", note: "SUPERSEDED - GB is intentionally always blank (target gb)."}
+      - {source_col: "Events",             eib_role: "event_ref",             eib_target: "GA", note: "SUPERSEDED - GA is intentionally always blank (target ga)."}
+      - {source_col: "Grant",              eib_role: "grant_ref",             eib_target: "GD", note: "SUPERSEDED - GD is intentionally always blank (target gd)."}
+      - {source_col: "Program",            eib_role: "programme_ref",         eib_target: "GE", note: "SUPERSEDED - GE is intentionally always blank (target ge)."}
+      - {source_col: "Revenue Cat",        eib_role: "revenue_category_ref",  eib_target: "EM", note: "SUPERSEDED - EM now reads Integration col Q directly (target em)."}
     ignored_columns:
       - "Ledger account"
       - "Spent Cat"
@@ -161,7 +189,11 @@ eib_house_defaults:
   note_mapping_sheet_unused: >
     The Mapping MASTER workbook and mapping_sheet_name are registered in the shell
     config for archetype parity ONLY. ar_integration_invoice never opens or reads
-    Mapping MASTER at runtime; all worktag resolution comes from Codes tab.
+    Mapping MASTER at runtime. 2026-09-22: worktag resolution no longer comes from
+    the Codes tab either, except for Company's (always-missing) fallback attempt -
+    Cost Centre/Reporting Type/Revenue Category/FA Learning Course are read directly
+    off the Integration sheet's own row 2; Camp/Event/Commercial Partner/Grant/
+    Programme are intentionally always blank.
 
 course_based_hierarchy:
   driver: Course Name
@@ -176,16 +208,19 @@ course_based_hierarchy:
     avoids the cost/error of transcribing the mapping into Mapping MASTER with a
     synthetic old-code for every course.
   business_objects_covered:
-    - Company (J) - from Codes!C + fallback NFC
-    - Revenue Category (EM) - from Codes!M
-    - Cost Centre (FX) - from Codes!E
-    - Reporting Type (FY) - from Codes!F
-    - Camp (FZ) - from Codes!H
-    - Event (GA) - from Codes!J
-    - Commercial Partner (GB) - from Codes!I
-    - FA Learning Course (GC) - from Codes!G
-    - Grant (GD) - from Codes!K
-    - Programme (GE) - from Codes!L
+    # 2026-09-22 (Combined 30-34 workbook): only Company still goes through this
+    # Codes lookup (and always falls back, since Codes has no Course column anymore).
+    - Company (J) - from Codes!C + fallback NFC (Codes lookup always misses; always fallback)
+  business_objects_superseded_2026_09_22:
+    - Revenue Category (EM) - now read directly from Integration col Q (target em)
+    - Cost Centre (FX) - now read directly from Integration col O (target fx)
+    - Reporting Type (FY) - now read directly from Integration col P (target fy)
+    - FA Learning Course (GC) - now read directly from Integration col S (target gc)
+    - Camp (FZ) - intentionally always blank (target fz)
+    - Event (GA) - intentionally always blank (target ga)
+    - Commercial Partner (GB) - intentionally always blank (target gb)
+    - Grant (GD) - intentionally always blank (target gd)
+    - Programme (GE) - intentionally always blank (target ge)
   business_objects_not_in_codes_tab:
     - Sales Item (EJ) - left blank (no source column)
     - Project (BN / GF) - left blank (Codes has no Project column; silent blank rule)
@@ -230,14 +265,22 @@ tax_rules:
 
 skip_rule:
   drop_when:
-    - Customer ID blank OR "#N/A" on source row (unresolved customer)
+    - Customer ID blank OR "#N/A" on source row (pre-check, before WORKDAY ID lookup)
+    - >-
+      WORKDAY ID blank on a source row that passed the pre-check above =
+      unresolved customer = row rejected (2026-09-22: replaces the old
+      Customer Spreadsheet extract-lookup rejection)
     - Date blank (invoice date required)
     - Gross Price \u00A3 = 0 and Net \u00A3 = 0 and Vat \u00A3 = 0 (zero-value row)
     - Course Name blank (cannot resolve any worktags; still warn then write blanks per
       archetype, do NOT drop - but count as a flagged row)
   warn_only:
-    - Course Name has no matching row in Codes tab (silent-blank worktags, flag counter)
-    - Any Codes-tab return column is blank for a matched Course Name (silent blank)
+    - >-
+      Course Name has no matching row in Codes tab (flag counter; as of
+      2026-09-22 this only affects Company, which falls back to
+      company_fallback - all other former Codes-tab worktags are either
+      read directly from the Integration sheet or intentionally always blank)
+    - Any Codes-tab Company value is blank for a matched Course Name (silent blank, falls back)
 
 mapping:
 # --- EIB scaffolding columns ---
@@ -257,8 +300,9 @@ mapping:
   note: Submit H = "Y" per eib_house_defaults.
 
 - target: i
-  default: "Y"
-  note: Locked in Workday I = "Y" per eib_house_defaults.
+  note: >
+    Locked in Workday I is left BLANK for this profile (2026-09-22 amendment,
+    matches ar_discipline_invoice). Do NOT write the eib_house_defaults "Y".
 
 # --- Header identifiers ---
 - target: d
@@ -318,23 +362,20 @@ mapping:
   note: Currency AI = GBP uniform per eib_house_defaults.
 
 - target: aj
-  source_column: Customer ID
-  lookup:
-    file: Customer Spreadsheet
-    tab: Sheet1
-    input_column: Reference ID
-    output_column: Customer ID
-    equality: exact
-    on_fail: reject_row
+  source_column: WORKDAY ID
+  on_fail: reject_row
   note: >
-    Customer AJ = source "Customer ID" (col B) resolved via Workday Customer Extract
-    Reference ID -> Customer ID. Exact match, no pipe nesting (NFCxxx refs are not
-    delimited). A #N/A or blank source value = unresolved = row rejected.
+    Customer AJ = source "WORKDAY ID" (col C), used verbatim. 2026-09-22
+    amendment (Combined 30-34 workbook): replaces the previous Customer
+    Spreadsheet extract lookup (Customer ID col B -> Reference ID -> Customer
+    ID), which was the source of the "CUSTOMER ID not found in customer
+    extract" rejects. A blank WORKDAY ID = unresolved customer = row rejected.
 
 - target: ak
-  derivation: mirror_aj
-  source_target: aj
-  note: Sold To Customer AK mirrors AJ (same sold-to as billed-to for AR Integration).
+  note: >
+    Sold To Customer AK is left blank per 2026-09-22 instruction. Workday's
+    own EIB template marks AK "Optional" (only Customer AJ is marked
+    "Required"/has the asterisk); previously mirrored AJ.
 
 - target: br
   source_column: Date
@@ -354,13 +395,17 @@ mapping:
   note: Document Status CL = Approved per house default.
 
 - target: cm
-  source_column: "Gross Price \u00A3"
-  source_column_aliases: ["Gross Price PS", "Gross Price"]
+  source_column: "Net \u00A3"
+  source_column_aliases: ["Net PS", "Net"]
+  number_format: "0.00"
   note: >
-    Amount Due CM = source "Gross Price £" (col J). One row = one invoice so
-    header-level amount equals the single line gross. Year-tab variants carry
-    header "Gross Price" (no £); resolved via FindOptionalColumnIndexInRow
-    fallback chain.
+    Amount Due CM = source "Net £" (col H). 2026-09-22 amendment: switched
+    from Gross to Net (previously used Gross Price £). One row = one invoice
+    so header-level amount equals the single line net. Year-tab variants
+    carry header "Net" (no £); resolved via FindOptionalColumnIndexInRow
+    fallback chain. Cell NumberFormat = "0.00" (2026-09-22; display only,
+    stored value stays unrounded), matching ar_discipline_invoice's
+    convention.
 
 - target: co
   default: Standard
@@ -382,11 +427,13 @@ mapping:
   fields:
     - source_column: Organisation Name
     - source_column: Course Name
-    - source_column: Course Code
+    - source_column: "Description|Course Code"
   separator: " | "
   note: >
-    Header Memo DB = "Organisation Name | Course Name | Course Code" from source
-    cols C, D, E. Gives Finance a searchable per-invoice narrative in Workday.
+    Header Memo DB = "Organisation Name | Course Name | Description" (2026-09-22:
+    source header renamed Course Code -> Description on the "Combined 30-34"
+    workbook; alias kept for older year-tab files that still say Course Code).
+    Gives Finance a searchable per-invoice narrative in Workday.
 
 # --- Line scaffolding ---
 - target: ds
@@ -396,11 +443,9 @@ mapping:
     derived invoice identifiers write a 1..N row id within the grouped invoice.
 
 - target: du
-  function: line_ref_from_row
-  format: "LINE-{spreadsheet_key}-{line_order}"
   note: >
-    Line Reference DU mirrors the shared invoice-line grouping outputs:
-    `LINE-{spreadsheet_key}-{line_order}`.
+    Customer Invoice Line Reference ID DU is left blank per 2026-09-22
+    instruction. Previously derived as `LINE-{spreadsheet_key}-{line_order}`.
 
 - target: dv
   function: invoice_group_line_order
@@ -410,28 +455,25 @@ mapping:
 
 # --- Line fields ---
 - target: em
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Revenue Cat
-    on_unresolved: silent_blank
+  source_column: Revenue Category
+  optional: true
   note: >
-    Revenue Category EM = Codes!"Revenue Cat" (col M) matched on Course Name.
-    CURRENTLY ALL CODES TAB ROWS HAVE BLANK Revenue Cat - THIS IS EXPECTED per
-    the 2026-09-03 source file snapshot. When Finance populates it the values
-    will land verbatim. Until then EM is written blank per silent_blank rule.
-    DO NOT attempt to infer from the old-code column (P) - that is legacy only.
+    Revenue Category EM = Integration col Q ("Revenue Category", the row-2
+    sub-header under the "Required Fields" group). 2026-09-22 amendment
+    (Combined 30-34 workbook): read DIRECTLY per row, no longer looked up
+    via the Codes tab (that tab no longer carries a Course-keyed hierarchy;
+    see transform-level note).
 
 - target: en
   derivation: concat_line_description
   fields:
     - source_column: Course Name
-    - source_column: Course Code
+    - source_column: "Description|Course Code"
   separator: " - "
-  note: Line Item Description EN = Course Name + " - " + Course Code from cols D/E.
+  note: >
+    Line Item Description EN = Course Name + " - " + Description (2026-09-22:
+    source header renamed Course Code -> Description; alias kept for older
+    year-tab files).
 
 - target: fa
   derivation: per_row_tax_applicability
@@ -452,42 +494,52 @@ mapping:
   note: Quantity FH = source "Quantity" (col G).
 
 - target: fi
-  default: "Each"
-  optional_override: if unit_cost_decimal_places > 2, leave blank
-  note: Unit of Measure FI = "Each" default.
+  note: Unit of Measure FI is left blank per 2026-09-22 instruction (previously defaulted to "Each").
 
 - target: fl
   source_column: "Net \u00A3"
   source_column_aliases: ["Net PS", "Net"]
+  number_format: "0.00"
   note: >
     Unit Cost FL = source "Net £" (col H). With Quantity (G) typically = 1 per
     line, Unit Cost FL and Extended Amount FO converge to the same value on most
     rows; when Quantity > 1 the VBA writes FL = (Net / Quantity) and FO = Net,
     mirroring the ar_bulk_invoice convention. Year-tab variants use header "Net"
-    (no £); resolved via FindOptionalColumnIndexInRow fallback.
+    (no £); resolved via FindOptionalColumnIndexInRow fallback. Cell
+    NumberFormat = "0.00" (2026-09-22; display only, stored value stays
+    unrounded).
 
 - target: fo
-  source_column: "Gross Price \u00A3"
-  source_column_aliases: ["Gross Price PS", "Gross Price"]
+  source_column: "Net \u00A3"
+  source_column_aliases: ["Net PS", "Net"]
+  number_format: "0.00"
   note: >
-    Extended Amount FO = source "Gross Price £" (col J). This is the authoritative
-    line value (incl. VAT) that Workday validates against the sum of Amount Due CM
-    across lines. FO is used for the reconciliation check (CM = sum of FO per invoice);
-    with one line per invoice archetype CM and FO are the same numeric value per row.
+    Extended Amount FO = source "Net £" (col H). 2026-09-22 amendment: switched
+    from Gross to Net (previously used Gross Price £), matching Amount Due CM
+    and Unit Cost FL. Workday validates FO against the sum of Amount Due CM
+    across lines; with one line per invoice archetype CM and FO are the same
+    numeric value per row. Cell NumberFormat = "0.00" (display only, stored
+    value stays unrounded).
 
 - target: fp
-  source_column: Order Date
-  source_format: shared_helper:source_date_normalization.excel_serial_and_dmy_text
-  target_format: YYYY-MM-DD
+  derivation: mirror_br
+  source_target: br
   note: >
-    Transaction Date FP = source "Order Date" (col F). Mixed format expected
-    (text like "29th July 2026" and "DD/MM/YYYY" and Excel serials across the
-    different year tabs). Use canonical NormalizeSourceDate helper.
+    Transaction Date FP mirrors Invoice Date BR (both = source "Date", col A).
+    2026-09-22 correction (Combined 30-34 workbook): previously mapped from
+    "Order Date"/"Course Date" (col G); Finance clarified FP should mirror the
+    header Date instead, matching the ar_discipline_invoice BR/FP convention.
 
 - target: fv
-  source_column: Course Code
+  source_column: "Email Address- can these be copied in|Email Address"
   optional: true
-  note: Line Memo FV = source "Course Code" (col E) when non-blank.
+  note: >
+    Line Memo FV = source "Email Address" column (col M on the "Combined 30-34"
+    workbook; header text there is literally "Email Address- can these be
+    copied in" - matched verbatim, with the plain "Email Address" alias kept
+    for older/cleaner-header source files) when non-blank. 2026-09-22 amendment:
+    previously this slot held Course Code; Course Code/Description now feeds
+    EN and DB instead (see those entries).
 
 # --- Billable Project (header BN + line GF) ---
 - target: bn
@@ -514,97 +566,67 @@ mapping:
 
 # --- 9-pack worktags FX..GF ---
 - target: fx
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Cost centre
-    on_unresolved: silent_blank
-  note: Cost Centre FX = Codes!"Cost centre" (col E).
+  source_column: Cost Centre
+  optional: true
+  note: >
+    Cost Centre FX = Integration col O ("Cost Centre", the row-2 sub-header
+    under the "Required Fields" group). 2026-09-22 amendment (Combined 30-34
+    workbook): read DIRECTLY per row, no longer looked up via the Codes tab.
+    NOTE: requested as "Column Q" but Q is Revenue Category (see target em);
+    Cost Centre's actual column, matched by header name, is O -- flagged for
+    confirmation, not silently guessed.
 
 - target: fy
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Reporting Type
-    on_unresolved: silent_blank
-  note: Reporting Type FY = Codes!"Reporting Type" (col F). Overrides any seg2 first-char rule (there is none for this profile).
+  source_column: Reporting Type
+  optional: true
+  note: >
+    Reporting Type FY = Integration col P ("Reporting Type", the row-2
+    sub-header under the "Required Fields" group). 2026-09-22 amendment
+    (Combined 30-34 workbook): read DIRECTLY per row, no longer looked up
+    via the Codes tab. Overrides any seg2 first-char rule (there is none for
+    this profile).
 
 - target: fz
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Camp
-    on_unresolved: silent_blank
-  note: Camp FZ = Codes!"Camp" (col H). Blank for non-camp courses (all current rows).
+  derivation: always_blank
+  note: >
+    Camp FZ is intentionally left blank. 2026-09-22 instruction: no longer
+    read from the Codes tab (which no longer supports the Course-keyed
+    hierarchy lookup this used) or any other source.
 
 - target: ga
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Events
-    on_unresolved: silent_blank
-  note: Event GA = Codes!"Events" (col J). Blank for non-event courses (all current rows).
+  derivation: always_blank
+  note: >
+    Event GA is intentionally left blank. 2026-09-22 instruction: no longer
+    read from the Codes tab (which no longer supports the Course-keyed
+    hierarchy lookup this used) or any other source.
 
 - target: gb
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Commerical Partners
-    on_unresolved: silent_blank
+  derivation: always_blank
   note: >
-    Commercial Partner GB = Codes!"Commerical Partners" (col I). CRITICAL: the
-    Codes header spells "Commerical" with one 'm'. VBA must match the header
-    string VERBATIM from the workbook ("Commerical Partners" not
-    "Commercial Partners"). Do not correct the spelling in code.
+    Commercial Partner GB is intentionally left blank. 2026-09-22 instruction:
+    no longer read from the Codes tab (which no longer supports the
+    Course-keyed hierarchy lookup this used, including its "Commerical
+    Partners" (sic) column) or any other source.
 
 - target: gc
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: FA Learning courses
-    on_unresolved: silent_blank
+  source_column: FA Learning Course
+  optional: true
   note: >
-    FA Learning Course GC = Codes!"FA Learning courses" (col G). Populated ONLY
-    for Level-4-award courses (Advanced Youth Award, ITMMiF, Talent ID 2 Club,
-    Goalkeeping A) — blank for grassroots courses. Verbatim write; do not
-    resolve through Mapping MASTER.
+    FA Learning Course GC = Integration col S ("FA Learning Course", the
+    row-2 sub-header under the "Optional Fields" group). 2026-09-22
+    amendment: read DIRECTLY per row, same pattern as Cost Centre/Reporting
+    Type/Revenue Category, no longer via the Codes tab.
 
 - target: gd
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Grant
-    on_unresolved: silent_blank
-  note: Grant GD = Codes!"Grant" (col K). Blank for all current Codes rows.
+  derivation: always_blank
+  note: >
+    Grant GD is intentionally left blank. 2026-09-22 instruction: no longer
+    read from the Codes tab (which no longer supports the Course-keyed
+    hierarchy lookup this used) or any other source.
 
 - target: ge
-  derivation: course_lookup_verbatim
-  lookup:
-    file: Source Data
-    sheet_name: Codes
-    lookup_input: source_column(Course Name)
-    match_column: Course
-    return_column: Program
-    on_unresolved: silent_blank
-  note: Programme GE = Codes!"Program" (col L). Blank for all current Codes rows.
+  derivation: always_blank
+  note: >
+    Programme GE is intentionally left blank. 2026-09-22 instruction: no
+    longer read from the Codes tab (which no longer supports the Course-keyed
+    hierarchy lookup this used) or any other source.
