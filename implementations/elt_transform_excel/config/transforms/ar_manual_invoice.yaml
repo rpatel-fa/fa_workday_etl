@@ -87,7 +87,7 @@ transform_constants:
 shell_defaults:
   source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/manual/source/Manual EBW Invoices - 26-27 1.xlsx
   target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/FA Submit Customer Invoice.xlsx
-  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/manual/target/Submit_Customer_Invoice_v46.1_ar_manual_invoice_output.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/manual/target/FA_Submit_Customer_Invoice_ar_manual_invoice_output.xlsx
   # source_layout defaults -- override here to change which sheet/rows the transform uses at build time
   source_worksheet_resolution: named
   source_worksheet_name: "Sales CRM Post 270726"
