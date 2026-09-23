@@ -1,0 +1,345 @@
+# Transform spec - ap_stationery_addisonlee_wnsl
+#
+# Addison Lee taxi-cost invoices for the WNSL company (Wembley National Stadium Ltd).
+# This is the dedicated transform that ap_stationery.yaml's DELIBERATE SCOPE EXCLUSION
+# defers /ADDISON LEE/WNSL/ files to. Human decision record + authoritative target-column
+# mapping; the mapping: section is the source of truth the .bas module
+# (vba_src/transforms/modApStatAddLeeWnslSupInv.bas) mirrors. Lives in
+# config/transform_specs/ (NOT config/transforms/, which is the build-globbed runnable set).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and
+# source layout (worksheet, header row, required headers, data-end marker, fill-down
+# columns) - live in the build profile config/transforms/ap_stationery_addisonlee_wnsl.yaml
+# (the build-consumed source of truth). Not restated here.
+#
+# OUTPUT RULES MIRROR ap_stationery (see config/transform_specs/ap_stationery.yaml Rules
+# 3/5/6/15/16/17/19/10/11 for the 2026-09-09 AP decisions). Rule numbers below re-use the
+# ap_stationery numbering so the two specs can be compared side by side. What differs is the
+# SOURCE: WNSL workbooks have no "Proactis Upload" tab. Finance builds a pivot table on the
+# "pivot" tab (tab-name case varies: "pivot" Jul 26, "PIVOT" Aug 26) summarising the Addison
+# Lee "Reference" job report by 4-segment accounting string:
+#   Row 3 = header. A:D are pivot-table fields; E:G are Finance-typed columns OUTSIDE the pivot.
+#     A "Row Labels"               accounting string, e.g. 1019-302101-00000000-0000
+#     B "Sum of Invoice Final Net" Net
+#     C "Sum of Invoice Total Vat" VAT
+#     D "Sum of Invoice Amount"    Gross
+#     E "Description" | "DESCRITPION" (Aug 26 Finance typo) - filled on every data row
+#     F "INVOICE DATE"             filled on the FIRST data row only
+#     G "INVOICE NUMBER"           filled on the FIRST data row only
+#   Rows 4..N = one line per accounting string; "Grand Total" row in col A ends the data.
+#   Exemplars inspected 2026-09-23:
+#     WNSL_3426595_31.7.26_BACKUP.xlsx  - 8 lines, inv 3426595, 31/07/2026, net 6429.65
+#     WNSL_3435380_31.8.26_BACK UP.xlsx - 6 lines, inv 3435380, 31/08/2026, net 4400.48
+#
+# Data shape = one workbook = ONE multi-line invoice (F/G filled down to every line). The
+# VBA still groups by INVOICE NUMBER through the shared AssignInvoiceLineGroup helper, so a
+# future pivot carrying 2+ invoice numbers would also emit correct multi-invoice output.
+#
+# Derived-field rules (pivot -> EIB mapping):
+#
+#   Rule 1  - Company (EIB R): FIXED company code "WNSL" (no SupplierID column to split).
+#             Resolved via the Runner mapping sheet (entity=company) -> "THE FA GROUP - WNSL"
+#             (config/ingest_lookups/ref_company.json); fallback = the same entity name.
+#   Rule 2  - Supplier (EIB U): FIXED CreditorID "ADD001" (Workday supplier extract: ADDISON
+#             LEE, S-000127), resolved ONCE per run via the same 2-part precedence
+#             ap_stationery uses: "ADD001-WNSL" first, then bare "ADD001". Unresolved = run
+#             FAILS (no row can be written without a supplier).
+#   Rule 3  - Invoice Number (EIB K): COMPOSITE = "ADD001" + "-" + YYMM(InvoiceDate) + "-" +
+#             raw INVOICE NUMBER. e.g. ADD001-2608-3435380. Same K on every line of the group.
+#   Rule 4  - Invoice Date (EIB AF): col F "INVOICE DATE" (filled down), NormalizeSourceDate
+#             -> YYYY-MM-DD text.
+#   Rule 5  - Receipt Date (EIB AG): LEAVE BLANK (mirrors ap_stationery 2026-09-09 decision).
+#   Rule 6  - Suppliers Invoice Number (EIB BG): raw INVOICE NUMBER passthrough (e.g. 3435380).
+#             INTENTIONALLY DIFFERENT from Rule 3 K.
+#   Rule 7  - Accounting string (worktags): col A "Row Labels" RAW, passed straight into the
+#             shared lowest-hierarchy resolver (separator normalisation is done inside it).
+#   Rule 8  - Item Description (EIB EP): col E UCase(Trim()).
+#   Rule 9  - Memo (EIB GQ): K composite + " " + "WNSL-ADD001" + " " + normalised accounting
+#             string. "WNSL-ADD001" is the {Company}-{CreditorID} token ap_stationery's memo
+#             carries from its SupplierID column, rebuilt here from the two fixed constants.
+#   Rule 10 - Line Amount (EIB GE Unit Cost + GF Extended Amount): BOTH = Net (col B), with the
+#             shared Gross - VAT fallback when Net is blank/zero; absolute value (mirrors
+#             ap_stationery). ROUNDED TO 2dp: pivot sums carry binary float noise
+#             (e.g. 2614.6400000000003) that must not leak into the EIB.
+#   Rule 11 - Tax (EIB FE/FF/FK): FIXED P20 triple on every line (user decision 2026-09-23:
+#             the pivot has no TaxCode column; VAT/Net is ~20% on every row in both exemplars):
+#             GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard / Fully_Recoverable.
+#   Rule 12 - Currency (EIB T): FIXED GBP (no currency column).
+#   Rule 14 - Reporting Type (EIB GR): LEFT(Seg2, 1) via ResolveReportingTypeFromFinalCode.
+#   Rule 15 - Spreadsheet Key (EIB B): per INVOICE NUMBER group, shared AssignInvoiceLineGroup.
+#   Rule 16 - Line Order (EIB EM): per-group 1..N from the same helper.
+#   Rule 17 - Control Amount Total (EIB AS): LEAVE BLANK.
+#   Rule 18 - Header Consistency Guard: Company / Supplier / Currency are fixed, so only
+#             InvoiceDate can diverge within an INVOICE NUMBER group; divergence FAILS the run
+#             before any EIB row is written.
+#   Rule 19 - Row ID (EIB EK): EXACT mirror of EM.
+#   Rule 13 (PO Number, EIB BH) does NOT apply - the pivot has no PO column; BH is not written.
+#
+# Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md);
+# house defaults inherited unchanged: I=Y, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+
+meta:
+  key: ap_stationery_addisonlee_wnsl
+  label: AP Stationery Addison Lee WNSL
+  requester: Finance (AP)
+  date_confirmed: 2026-09-23
+  exemplar_to_fork: ap_stationery
+  note: >
+    Output rules forked 1:1 from ap_stationery. Source differs: Finance-built pivot tab
+    (accounting string / Net / VAT / Gross) plus three Finance-typed columns outside the
+    pivot (Description / INVOICE DATE / INVOICE NUMBER). Supplier, company, currency and tax
+    are fixed because the pivot carries no per-row SupplierID / Currency / TaxCode columns.
+
+shared_helpers:
+  supplier_resolution: fixed_reference_id
+  company_resolution: fixed_literal
+  accounting_string_derivation: direct_column_separator_normalized
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: effective_net_gross_tax_fallback
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  supplier:
+    source_code: ADD001                       # fixed CreditorID (no SupplierID column in the pivot)
+    company_code: WNSL
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    key_precedence:
+      1: "{CreditorID}-{Company}"             # "ADD001-WNSL"
+      2: "{CreditorID}"                       # "ADD001"
+    reference_id_delimiter: pipe
+    on_unresolved: fail_run
+    note: >
+      Resolved ONCE per run with ResolveSupplierWithCompanyPrecedence (same 2-part precedence
+      as ap_stationery, but with fixed inputs). The Aug 2026 supplier extract has no
+      "ADD001-WNSL" key, so today it resolves via the bare "ADD001" fallback to S-000127.
+  company:
+    source_code: WNSL                         # fixed company code
+    resolved_via: mapping tab entity=company
+    fallback: THE FA GROUP - WNSL             # same string as company_fallback in build profile
+
+fields:
+  invoice_number:                             # EIB K (Rule 3, COMPOSITE)
+    function: concatenate_three_segments_with_dash
+    segment_sources:
+      - segment: "Fixed_CreditorID_ADD001"
+      - segment: "YYMM_2digitYear_2digitMonth_of_InvoiceDate"   # from the NormalizeSourceDate output written to AF
+      - segment: "Source_InvoiceNumber_Raw_Passthrough"          # col G INVOICE NUMBER (filled down)
+    separator: "-"
+    group_key_source_column: INVOICE NUMBER
+    examples:
+      - "ADD001-2607-3426595   (WNSL_3426595_31.7.26_BACKUP.xlsx, InvoiceDate 2026-07-31)"
+      - "ADD001-2608-3435380   (WNSL_3435380_31.8.26_BACK UP.xlsx, InvoiceDate 2026-08-31)"
+    intentionally_differs_from_target_column_k: true
+  invoice_date:                               # EIB AF
+    source_column: INVOICE DATE               # col F, filled down from the first data row
+    format: Excel date coerced to YYYY-MM-DD text at VBA write time
+  receipt_date:                               # EIB AG
+    function: leave_blank
+  suppliers_invoice_number:                   # EIB BG (Rule 6)
+    source_column: INVOICE NUMBER             # col G raw passthrough (filled down)
+    intentionally_differs_from_target_column_k: true
+  item_description:                           # EIB EP
+    source_column: Description                # alias "DESCRITPION" (Aug 26 typo)
+    post_process: UCase(Trim(value))
+  memo:                                       # EIB GQ (Rule 9)
+    rule: InvoiceNumberComposite + ' ' + 'WNSL-ADD001' + ' ' + AccountingStringNormalized
+  line_amount:                                # EIB GE + GF (Rule 10)
+    source_column_net: Sum of Invoice Final Net
+    source_column_tax: Sum of Invoice Total Vat
+    source_column_gross: Sum of Invoice Amount
+    basis: net
+    fallback_net_from_gross_minus_tax: true
+    absolute_value: true
+    round_to_decimals: 2
+  currency:
+    value: GBP                                # Rule 12, fixed
+  spreadsheet_key_group_id:                   # EIB B (Rule 15)
+    function: per_source_invoice_number_group_sequential_id
+    group_key_source_column: INVOICE NUMBER
+    id_start: 1
+    id_assignment_order: source_file_row_order
+  line_order_within_group:                    # EIB EM (Rule 16)
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: INVOICE NUMBER
+    counter_start: 1
+    reset_on_new_group: true
+  invoice_line_row_id:                        # EIB EK (Rule 19) - mirror of EM
+    function: per_source_invoice_number_group_1based_reset_counter
+    group_key_source_column: INVOICE NUMBER
+    cross_column_guarantee: bitwise_equal_to_target_column_em_line_order
+  control_amount_total_per_group:             # EIB AS (Rule 17)
+    function: leave_blank
+    group_key_source_column: INVOICE NUMBER
+  header_consistency_guard_within_group:      # Rule 18; runtime error guard (no mapping target)
+    guard_type: runtime_error_before_eib_write
+    group_key_source_column: INVOICE NUMBER
+    must_be_equal_across_group:
+      - Rule 4 InvoiceDate (EIB AF)
+    on_mismatch: reject_build_with_error_message
+  spend_category:                             # EIB EW
+    derivation: per_row_lookup
+    key_source_column: Row Labels
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Spend Category
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  cost_centre:                                # EIB GT
+    derivation: per_row_lookup
+    key_source_column: Row Labels
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  reporting_type:                             # EIB GR (Rule 14)
+    derivation: derived_from_second_segment
+    source_segment_string: Row Labels
+    rule: LEFT(SEG2, 1) mapped via ResolveReportingTypeCode
+  related_worktags:                           # 7 optional worktags, all skip_ok on miss
+    event:              {target: GV, source_segment: Row Labels, worktag_business_object_key: Events - Custom Org, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    camp:               {target: GX, source_segment: Row Labels, worktag_business_object_key: Camps - Custom Org, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    fa_learning_course: {target: GZ, source_segment: Row Labels, worktag_business_object_key: FA Learning - Custom Org, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    commercial_partner: {target: HB, source_segment: Row Labels, worktag_business_object_key: Commercial Partners - Custom Worktag, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    grant:              {target: HD, source_segment: Row Labels, worktag_business_object_key: Grant, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    programme:          {target: HF, source_segment: Row Labels, worktag_business_object_key: Program - Delivered Org, use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+    project:            {target: HH, source_segment: Row Labels, worktag_business_object_key: Projects (Opex), use_shared_lookup: standard_9pack_lowest_specificity, on_unresolved: skip_ok}
+
+tax:
+  mode: uniform
+  sets:
+    - applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+      note: >
+        Same triple as ap_stationery P20. Fixed because the pivot carries no TaxCode column
+        (user decision 2026-09-23).
+
+skip_rule:
+  end_of_data: first row whose col A "Row Labels" = "Grand Total" (pivot total row, never a line)
+  drop_when:
+    - Row empty or a summation trailer (shared RowIsEmptyOrTrailer; Description blank + TOTAL/GRAND label)
+    - Row Labels (accounting string) blank
+    - INVOICE NUMBER blank after fill-down
+    - INVOICE DATE blank after fill-down
+    - Net <= 0 AND Gross - VAT <= 0 (zero-value line)
+    - cost_centre unresolved
+    - spend_category unresolved
+
+unused_source_columns: []                    # every pivot column A:G is used
+
+open_questions: []                           # all decisions resolved in this spec
+
+mapping:
+# EIB-level columns. House defaults = I=Y, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+- target: B
+  source: spreadsheet_key_group_id (fields.spreadsheet_key_group_id)
+  rule: Rule 15 (per INVOICE NUMBER group via AssignInvoiceLineGroup; 1..M in source order)
+- target: I
+  default: "Y"
+- target: K
+  source: invoice_number (fields.invoice_number)
+  function: concatenate_3segments_creditorid_yymm_sourceinvnum_dash_separated
+  rule: Rule 3 (ADD001 + '-' + YYMM(AF) + '-' + raw INVOICE NUMBER)
+- target: R
+  source_value: WNSL                          # Rule 1
+  lookup:
+    file: this
+    tab: mapping
+    filter_column: entity
+    filter_value: company
+    input_column: source
+    output_column: target
+    fallback_on_fail: THE FA GROUP - WNSL
+- target: T
+  default: GBP                                # Rule 12
+- target: U
+  source_value: ADD001                        # Rule 2 (2-part precedence with company WNSL)
+  lookup:
+    file: Supplier Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Supplier ID
+    equality: pipe_delimiter_contains
+    on_fail: fail_run
+- target: AF
+  source_column: INVOICE DATE
+  target_format: YYYY-MM-DD
+- target: AG
+  source: receipt_date (fields.receipt_date)
+  rule: Rule 5 - LEAVE BLANK
+- target: AS
+  source: control_amount_total_per_group (fields.control_amount_total_per_group)
+  rule: Rule 17 - LEAVE BLANK
+- target: BG
+  source: suppliers_invoice_number (fields.suppliers_invoice_number)
+  source_column: INVOICE NUMBER
+  rule: Rule 6 - raw passthrough, intentionally different from K
+- target: EL
+  rule: Leave EMPTY (Workday auto-assigns Supplier Invoice Line ID from Line Order EM)
+- target: EM
+  source: line_order_within_group (fields.line_order_within_group)
+  rule: Rule 16 (per-group 1..N)
+- target: EK
+  source: invoice_line_row_id (fields.invoice_line_row_id)
+  rule: Rule 19 (EXACT mirror of EM)
+- target: EP
+  source_column: Description
+  post_process: UCaseTrim
+- target: EW
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Spend Category
+  on_blank: reject
+- target: FE
+  default: GBR_Domestic_Purchase_Of_Goods_And_Services   # Rule 11 uniform
+- target: FF
+  default: GBR_Standard
+- target: FH
+  default: INVOICE/ADJUSTMENT_DATE
+- target: FK
+  default: Fully_Recoverable
+- target: FL
+  default: CALC_TAX_DUE
+- target: GE
+  source_resolution: net_amount_or_gross_minus_tax_rounded_2dp
+- target: GF
+  source_resolution: net_amount_or_gross_minus_tax_rounded_2dp   # SAME as GE (Rule 10)
+- target: GQ
+  function: concat_traceability_memo
+- target: GR
+  source_resolution: reporting_type_from_final_code_segment2_first_char
+  worktag: Reporting Type
+- target: GT
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Cost Centre
+  on_blank: reject
+- target: GV
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Events - Custom Org
+  optional: true
+- target: GX
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Camps - Custom Org
+  optional: true
+- target: GZ
+  source_resolution: lowest_hierarchy_final_code
+  worktag: FA Learning - Custom Org
+  optional: true
+- target: HB
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Commercial Partners - Custom Worktag
+  optional: true
+- target: HD
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Grant
+  optional: true
+- target: HF
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Program - Delivered Org
+  optional: true
+- target: HH
+  source_resolution: lowest_hierarchy_final_code
+  worktag: Projects (Opex)
+  optional: true

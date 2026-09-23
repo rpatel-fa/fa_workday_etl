@@ -55,7 +55,8 @@ transform:
     Per-row dates: InvoiceDate from col D (InvoiceDate); AG is blank per (2) above.
     Line description from col O Description. Net/Gross amounts from cols L+N.
 
-    DELIBERATE EXCLUSION — handled as a separate future transform (separate session):
+    DELIBERATE EXCLUSION — handled by the separate transform ap_stationery_addisonlee_wnsl
+    (config/transforms/ap_stationery_addisonlee_wnsl.yaml; reads the "pivot" tab):
     * ANY workbook under /ADDISON LEE/WNSL/ subfolder (i.e. WNSL-prefixed SupplierID
       such as "WNSL-ADD001" / WNSL-invoice-3426595* files). These are intentionally NOT
       routed through this generic ap_stationery pipeline. The WNSL folder today contains
@@ -201,7 +202,8 @@ shell_defaults:
   # (3) the machine-local output_file_path target.
   #
   # DELIBERATE EXCLUSION (kept as a belt-and-braces note even though the TEMPLATE pattern
-  # already excludes it): /ADDISON LEE/WNSL/ files are intentionally NOT covered here.
+  # already excludes it): /ADDISON LEE/WNSL/ files are intentionally NOT covered here —
+  # see ap_stationery_addisonlee_wnsl.yaml.
   variants:
     - profile_key: ap_stationery_addison_lee_fa
       profile_label: AP Stationery Addison Lee FA
