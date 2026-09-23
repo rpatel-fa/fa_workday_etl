@@ -24,3 +24,14 @@
 - Example entry points (what to run): [docs/examples.md](docs/examples.md)
 - Reference export outlier (`fin_workday_ref.py`): [docs/reference-export.md](docs/reference-export.md)
 - Reconciliation (source→target data integrity, distinct from validation): [docs/reconciliation.md](docs/reconciliation.md)
+
+## Standalone utilities (outside the SQL/ELT pipeline)
+
+These scripts live under `scripts/` but are **not** part of the ingest → transform →
+publish pipeline. They solve one-off Finance requests that reuse the repo's Python
+tooling (openpyxl, duckdb conventions) but do not touch config or publish workbooks.
+
+| Utility | Docs | When to use |
+|---|---|---|
+| [scripts/email_to_contact_names.py](scripts/email_to_contact_names.py) | [docs/email-contact-name-fill.md](docs/email-contact-name-fill.md) | Given a 3-col workbook (email / First name / Surname), fill names from the email local-part where confident, blank everything else. For Gayle/3+ style EIB prep: "leave blank if you can't tell unambiguously". |
+| [scripts/populate_eib_corrections.py](scripts/populate_eib_corrections.py) | Header docstring in the script | Fills the yellow `CORRECTION` column on a Workday Submit-Supplier EIB error tab, joining the DuckDB transform output keyed on the stable GP Vendor reference so corrections carry leading zeros correctly. |
