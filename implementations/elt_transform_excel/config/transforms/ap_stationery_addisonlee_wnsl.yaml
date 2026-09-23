@@ -1,0 +1,176 @@
+version: 1
+
+transform:
+  key: ap_stationery_addisonlee_wnsl
+  label: AP Stationery Addison Lee WNSL
+  source_type: AP Stationery Addison Lee WNSL Pivot
+  eib_population_type: Supplier Invoice
+  description: >
+    Addison Lee taxi-cost invoice workbooks for the WNSL company (Wembley National Stadium
+    Ltd) transformed into the Workday Supplier Invoice EIB. This is the separate transform
+    that ap_stationery.yaml defers /ADDISON LEE/WNSL/ files to. It mirrors the ap_stationery
+    output rules (composite K, raw BG, blank AG/AS, per-group EM/EK counter, Net-only GE/GF,
+    P20 triple, 9 worktags via Mapping MASTER), but the SOURCE LAYOUT IS DIFFERENT: WNSL
+    workbooks (e.g. WNSL_3435380_31.8.26_BACK UP.xlsx) have no "Proactis Upload" tab. Finance
+    builds a pivot table on the "pivot" tab (see the PROCESS tab in the Jul file) summarising the
+    Addison Lee "Reference" job report by 4-segment accounting string.
+
+    "pivot" tab layout (inspected 2026-09-23 on WNSL_3426595_31.7.26_BACKUP.xlsx [tab "pivot"]
+    and WNSL_3435380_31.8.26_BACK UP.xlsx [tab "PIVOT"] -- identical layout; tab-name case
+    varies, which is fine because Excel's Worksheets(name) lookup is case-insensitive):
+      * Row 3 = header row. A:D are pivot-table fields; E:G are Finance-typed columns
+        OUTSIDE the pivot table that carry invoice-level information:
+          A "Row Labels"               -> 4-segment accounting string (e.g. 1019-302101-00000000-0000)
+          B "Sum of Invoice Final Net" -> Net
+          C "Sum of Invoice Total Vat" -> VAT
+          D "Sum of Invoice Amount"    -> Gross
+          E "Description"              -> line description (filled on every data row).
+                                          Header spelling varies: Jul = "Description",
+                                          Aug = "DESCRITPION" (Finance typo) -- aliased below.
+          F "INVOICE DATE"             -> filled on the FIRST data row only (row 4)
+          G "INVOICE NUMBER"           -> filled on the FIRST data row only (row 4)
+      * Rows 4..N = one line per accounting string.
+      * "Grand Total" row in col A terminates the data and is NOT a line.
+    The whole tab is ONE multi-line invoice: F and G are filled down from the first data row
+    to every line (transform_constants.fill_down_context_columns), so all lines share one Spreadsheet Key (col B) group.
+
+    Output rules mirrored from ap_stationery (see that config for the 2026-09-09 decisions):
+      (1) K (InvoiceNumber) = COMPOSITE = CreditorID + "-" + YYMM(InvoiceDate) + "-" + raw
+          INVOICE NUMBER (e.g. ADD001-2608-3435380). BG (SuppliersInvoiceNumber) = raw
+          INVOICE NUMBER (e.g. 3435380).
+      (2) AG (ReceiptDate) left BLANK.
+      (3) EM (Line Order) = 1..N per invoice group.
+      (4) EK (Row ID) = EXACT MIRROR of EM.
+      (5) AS (Control Amount Total) left BLANK.
+      (6) GE = GF = Net (col B) only, no VAT pre-add.
+      (7) Tax = FIXED P20 triple on every line (user decision 2026-09-23: the pivot has no
+          TaxCode column; VAT/Net is ~20% on every row): GBR_Domestic_Purchase_Of_Goods_And_Services /
+          GBR_Standard / Fully_Recoverable.
+    Differences from ap_stationery (no per-row source columns exist for these):
+      * Supplier is FIXED: CreditorID ADD001 (Workday supplier extract: ADDISON LEE, S-000127),
+        company WNSL. Same 2-part key precedence ({CreditorID}-{Company} then {CreditorID}).
+      * Company is FIXED: WNSL -> "THE FA GROUP - WNSL" (ingest_lookups/ref_company.json).
+      * Currency is FIXED: GBP.
+
+    VBA: dedicated step-list macro RunApStationeryAddisonLeeWnslSupplierInvoice in
+    vba_src/transforms/modApStatAddLeeWnslSupInv.bas (module name shortened to fit VBA's
+    31-char limit) reads the pivot layout above. See
+    config/transform_specs/ap_stationery_addisonlee_wnsl.yaml for the decision record and
+    per-column mapping.
+
+runtime:
+  step_list_macro: RunApStationeryAddisonLeeWnslSupplierInvoice
+
+source_layout:
+  worksheet_name: pivot
+  worksheet_resolution: named
+  header_row: 3
+  data_start_row: 4
+  header_detection: scan_required_headers
+  # Data ends at the row whose col A (Row Labels) = "Grand Total" (pivot total row, excluded).
+  data_end_marker:
+    column: Row Labels
+    value: Grand Total
+  required_headers:
+    - Row Labels
+    - Sum of Invoice Final Net
+    - Sum of Invoice Total Vat
+    - Sum of Invoice Amount
+    # Pipe-delimited alias list (same convention as ap_stationery): Jul file = "Description",
+    # Aug file = "DESCRITPION" (Finance typo). NormalizeToken handles whitespace/case.
+    - Description|DESCRITPION
+    - INVOICE DATE
+    - INVOICE NUMBER
+
+transform_constants:
+  # Supplier resolution contract. No SupplierID column in the pivot, so the two segments that
+  # ap_stationery splits per row from "{CompanyPrefix}-{CreditorID}" are fixed here.
+  supplier_resolution:
+    mode: fixed
+    segments:
+      - index: 1
+        name: Company
+        value: WNSL
+        note: Resolves Workday company ref-id via mapping sheet entity=company
+      - index: 2
+        name: CreditorID
+        value: ADD001
+        note: Addison Lee bare creditor ID (Workday supplier extract, S-000127)
+    key_precedence:
+      1: "{CreditorID}-{Company}"
+      2: "{CreditorID}"
+    resolved_via: Supplier Spreadsheet
+    key_column: Reference ID
+    value_column: Supplier ID
+    reference_id_delimiter: pipe
+  fixed_company_code: WNSL
+  fixed_supplier_reference_id: ADD001
+  fixed_currency: GBP
+  # Invoice-level headers typed OUTSIDE the pivot table (cols F:G): populated on the first
+  # data row only; filled down to every line before row iteration (canonical key, same as
+  # ap_amex_trains_v2).
+  fill_down_context_columns:
+    - INVOICE DATE
+    - INVOICE NUMBER
+  # Source column -> invoice field bindings for the pivot layout.
+  source_columns:
+    accounting_string: Row Labels
+    net_amount: Sum of Invoice Final Net
+    tax_amount: Sum of Invoice Total Vat
+    gross_amount: Sum of Invoice Amount
+    line_description: Description|DESCRITPION
+    invoice_date: INVOICE DATE
+    invoice_number: INVOICE NUMBER
+  # Fixed P20 on every line (no TaxCode column). Same triple as ap_stationery rate_20.
+  uniform_tax:
+    applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
+  company_fallback: THE FA GROUP - WNSL
+  mapping_sheet: MAPPING MASTER
+  # All 9 worktags resolved from the col A "Row Labels" 4-segment accounting string via
+  # Mapping MASTER lowest-hierarchy match (Seg1=Cost Centre, Seg2=Spend Category,
+  # Seg3=Project/Commercial Partner/Grant, Seg4=Program).
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  source_worksheet_name: pivot
+  source_worksheet_resolution: named
+  source_header_row: 3
+  source_data_start_row: 4
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml.
+  #
+  # Paths use the repo's authored root (/Users/Rakesh.Patel/Documents/__data); the Windows
+  # build profile in config/root_path_substitutions.yaml rewrites it to
+  # C:\Users\Chika.Etheridge\Documents\workday_finance\data.
+  variants:
+    - profile_key: ap_stationery_addisonlee_wnsl
+      profile_label: AP Stationery Addison Lee WNSL
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/WNSL/source/WNSL_3435380_31.8.26_BACK UP.xlsx
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/WNSL/target/Submit_Supplier_Invoice_ap_stationery_addisonlee_wnsl_output.xlsx
