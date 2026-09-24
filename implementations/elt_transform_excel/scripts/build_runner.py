@@ -2699,7 +2699,7 @@ VALID_HEADER_DETECTIONS = {"literal_row", "scan_required_headers"}
 # one archetype branch in _validate_transform_constants_schema). This is the
 # single place to extend when Business later brings Setup EIBs on.
 SUPPORTED_EIB_POPULATION_TYPES: frozenset[str] = frozenset(
-    {"Supplier Invoice", "Customer Invoice"}
+    {"Supplier Invoice", "Customer Invoice", "Supplier Invoice Adjustment"}
 )
 
 
@@ -2769,6 +2769,13 @@ def _load_eib_defaults(defaults_path: Path) -> dict[str, dict[str, object]]:
             "submit_flag_default",
             "payment_status_default",
             "document_status_default",
+            "default_currency_default",
+            "safe_shared_columns",
+        ),
+        "Supplier Invoice Adjustment": required_keys_base + (
+            "add_only_default",
+            "auto_complete_default",
+            "submit_flag_default",
             "default_currency_default",
             "safe_shared_columns",
         ),
@@ -3329,6 +3336,32 @@ def _validate_transform_constants_schema(
             _validate_derived_worktags_block(profile_path, transform_consts)
             _validate_unmapped_handling(profile_path, transform_consts)
             _validate_customer_invoice_eib_columns(profile_path, transform_consts)
+    elif eib_type == "Supplier Invoice Adjustment":
+        # Credit-note / amendment archetype (Submit Supplier Invoice Adjustment EIB).
+        # There is NO worktag hierarchy pipeline and NO tax pipeline: amendment lines carry
+        # no per-line coding (Spend Category is left blank, matching the GP-ingest precedent
+        # workday_supplier_credit_note.sql). The ONLY required constant is company_fallback
+        # (used by ResolveMappedCompany for the constant company code). worktag_business_objects
+        # / fixed_literal_worktags / tax blocks MUST NOT be declared for this archetype.
+        company_fallback = transform_consts.get("company_fallback")
+        if not isinstance(company_fallback, str):
+            raise ValueError(
+                f"Profile '{profile_path}' transform_constants.company_fallback "
+                "must be a string for the Supplier Invoice Adjustment archetype "
+                "(use empty string '' explicitly if there is no fallback)."
+            )
+        forbidden = [
+            k for k in ("worktag_business_objects", "fixed_literal_worktags",
+                        "uniform_tax", "per_row_tax", "tax_mode")
+            if transform_consts.get(k) is not None
+        ]
+        if forbidden:
+            raise ValueError(
+                f"Profile '{profile_path}' is Supplier Invoice Adjustment archetype but "
+                f"declares {forbidden}. Amendment (credit-note) lines carry NO worktag "
+                "hierarchy pipeline and NO tax pipeline (Spend Category is left blank per "
+                "the GP-ingest workday_supplier_credit_note.sql precedent). Remove those blocks."
+            )
     else:
         raise ValueError(
             f"Profile '{profile_path}' has unknown eib_population_type "

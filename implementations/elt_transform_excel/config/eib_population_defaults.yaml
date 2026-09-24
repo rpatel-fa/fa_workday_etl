@@ -117,3 +117,27 @@ eib_populations:
       grant: GD
       programme: GE
       project_line: GF
+
+  # Credit notes are loaded to Workday as Supplier Invoice Adjustments (a separate business
+  # object / EIB from Submit Supplier Invoice). Added 2026-09-24 for CFA Distributions credit
+  # notes (ap_cfa_distributions_amendments). Template: Submit_Supplier_Invoice_Adjustment_v46.0.
+  # Column mapping mirrors the GP-ingest workday_supplier_credit_note.sql precedent.
+  "Supplier Invoice Adjustment":
+    target_sheet_name: "Submit Supplier Invoice Adjustm"   # v46.0 tab name (31-char Excel limit)
+    target_data_start_row: 6
+    # Amendment line fields run to FB (Memo). Clear to FB on re-runs (the template ships a
+    # sample "Conversion" row at row 6 that must be cleared).
+    clear_published_rows_end_col: "FB"
+    add_only_default: "Y"
+    auto_complete_default: "Y"
+    submit_flag_default: "Y"
+    default_currency_default: "GBP"
+    # Archetype-safe SHARED columns for the amendment writer (the ColumnIndex() coverage gate's
+    # single source of truth for this population type). Header B, control flags C/E/I, invoice
+    # number K, company P, currency R, supplier S, adjustment reason X, adjustment date Y,
+    # control total AP; line row id CV, item description DA, spend category DH, extended amount
+    # EQ, memo FB.
+    safe_shared_columns: [
+      "B", "C", "E", "I", "K", "P", "R", "S", "X", "Y", "AP",
+      "CV", "DA", "DH", "EQ", "FB"
+    ]

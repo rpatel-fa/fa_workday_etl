@@ -261,6 +261,19 @@ shared_helpers:
   # --------------------------------------------------------------------------
   invoice_line_grouping:
 
+    none:
+      description: >
+        No invoice-line grouping. Each output row is its own standalone document with a plain
+        per-row sequence Spreadsheet Key (and a fixed single-line Row ID). Used where grouping by
+        the source invoice-number field would be WRONG because that field is not unique per
+        document -- e.g. CFA Distributions credit-note amendments, where every credit note has a
+        distinct supplier but shares the same "Invoice Number" label, so each must be a separate
+        Supplier Invoice Adjustment. The transform does NOT call AssignInvoiceLineGroup.
+      vba_module: null
+      vba_public_fn: null
+      examples:
+        - ap_cfa_distributions_amendments
+
     per_invoice_number:
       description: >
         Assign the Workday header Spreadsheet Key per source invoice number and
@@ -324,7 +337,6 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
-        - ap_cfa_claims
 
     amex_padded_22char_pipeline:
       description: >
@@ -353,6 +365,21 @@ shared_helpers:
         - ap_prize_funds
         - ap_referees
         - ap_referees_v2
+
+    none:
+      description: >
+        No accounting/cost-code string is present in the source at all, so there is
+        NO derivation and NO separator normalisation. Used where Finance now deliver a
+        source file that has ALREADY resolved every coding element into its own explicit
+        Workday-ref-id column (e.g. the Sep-2026-onwards CFA Claims "Finance Approv" tab,
+        which carries Cost Centre / Spend Category / Program / Grant / etc. as discrete
+        pre-resolved columns instead of a Budget Code coding string). The transform reads
+        those columns directly (see worktag_hierarchy_lookup.none) and never calls
+        NormalizeCostCodeSeparators / FinalCodeSegment / the lowest-hierarchy resolver.
+      vba_module: null
+      vba_public_fn: null
+      examples:
+        - ap_cfa_claims
 
     direct_distribution_reference_code:
       description: >
@@ -402,7 +429,6 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
-        - ap_cfa_claims
         - ap_cfa_distributions
         - ap_prize_funds
         - ap_referees
@@ -462,6 +488,28 @@ shared_helpers:
         integration_mandatory_on_unresolved: skip_and_report
         # All 7 optional tags are always permissive (blank is always valid).
         optional_on_unresolved: skip_ok
+
+    none:
+      description: >
+        No worktag hierarchy resolution at all. Every worktag (Cost Centre, Spend
+        Category, and the optional 7) arrives PRE-RESOLVED as a discrete Workday-ref-id
+        column in the source and is written through VERBATIM (source is the single source
+        of truth for coding). The worktag pipeline is INACTIVE in the profile
+        (no transform_constants.worktag_business_objects / derived_worktags), so the .bas
+        references NO WBO_* public constants, opens NO Mapping MASTER for resolution, and
+        never calls BuildBusinessObjectHierarchyLookup /
+        ResolveLowestHierarchyLookupAcrossFinalCodeSegments /
+        ResolveReportingTypeFromFinalCode. Mandatory Cost Centre / Spend Category still
+        reject the row when the source cell is BLANK (a direct blank-cell gate, not a
+        lookup miss). Existence of each pre-resolved value in Mapping MASTER (WORKDAY REF
+        ID, Core vs Prism = Core) is validated OUT OF BAND at authoring / reconcile time
+        (pass-through + report), not at macro runtime.
+      vba_module: null
+      vba_public_fn: null
+      requires_columns:
+        - one pre-resolved Workday-ref-id source column per active worktag
+      examples:
+        - ap_cfa_claims
 
   # --------------------------------------------------------------------------
   # ROW NET AMOUNT RESOLUTION (for RowIsSkippable)

@@ -31,6 +31,7 @@ active_profiles:
   - ap_amex_trains_v2
   - ap_cfa_claims
   - ap_cfa_distributions
+  - ap_cfa_distributions_amendments
   - ap_commercial_invoice
   - ap_prize_funds
   - ap_stationery

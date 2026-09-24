@@ -1,0 +1,141 @@
+# Transform spec - ap_cfa_distributions_amendments  (*** CFA DISTRIBUTIONS CREDIT NOTES ONLY ***)
+#
+# Credit notes from the CFA Distributions workbook are loaded to Workday as SUPPLIER INVOICE
+# ADJUSTMENTS (Submit_Supplier_Invoice_Adjustment_v46.0), a separate business object from the
+# Submit Supplier Invoice used by the sibling ap_cfa_distributions (invoices). Confirmed by
+# Finance (AP) 2026-09-24.
+#
+# 1 input -> 1 output. This transform reads the SAME source workbook + tab as ap_cfa_distributions
+# ("Distributions - <Month> <YYYY>.xlsm", tab "Finance Master analysis", header row 5, data 6+)
+# and FILTERS to rows where col U "Invoice type" <> "Invoice" (credit notes; negative Original
+# Amount at the bottom of col V). The invoices path filters the complement. The Runner is
+# one-input-one-output, so the partition is by two transforms, not one multi-output macro.
+#
+# Column mapping mirrors the GP-ingest precedent (the CODING AGENT was pointed here by AP):
+#   implementations/elt_ingest_excel/config/transform/sql/finance/supplier_invoice/
+#     workday_supplier_credit_note.sql
+# Amendment (credit-note) lines carry NO per-line worktag coding: Spend Category (DH) is left
+# BLANK, exactly as the ingest SQL does (CAST(NULL AS VARCHAR) column_dh). There is NO Mapping
+# MASTER lookup and NO tax pipeline for this archetype.
+#
+# Source columns used (Finance Master analysis):
+#   T  = Workday ID          -> EIB S  Supplier (passthrough, S-XXXXXX)
+#   U  = Invoice type        -> filter (process only <> "Invoice")
+#   V  = Original Amount      -> EIB AP Control Total + EIB EQ Extended Amount (as-is; negative)
+#   Z  = Invoice Number       -> EIB K  Invoice Number
+#   AA = Invoice Description   -> EIB DA Item Description
+#   AD = Invoice Date          -> EIB Y  Adjustment Date (01/09/2026)
+#   D  = Creditor ID           -> trace only (reject-row context)
+#   A  = DocNo / row key       -> (headerless; = CFA_col - 1) trace only
+
+meta:
+  key: ap_cfa_distributions_amendments
+  label: AP CFA Distributions Amendments (Credit Notes)
+  requester: Finance (AP)
+  date_confirmed: 2026-09-24
+  exemplar_to_fork: workday_supplier_credit_note.sql (elt_ingest_excel)
+  note: >
+    New transform 2026-09-24. Credit notes -> Supplier Invoice Adjustment EIB (new archetype
+    added to build_runner SUPPORTED_EIB_POPULATION_TYPES + eib_population_defaults). Supplier =
+    col T passthrough; Company = constant FA; amounts as-is (negative). No worktag/tax pipeline;
+    Spend Category and Adjustment Reason left blank per the ingest precedent.
+  open_questions: []
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_passthrough
+  company_resolution: fixed_literal
+  accounting_string_derivation: none          # amendments carry no accounting string
+  worktag_hierarchy_lookup: none              # no worktag coding on credit notes (Spend Category blank)
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: none                 # each credit note is its own adjustment (per-row sequence)
+
+parties:
+  supplier:
+    source_code: per_row_direct_passthrough
+    source_column: Workday ID
+    source_column_letter: T
+    resolved_via: "AP-curated Workday Supplier Reference (S-XXXXXX) in col T (DIRECT passthrough). Blank T -> skip + report."
+    reject_if_unresolved: true
+  company:
+    source_code: constant
+    value: FA
+    source_column_present: false
+    resolved_via: "ResolveMappedCompany(\"FA\") -> THE FA GROUP - FA."
+
+row_filter:
+  keep_when: "col U 'Invoice type' present AND UPPER(value) <> 'INVOICE' (credit notes)"
+  route_invoice_rows_to: ap_cfa_distributions
+  note: "Rows with Invoice type = 'Invoice' are skipped silently here (handled by the invoices transform)."
+
+skip_rule:
+  drop_when:
+    - col T (Workday ID / supplier) is blank
+    - col V (Original Amount) is 0 or blank
+    - col Z (Invoice Number) is blank
+    - col AA (Invoice Description) is blank
+    - col AD (Invoice Date) is blank
+  on_drop: reject_row_and_report
+
+eib_population:
+  population_type: Supplier Invoice Adjustment
+  template_version: v46.0
+  template_path_reference: target_eib
+
+mapping:
+  # Submit_Supplier_Invoice_Adjustment_v46.0 column mapping. Mirrors workday_supplier_credit_note.sql.
+  - target: B
+    function: per_row_sequence
+    note: "Spreadsheet Key = per-row sequence (each credit note is its own adjustment document)."
+  - target: C
+    function: fixed_literal_Y
+    constant: "Y"
+    note: "Add Only = Y."
+  - target: E
+    function: fixed_literal_Y
+    constant: "Y"
+    note: "Auto Complete = Y."
+  - target: I
+    function: fixed_literal_Y
+    constant: "Y"
+    note: "Submit = Y."
+  - target: K
+    source_column: Invoice Number
+    note: "Invoice Number = col Z verbatim."
+  - target: P
+    function: mapped_company_constant_fa
+    source_column: "(absent; constant 'FA')"
+    note: "Company = THE FA GROUP - FA via ResolveMappedCompany(FA)."
+  - target: R
+    function: fixed_literal_GBP
+    note: "Currency = GBP."
+  - target: S
+    source_column: Workday ID
+    note: "Supplier = col T passthrough (S-XXXXXX)."
+  - target: X
+    function: blank
+    note: "Adjustment Reason = BLANK (none provided by Finance; matches ingest CAST(NULL))."
+  - target: Y
+    source_column: Invoice Date
+    normalize_source_date: true
+    note: "Adjustment Date = col AD (01/09/2026)."
+  - target: AP
+    source_column: Original Amount
+    note: "Control Total Amount = col V (as-is; negative for credit notes)."
+  - target: CV
+    function: fixed_literal_1
+    constant: "1"
+    note: "Line Row ID = 1 (single line per adjustment)."
+  - target: DA
+    source_column: Invoice Description
+    note: "Item Description = col AA verbatim."
+  - target: DH
+    function: blank
+    note: "Spend Category = BLANK (credit notes carry no coding; matches ingest CAST(NULL))."
+  - target: EQ
+    source_column: Original Amount
+    note: "Extended Amount = col V (as-is; negative)."
+  - target: FB
+    function: blank
+    note: "Memo = BLANK (matches ingest CAST(NULL))."

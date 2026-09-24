@@ -1,0 +1,89 @@
+version: 1
+
+transform:
+  key: ap_cfa_distributions_amendments
+  label: AP CFA Distributions Amendments (Credit Notes)
+  source_type: AP CFA Distributions
+  eib_population_type: Supplier Invoice Adjustment
+  description: >
+    *** CFA DISTRIBUTIONS - CREDIT NOTES ONLY (the amendment/adjustment sibling of
+    ap_cfa_distributions, which handles the positive invoices). ***
+    Credit notes are loaded to Workday as SUPPLIER INVOICE ADJUSTMENTS (a separate business
+    object / EIB from Submit Supplier Invoice), per Finance (AP) 2026-09-24.  Reads the SAME
+    source workbook and tab as ap_cfa_distributions ("Distributions - <Month> <YYYY>.xlsm",
+    tab "Finance Master analysis", header row 5, data rows 6+) but FILTERS to rows where
+    col U "Invoice type" <> "Invoice" (i.e. "Credit Note", shown as NEGATIVE Original Amount at
+    the bottom of col V).  1 input -> 1 output; the invoice/credit-note split is by Invoice type
+    across the two transforms (the Runner is one-input-one-output, so no multi-output macro).
+    Column mapping mirrors the GP-ingest precedent
+    implementations/elt_ingest_excel/config/transform/sql/finance/supplier_invoice/workday_supplier_credit_note.sql:
+      EIB B  = Spreadsheet Key (sequence)
+      EIB C  = Add Only (Y) ; EIB E = Auto Complete (Y) ; EIB I = Submit (Y)
+      EIB K  = Invoice Number      <- col Z
+      EIB P  = Company             <- constant FA (THE FA GROUP - FA)
+      EIB R  = Currency (GBP)
+      EIB S  = Supplier            <- col T "Workday ID" (passthrough)
+      EIB X  = Adjustment Reason   <- BLANK (none provided by Finance)
+      EIB Y  = Adjustment Date     <- col AD "Invoice Date" (01/09/2026)
+      EIB AP = Control Total Amount<- col V "Original Amount" (as-is; negative for credit notes)
+      EIB CV = Line Row ID (1)
+      EIB DA = Item Description    <- col AA "Invoice Description"
+      EIB DH = Spend Category      <- BLANK (credit notes carry no coding; matches ingest precedent)
+      EIB EQ = Extended Amount     <- col V "Original Amount" (as-is; negative)
+      EIB FB = Memo                <- BLANK
+    Template: Submit_Supplier_Invoice_Adjustment_v46.0.xlsx (tab "Submit Supplier Invoice Adjustm").
+    See config/transform_specs/ap_cfa_distributions_amendments.yaml for the decision record + mapping.
+
+runtime:
+  step_list_macro: RunApCfaDistribAmendment
+
+source_layout:
+  worksheet_name: "Finance Master analysis"
+  worksheet_resolution: named
+  header_row: 5
+  data_start_row: 6
+  header_detection: scan_required_headers
+  required_headers:
+    - "CFA"                     # B - County FA name (anchor; DocNo = this col - 1)
+    - "Creditor ID"             # D - legacy creditor code (trace)
+    - "Workday ID"              # T - DIRECT PASSTHROUGH supplier (S-XXXXXX)
+    - "Invoice type"            # U - row-type filter ("Credit Note" here; "Invoice" -> ap_cfa_distributions)
+    - "Original Amount"         # V - Control Total / Extended Amount (negative for credit notes)
+    - "Invoice Number"          # Z - EIB Invoice Number (K)
+    - "Invoice Description"     # AA - EIB Item Description (DA)
+    - "Invoice Date"            # AD - EIB Adjustment Date (Y)
+
+target_eib:
+  template_name: Submit_Supplier_Invoice_Adjustment_v46.0
+  output_columns: 241
+  sheet_name: Sheet1
+
+transform_constants:
+  # Supplier Invoice Adjustment archetype: NO worktag hierarchy pipeline, NO tax pipeline.
+  # Amendment lines carry no per-line coding (Spend Category left blank) per the GP-ingest
+  # workday_supplier_credit_note.sql precedent. Only company_fallback is required (for the
+  # constant company resolution). Do NOT add worktag_business_objects / uniform_tax / etc.
+  company_fallback: THE FA GROUP - FA
+  amendment_constants:
+    constant_company_code: FA
+    invoice_type_filter_column: U          # process only rows where Invoice type <> "Invoice"
+    invoice_type_invoice_value: Invoice
+    supplier_id_column: T                   # Workday ID passthrough -> EIB S
+    control_total_amount_column: V          # Original Amount (as-is, negative) -> EIB AP + EQ
+    invoice_number_column: Z                # -> EIB K
+    item_description_column: AA             # -> EIB DA
+    adjustment_date_column: AD              # -> EIB Y
+    spend_category_blank: true              # EIB DH left blank (no coding on credit notes)
+    adjustment_reason_blank: true           # EIB X left blank (none provided)
+
+shell_defaults:
+  # Same source workbook as ap_cfa_distributions; filters the SAME input by Invoice type.
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/source/Distributions - Sep 2.xlsm
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_Adjustment_v46.0.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/target/Submit_Supplier_Invoice_Adjustment_ap_cfa_distributions_amendments_output.xlsx
+  source_worksheet_name: "Finance Master analysis"
+  source_worksheet_resolution: named
+  source_header_row: 5
+  source_data_start_row: 6
+  # supplier_spreadsheet / mapping_spreadsheet are inherited but NOT loaded at runtime
+  # (supplier = col T passthrough; amendments carry no worktag coding, so no Mapping MASTER).
