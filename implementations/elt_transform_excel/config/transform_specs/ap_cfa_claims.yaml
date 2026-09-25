@@ -21,8 +21,9 @@
 # against Mapping MASTER (lowest-hierarchy, Core vs Prism = Core) to derive Cost Centre,
 # Spend Category, Reporting Type and the 7 optional worktags.
 #
-# The NEW file ("1.0 CFA Claims - Finance Approval - September 2026.xlsx", tab
-# "1.0 CFA Claims - Finance Approv") has done that mapping IN-SOURCE.  Every coding element
+# The NEW file ("1.0 CFA Claims - Finance Approval - September 2026 V2.xlsx", tab
+# "Sheet1" - same A..AA layout as the "1.0 CFA Claims - Finance Approv" tab, which the
+# transform no longer reads) has done that mapping IN-SOURCE.  Every coding element
 # is now a discrete, pre-resolved column, and the invoice header fields are pre-computed:
 #
 #   Col A = Sheet Name / Claim Category   (per-row key; informational + memo)
@@ -34,7 +35,8 @@
 #                                             "National Game Board (NGB)", "FA Investments" -
 #                                             NOT a Mapping MASTER ref id; no WBO exists for it)
 #   G = Revenue Category                  (AR concept; EMPTY on Claims; NOT written to Supplier EIB)
-#   H = Spend Category                    *** PRE-RESOLVED Workday Spend Category ref id (mandatory)
+#   H = Spend Category                    *** PRE-RESOLVED Workday Spend Category ref id (OPTIONAL
+#                                             since 2026-09-25; blank -> EW blank, row kept)
 #   I = Events - Custom Org               *** PRE-RESOLVED Event worktag (optional)
 #   J = FA Learning - Custom Org          *** PRE-RESOLVED FA Learning worktag (optional)
 #   K = Camps - Custom Org                *** PRE-RESOLVED Camp worktag (optional)
@@ -57,7 +59,8 @@
 #   Y = Invoice Number                    *** PRE-COMPUTED -> EIB Invoice Number (K) verbatim,
 #                                             and BG (Suppliers Invoice Number) mirrors it.
 #   Z = Invoice Description               *** PRE-COMPUTED -> EIB Item Description (EP).
-#                                             (Source header carries a typo "Invoice Desctiption".)
+#                                             (Sheet1 header is correctly spelled; the .bas also
+#                                             accepts the legacy typo "Invoice Desctiption".)
 #   AA = Invoice Date                     *** PRE-COMPUTED -> EIB Invoice Date (AF) + Receipt Date (AG).
 #
 # WHAT WAS RETIRED (do NOT re-introduce for the pre-resolved format):
@@ -73,8 +76,15 @@
 #   source is now the single source of truth for coding, so the worktag pipeline is INACTIVE
 #   (no worktag_business_objects / derived_worktags in the profile): the .bas does NO Mapping
 #   MASTER hierarchy lookup, references no WBO_* constants, and never calls
-#   ResolveReportingTypeFromFinalCode.  Mandatory Cost Centre (E) and Spend Category (H) still
-#   REJECT the row when the source cell is BLANK (a direct blank gate).
+#   ResolveReportingTypeFromFinalCode.  Mandatory Cost Centre (E) still REJECTS the row when
+#   the source cell is BLANK (a direct blank gate).
+#
+# SPEND CATEGORY OPTIONAL (decision 2026-09-25):
+#   Sheet1 of the V2 file has Spend Category (H) BLANK on all 14 rows and "Staff_Grant" in
+#   Reporting Type (F).  Decision: H is no longer mandatory - a blank H does NOT reject the
+#   row; EIB EW is written blank and F is written to GR verbatim.  Known risk: Workday
+#   normally requires a Spend Category (or Item) on a supplier invoice line, and GR expects
+#   a Reporting Type org ref id, so such lines may be rejected on EIB load.
 #
 #   Existence of each pre-resolved value in Mapping MASTER (WORKDAY REF ID, Core vs Prism =
 #   Core) is validated OUT OF BAND (at authoring / reconcile time), NOT at macro runtime.
@@ -103,7 +113,10 @@ meta:
     derivation or the per-group invoice counter.  Supplier = col W "Workday Supplier ID Lookup"
     DIRECT passthrough; Company = constant FA.  Mapping MASTER is loaded only for a read-only
     worktag existence check (pass-through + report).
-  open_questions: []
+    UPDATED 2026-09-25: source = "... September 2026 V2.xlsx" tab "Sheet1"; Spend Category (H)
+    made OPTIONAL (blank H no longer rejects the row).
+  open_questions:
+    - "Sheet1 (V2) carries Staff_Grant in Reporting Type (F) with Spend Category (H) blank on every row - Workday may reject these lines (no Spend Category; Staff_Grant is not a Reporting Type). Confirm with Finance whether F/H should be swapped at source."
 
 shared_helpers:
   supplier_resolution: direct_workday_id_passthrough
@@ -142,7 +155,7 @@ worktags_pre_resolved:
   # mandatory = reject row when source cell BLANK.  existence_check = report (not reject) when
   # the non-blank value is not a known ref id for its business object.
   cost_centre:       {source_column: Cost Centre, source_column_letter: E, eib_column: GT, business_object: "Cost Center", mandatory: true,  existence_check: true}
-  spend_category:    {source_column: Spend Category, source_column_letter: H, eib_column: EW, business_object: "Spend Category", mandatory: true, existence_check: true}
+  spend_category:    {source_column: Spend Category, source_column_letter: H, eib_column: EW, business_object: "Spend Category", mandatory: false, existence_check: true, note: "OPTIONAL since 2026-09-25; blank H -> EW blank, row kept"}
   reporting_type:    {source_column: Reporting Type, source_column_letter: F, eib_column: GR, business_object: null, mandatory: false, existence_check: false, note: "display name, no Mapping MASTER WBO; passed through verbatim"}
   event:             {source_column: Events - Custom Org, source_column_letter: I, eib_column: GV, business_object: "Events - Custom Org", mandatory: false, existence_check: true}
   fa_learning:       {source_column: FA Learning - Custom Org, source_column_letter: J, eib_column: GZ, business_object: "FA Learning - Custom Org", mandatory: false, existence_check: true}
@@ -166,7 +179,7 @@ derived_fields:
     function: direct_source_column
     source_column: Invoice Description
     source_column_letter: Z
-    note: "Source header carries a typo (Invoice Desctiption); matched via pipe-alias."
+    note: "Header 'Invoice Description' (required_headers). The .bas lookup also accepts the legacy typo 'Invoice Desctiption' via pipe-alias."
   invoice_date_af:
     source_column: Invoice Date
     source_column_letter: AA
@@ -196,7 +209,6 @@ skip_rule:
     - col Y (Invoice Number, pre-computed) is blank
     - col AA (Invoice Date, pre-computed) is blank
     - cost_centre (col E) is blank      # mandatory worktag - source is SOT
-    - spend_category (col H) is blank   # mandatory worktag - source is SOT
   retain_for_trace_but_no_longer_lookup:
     - col C (County FA GP ID): retained for skip-gate integrity + trace; not used for resolution
   on_drop: reject_row_and_report
@@ -263,7 +275,7 @@ mapping:
     worktag: Spend Category
     passthrough: true
     existence_check: true
-    note: "PRE-RESOLVED Spend Category ref id (col H) written verbatim; mandatory (blank -> reject); existence-checked + reported."
+    note: "PRE-RESOLVED Spend Category ref id (col H) written verbatim; OPTIONAL since 2026-09-25 (blank -> EW blank, row kept); existence-checked + reported when non-blank."
   - target: FE
     function: tax_always_outside_of_scope
     source_column: "(absent; CFA Claims carry no tax)"
@@ -286,10 +298,12 @@ mapping:
     note: "Tax Option = Calculate Tax Due house default (harmless on zero-rated lines)."
   - target: GE
     source_column: Total Claim (GBP)
-    note: "PurchasesAmount (net line) = col D verbatim. Decimals allowed."
+    number_format: "0.00"
+    note: "PurchasesAmount (net line) = col D verbatim. Decimals allowed. Cell NumberFormat = 0.00 (2026-09-25; display only, stored value not rounded)."
   - target: GF
     source_column: Total Claim (GBP)
-    note: "Line Amount = col D verbatim (1:1 with PurchasesAmount on single-line invoices)."
+    number_format: "0.00"
+    note: "Line Amount = col D verbatim (1:1 with PurchasesAmount on single-line invoices). Cell NumberFormat = 0.00 (2026-09-25; display only, stored value not rounded)."
   - target: GQ
     function: join_pipe_gpid_sheetname_budgetname_processedby
     note: 'Memo = "{C GP ID} | {A Sheet Name} | {U Budget Code Naming} | by {R Processed By}".'

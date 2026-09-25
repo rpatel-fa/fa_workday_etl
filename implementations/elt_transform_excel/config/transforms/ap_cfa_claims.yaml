@@ -10,7 +10,8 @@ transform:
     grant-distribution workbook). ***
     County FA (CFA) Claims workbook ("1.0 CFA Claims - Finance Approval - <Month> <YYYY>.xlsx")
     transformed into the Workday Supplier Invoice EIB.  Sources the Finance-prepared
-    "1.0 CFA Claims - Finance Approv" tab (header row 1, data rows 2..N).
+    "Sheet1" tab (header row 1, data rows 2..N; same A..AA layout as the
+    "1.0 CFA Claims - Finance Approv" tab).
     REWORKED 2026-09-24 for the September-2026-onwards source format: Finance now deliver a
     PRE-RESOLVED file where the Budget Code -> Workday hierarchy mapping has ALREADY been done
     in-source.  Each coding element is a discrete Workday-ref-id column
@@ -20,7 +21,7 @@ transform:
     reads those columns DIRECTLY (pass-through) and the old Budget-Code -> Mapping MASTER
     lowest-hierarchy lookup, the dash-normalisation step, the batch-token derivation and the
     per-group InvoiceNumber counter are ALL RETIRED.
-    Workday Supplier ID is read DIRECTLY from Claims col W "Workday Supplier ID Lookup"
+    Supplier (EIB col U) = Workday Supplier ID read DIRECTLY from Claims col W "Workday Supplier ID Lookup"
     (AP/Finance-curated S-XXXXXX reference; Supplier Spreadsheet lookup RETIRED; County FA GP
     ID (col C) retained for trace + skip gate only).
     Company = constant "FA" (CFA Claims always = THE FA GROUP - FA; the Claims tab has no
@@ -30,16 +31,20 @@ transform:
     CFA Workday validates cross-column consistency and rejects diverged pairs).
     Item Description (EIB EP) = col Z "Invoice Description".
     InvoiceDate + ReceiptDate (EIB AF/AG) = col AA "Invoice Date" (01/09/2026 in the Sep file).
-    PurchasesAmount (EIB GE/GF) = col D "Total Claim (GBP)" verbatim.
+    PurchasesAmount (EIB GE/GF) = col D "Total Claim (GBP)" verbatim; cells formatted "0.00"
+    (2 decimal places, display only - stored value not rounded).
     Tax: CFA Claims source has NO Tax columns; all rows zero-rated
     (Outside_of_Scope / Zero_Rated / Nonrecoverable_Allocate uniform_tax branch).
     WORKTAG VALIDATION (pass-through + report): the pre-resolved worktag values are written
     verbatim (the worktag pipeline is INACTIVE - no Mapping MASTER lookup at runtime).
     Existence of each value in Mapping MASTER (WORKDAY REF ID, Core vs Prism = Core) is
     validated OUT OF BAND at authoring / reconcile time and reported for Finance to correct at
-    source.  Mandatory Cost Centre (E) and Spend Category (H) still REJECT the row when the
-    source cell is BLANK.  Reporting Type (F) is a display name with no Mapping MASTER business
-    object and is passed through without any existence check.
+    source.  Mandatory Cost Centre (E) still REJECTS the row when the source cell is BLANK.
+    Spend Category (H) is OPTIONAL (decision 2026-09-25): a blank H no longer rejects the row;
+    EIB EW is written blank and Workday may reject such lines on load (a supplier invoice line
+    normally needs a Spend Category or Item).  Reporting Type (F) is passed through verbatim
+    to EIB GR without any existence check (Sheet1 of the Sep-2026 V2 file carries "Staff_Grant"
+    in F with H blank on every row).
     Authoring-time witness (Mapping MASTER v42, Sep-2026 file): Cost Centre / Program / Grant
     all present (Core); Spend Category had 7 rows not in the mapping
     ("Programme_Cost_Programme" x4, "(Programme costs / Professional Fees" x3) - written
@@ -53,17 +58,16 @@ runtime:
   step_list_macro: RunApCfaClaimsSupplierInvoice
 
 source_layout:
-  worksheet_name: "1.0 CFA Claims - Finance Approv"
+  worksheet_name: "Sheet1"
   worksheet_resolution: named
   header_row: 1
   data_start_row: 2
   header_detection: scan_required_headers
   # NOTE: required_headers are matched as EXACT single tokens (case-insensitive, trimmed) by
   # BOTH the VBA schema validator and the Python reconcile tool - the reconcile matcher does
-  # NOT split pipe "|" aliases, so these must be the verbatim source header spellings (incl. the
-  # "Total Claim (GBP)" pound symbol and the source's "Invoice Desctiption" typo). The .bas
-  # FindColumnIndexInRow calls use their own pipe-alias literals for robustness; the two lists
-  # are intentionally independent.
+  # NOT split pipe "|" aliases, so every entry must be a single verbatim header spelling
+  # (incl. the "Total Claim (£)" pound symbol). The .bas FindColumnIndexInRow calls use their
+  # own pipe-alias literals for robustness; the two lists are intentionally independent.
   required_headers:
     - "Sheet Name"                              # A - claim category / payment-group key part
     - "County FA"                               # B - claimant entity (informational, NOT legal-entity company)
@@ -71,7 +75,6 @@ source_layout:
     - "Total Claim (£)"                         # D - PurchasesAmount (verbatim source header incl. pound symbol)
     - "Cost Centre"                             # E - PRE-RESOLVED Workday Cost Center ref id (mandatory)
     - "Reporting Type"                          # F - PRE-RESOLVED reporting type (display name; no Mapping MASTER WBO)
-    - "Spend Category"                          # H - PRE-RESOLVED Workday Spend Category ref id (mandatory)
     - "Head of Approval"                        # Q - informational (memo)
     - "Processed By"                            # R - informational (memo)
     - "Processed Date"                          # S - informational / trace (dates now come from AA)
@@ -79,12 +82,13 @@ source_layout:
     - "Budget Code Naming"                      # U - Finance label (memo)
     - "Workday Supplier ID Lookup"              # W - DIRECT PASSTHROUGH (AP-curated S-XXXXXX Workday Supplier ref)
     - "Invoice Number"                          # Y - PRE-COMPUTED Invoice Number (EIB K + BG mirror)
-    - "Invoice Desctiption"                     # Z - PRE-COMPUTED Item Description (EIB EP); source header carries this typo verbatim
+    - "Invoice Description"                     # Z - PRE-COMPUTED Item Description (EIB EP)
     - "Invoice Date"                            # AA - PRE-COMPUTED Invoice Date + Receipt Date (EIB AF/AG)
   # Optional pre-resolved worktag columns: header presence is verified (present/absent) but the
   # cells are legitimately blank on many/most rows (worktags only apply where relevant), so they
   # are NOT subject to the non-blank data check. Passed through verbatim by the .bas.
   optional_headers:
+    - "Spend Category"                          # H - PRE-RESOLVED Spend Category (optional since 2026-09-25; blank -> EW blank)
     - "Events - Custom Org"                     # I - PRE-RESOLVED Event worktag (optional)
     - "FA Learning - Custom Org"                # J - PRE-RESOLVED FA Learning worktag (optional)
     - "Camps - Custom Org"                      # K - PRE-RESOLVED Camp worktag (optional)
@@ -95,8 +99,8 @@ source_layout:
 
 target_eib:
   template_name: Submit_Supplier_Invoice_v46.2
-  output_columns: 237
-  sheet_name: Sheet1
+  output_columns: 290
+  sheet_name: Submit Supplier Invoice
 
 transform_constants:
   # CFA Claims source has NO Tax columns.  Use uniform_tax archetype (single fixed
@@ -116,9 +120,11 @@ transform_constants:
     document_type_literal: INVOICE
     document_type_hard_coded: true   # no DocumentType column in Claims source
     worktags_pre_resolved_in_source: true   # E..O carry Workday ref ids; no Mapping MASTER lookup
-    invoice_number_pre_computed_column: Y    # EIB K + BG mirror read directly from source
-    invoice_description_column: Z
-    invoice_date_column: AA
+    # Source (Claims tab) column -> target EIB column (Submit_Supplier_Invoice_v46.2):
+    supplier_id_column: W                    # "Workday Supplier ID Lookup" -> EIB U (Supplier*)
+    invoice_number_pre_computed_column: Y    # "Invoice Number" -> EIB K (Invoice Number) + BG mirror
+    invoice_description_column: Z            # "Invoice Description" -> EIB EP (Item Description)
+    invoice_date_column: AA                  # "Invoice Date" -> EIB AF (Invoice Date) + AG
 
   worktag_target_columns:
     # Standard 9-pack worktag column letters for v46.2 Supplier Invoice EIB.
@@ -135,11 +141,11 @@ transform_constants:
 shell_defaults:
   # CFA CLAIMS ONLY (not CFA Distributions; sibling ap_cfa_distributions uses
   # a separate /ap/cfa_distributions/ folder).
-  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/source/1.0 CFA Claims - Finance Approval - September 2026.xlsx
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/source/1.0 CFA Claims - Finance Approval - September 2026 V2.xlsx
   target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/target/Submit_Supplier_Invoice_ap_cfa_claims_output.xlsx
   # source_layout defaults - override here to change which sheet/rows the transform uses at build time
-  source_worksheet_name: "1.0 CFA Claims - Finance Approv"
+  source_worksheet_name: "Sheet1"
   source_worksheet_resolution: named
   source_header_row: 1
   source_data_start_row: 2
