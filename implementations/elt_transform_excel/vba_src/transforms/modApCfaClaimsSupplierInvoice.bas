@@ -30,6 +30,8 @@ Private Const OUTPUT_TAX_RECOVERABILITY As String = "Nonrecoverable_Allocate"
 Private Const OUTPUT_TAX_POINT_DATE_TYPE As String = "INVOICE/ADJUSTMENT_DATE"
 Private Const OUTPUT_TAX_OPTION As String = "CALC_TAX_DUE"
 Private Const OUTPUT_COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
+' GE / GF cell display format (transform_specs mapping number_format; display only, value not rounded).
+Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 
 ' Company is a constant "FA" (claims_constants.constant_company_code). Claims tab B = County FA
 ' NAME, not legal-entity code; the paying legal entity is always The FA Group.
@@ -60,7 +62,7 @@ Public Sub RunApCfaClaimsSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     Dim purchasesAmountColumn As Long           ' D  Total Claim (GBP) -> PurchasesAmount
     Dim costCentreColumn As Long                ' E  PRE-RESOLVED Cost Centre (mandatory)
     Dim reportingTypeColumn As Long             ' F  PRE-RESOLVED Reporting Type (display name)
-    Dim spendCategoryColumn As Long             ' H  PRE-RESOLVED Spend Category (mandatory)
+    Dim spendCategoryColumn As Long             ' H  PRE-RESOLVED Spend Category (optional)
     Dim eventColumn As Long                     ' I  PRE-RESOLVED Event worktag (optional)
     Dim faLearningColumn As Long                ' J  PRE-RESOLVED FA Learning worktag (optional)
     Dim campColumn As Long                      ' K  PRE-RESOLVED Camp worktag (optional)
@@ -123,7 +125,7 @@ Public Sub RunApCfaClaimsSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     ' is opened either (pipeline inactive).
 
     '  Source of truth: config/transforms/ap_cfa_claims.yaml source_layout.required_headers.
-    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApCfaClaimsSupplierInvoice", 16)
+    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApCfaClaimsSupplierInvoice", 15)
 
     Set sourceWorkbook = OpenWorkbookReadOnly(sourceDataPath)
     Set sourceSheet = ResolveSourceWorksheet(sourceWorkbook, sheetToResolve)
@@ -216,14 +218,14 @@ Public Sub RunApCfaClaimsSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
         ElseIf RowIsSkippable(sourceTable, rowIndex, _
             sheetNameColumn, gpIdColumn, processedDateColumn, purchasesAmountColumn, _
             budgetCodeNamingColumn, invoiceNumberColumn, invoiceDateColumn, _
-            costCentreColumn, spendCategoryColumn) Then
+            costCentreColumn) Then
             rowsSkipped = rowsSkipped + 1
             missingFieldRows = missingFieldRows + 1
             AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
                 "Missing required Claims field (Sheet Name/A / County-FA-GP-ID/C / " _
                     & "Processed-Date/S / Budget-Code-Naming/U / Invoice-Number/Y / " _
                     & "Invoice-Date/AA blank, Total-Claim/D <=0, or mandatory pre-resolved " _
-                    & "Cost-Centre/E or Spend-Category/H blank)", _
+                    & "Cost-Centre/E blank)", _
                 Trim$(CStr(sourceTable(rowIndex, gpIdColumn))), _
                 Trim$(CStr(sourceTable(rowIndex, invoiceNumberColumn)))
         Else
@@ -259,7 +261,7 @@ Public Sub RunApCfaClaimsSupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
         issueParts.Add "Skipped " & CStr(missingFieldRows) _
             & " source row(s) with a missing required field (Sheet Name/A, County FA GP ID/C, " _
             & "Processed Date/S, Budget Code Naming/U, Invoice Number/Y, Invoice Date/AA, " _
-            & "Total Claim/D <=0, or mandatory pre-resolved Cost Centre/E or Spend Category/H blank)."
+            & "Total Claim/D <=0, or mandatory pre-resolved Cost Centre/E blank)."
     End If
     If unresolvedSupplierRows > 0 Then
         issueParts.Add "Skipped " & CStr(unresolvedSupplierRows) _
@@ -324,9 +326,9 @@ End Sub
 '     BG Suppliers Invoice No (1:1 mirror of K)
 '     EK Row ID / EM Line Order (1..N within Invoice Number group)
 '     EP Item Description      (col Z verbatim)
-'     EW Spend Category        (col H passthrough; mandatory)
+'     EW Spend Category        (col H passthrough; optional - blank H writes EW blank)
 '     FE FF FH FK FL tax       (uniform zero-rated constants)
-'     GE Unit Cost / GF Extended Amount (col D)
+'     GE Unit Cost / GF Extended Amount (col D; NumberFormat "0.00")
 '     GQ Memo                  ("{C} | {A} | {U} | by {R}")
 '     GR Reporting Type        (col F passthrough)
 '     GT Cost Centre           (col E passthrough; mandatory)
@@ -376,7 +378,9 @@ Private Function WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex("FK")).Value = OUTPUT_TAX_RECOVERABILITY
     targetSheet.Cells(targetRow, ColumnIndex("FH")).Value = OUTPUT_TAX_POINT_DATE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex("FL")).Value = OUTPUT_TAX_OPTION
+    targetSheet.Cells(targetRow, ColumnIndex("GE")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GE")).Value = amount
+    targetSheet.Cells(targetRow, ColumnIndex("GF")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GF")).Value = amount
     targetSheet.Cells(targetRow, ColumnIndex("GQ")).Value = Trim$(CStr(sourceTable(sourceRow, gpIdColumn))) _
         & " | " & Trim$(CStr(sourceTable(sourceRow, sheetNameColumn))) _
@@ -423,7 +427,8 @@ End Function
 '  Per-row data-integrity gates (counted as reject rows if any fire).
 '  Sheet Name/A blank OR County-FA-GP-ID/C blank OR Processed-Date/S blank OR
 '  Budget-Code-Naming/U blank OR Invoice-Number/Y blank OR Invoice-Date/AA blank OR
-'  amount D <= 0 OR mandatory pre-resolved Cost-Centre/E blank OR Spend-Category/H blank.
+'  amount D <= 0 OR mandatory pre-resolved Cost-Centre/E blank.
+'  Spend Category (H) is OPTIONAL (transform_specs/ap_cfa_claims.yaml, 2026-09-25).
 ' -----------------------------------------------------------------
 Private Function RowIsSkippable( _
     ByVal tableData As Variant, _
@@ -435,8 +440,7 @@ Private Function RowIsSkippable( _
     ByVal budgetCodeNamingColumn As Long, _
     ByVal invoiceNumberColumn As Long, _
     ByVal invoiceDateColumn As Long, _
-    ByVal costCentreColumn As Long, _
-    ByVal spendCategoryColumn As Long _
+    ByVal costCentreColumn As Long _
 ) As Boolean
     RowIsSkippable = _
         LenB(Trim$(CStr(tableData(rowIndex, sheetNameColumn)))) = 0 Or _
@@ -446,6 +450,5 @@ Private Function RowIsSkippable( _
         LenB(Trim$(CStr(tableData(rowIndex, invoiceNumberColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, invoiceDateColumn)))) = 0 Or _
         ResolveAmount(tableData(rowIndex, purchasesAmountColumn)) <= 0# Or _
-        LenB(Trim$(CStr(tableData(rowIndex, costCentreColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, spendCategoryColumn)))) = 0
+        LenB(Trim$(CStr(tableData(rowIndex, costCentreColumn)))) = 0
 End Function
