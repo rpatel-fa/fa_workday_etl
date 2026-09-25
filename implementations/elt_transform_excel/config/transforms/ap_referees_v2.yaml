@@ -2,15 +2,17 @@ version: 1
 
 transform:
   key: ap_referees_v2
-  label: AP Referees V2 (Analysis tab)
+  label: AP Referees V2 (Sheet1 tab)
   source_type: AP Referees V2
   eib_population_type: Supplier Invoice
   description: >
-    Referee match-expense workbook ("Copy of Approved 18_08_26_V2_LIVE_V2.xlsx") transformed into the Workday
+    Referee match-expense workbook ("referee expense sep 26.xlsx") transformed into the Workday
     Supplier Invoice EIB — V2 pipeline that ELIMINATES the Finance pre-step of building the
-    Integration tab from the Master/Analysis workbook.  Sources the "analysis"
-    tab directly (the canonical form entry staff submit + Finance review).  The 12 Integration-tab
-    fields required by the EIB are DERIVED in-VBA from the Analysis columns:
+    Integration tab from the Master/Analysis workbook.  Sources the "Sheet1"
+    tab directly (September 2026 refresh: 23 cols A..W, header row 1; replaces the August 2026
+    "analysis" tab).  Sheet1 is the Finance-approved extract: it has NO HH Final Approval /
+    PE Approval / Category / approver columns, so every row is treated as approved.  The 12
+    Integration-tab fields required by the EIB are DERIVED in-VBA from the Sheet1 columns:
       Company          = constant FA (no explicit Company col on Analysis; Cost Code confirms FA-only)
       BatchID token    = REFS{MM}{YY}ME from MAX(Submission Date) (col 2/B)
       DocumentType     = constant INVOICE
@@ -20,25 +22,30 @@ transform:
       ReceiptDate (AG) = batch MAX(Submission Date col 2/B) = latest claim form-submission date
       DocNo (AU)       = INV number col 1/A (NOV17056 etc. -- 1:1 unique, same as v1)
       InvoiceNumber (G)= {batch_token}-{INV number} (per-invoice uniqueness -- matches v1 Rule 8)
-      DistributionRef  = Cost Code col 12/L (4-6-8-4 format -- previously was col N 14 in April v2)
+      DistributionRef  = Cost Code col 11/K (4-6-8-4 format -- was col L 12 on the August 2026
+                         analysis tab)
       PurchasesAmount  = Invoice Total col 7/G (previously col I 9; net; TaxAmount hardcoded 0,
-                         TaxDetailID=POS)
+                         TaxDetailID=POS); EIB GE/GF cells formatted "0.00"
+                         (2 decimal places, display only - stored value not rounded)
       Memo (EO)        = INV number + " " + Cost Code (voucher + accounting string traceability)
-      Supplier         = DIRECT passthrough of "NEW WORKDAY ID" col 21/U (AP/Finance team now
-                         curate the Workday S-XXXXXX reference directly in the source file; the
+      Supplier (U)     = DIRECT passthrough of "Workday ID" col 18/R (was "NEW WORKDAY ID"
+                         col 21/U in August 2026; AP/Finance curate the Workday S-XXXXXX
+                         reference directly in the source file; the
                          old Creditor-ID -> Supplier Spreadsheet lookup is RETIRED.
-                         VENDOR ID col H 8 is retained for trace but is NOT used for resolution.
+                         VENDOR ID col H 8 is OPTIONAL (trace only; blank or absent does not
+                         reject the row) and is NOT used for resolution.
                          Rows whose VENDOR ID = "#NO MATCH" are now accepted so long as
-                         NEW WORKDAY ID is populated (August 2026 exemplar has 4 such rows).
-    Skip gates present in August 2026 V2:
-      - HH Final Approval != "Approved" -> rejected (staged / submitted-only rows)
-      - NEW WORKDAY ID blank -> rejected (AP has not yet allocated a Supplier ref; handled
+                         Workday ID is populated (September 2026 file has 22 such rows).
+                         "GP ID to Supplier ID" col 23/W is NOT used.
+    Skip gates present in September 2026 V2:
+      - HH Final Approval gate RETIRED (column absent from Sheet1; file is pre-approved)
+      - Workday ID blank -> rejected (AP has not yet allocated a Supplier ref; handled
         manually as New Supplier onboarding just like old "#NO MATCH" rows)
-      - INV number blank / VENDOR ID blank / Details of Invoice blank /
+      - INV number blank / Details of Invoice blank /
         Invoice Date blank / Submission Date blank / Cost Code blank / Invoice Total <= 0
         -> rejected (malformed claim line)
-    The secondary bank-detail columns (A N check / S C check) are intentionally NOT used as
-    pass gates; only the AP-curated NEW WORKDAY ID column is authoritative for Supplier.
+    The secondary bank-detail columns (Account num match / SC MATCH) are intentionally NOT used
+    as pass gates; only the AP-curated Workday ID column is authoritative for Supplier.
     9-worktag resolution from Cost Code is identical to v1 (lowest-hierarchy MAPPING MASTER).
     Tax treatment is uniform Outside of Scope / Zero Rated / Nonrecoverable (same as v1;
     Analysis tab has no tax columns -> TaxAmount and TaxDetailID are VBA constants 0 / POS).
@@ -48,7 +55,7 @@ runtime:
   step_list_macro: RunApRefereeV2SupplierInvoice
 
 source_layout:
-  worksheet_name: analysis
+  worksheet_name: "Sheet1"
   worksheet_resolution: named
   header_row: 1
   data_start_row: 2
@@ -59,29 +66,23 @@ source_layout:
     - Invoice Date
     - Details of Invoice
     - Invoice Total
-    - VENDOR ID
     - Cost Code
-    - HH Final Approval
-    - NEW WORKDAY ID|WORKDAY SUPPLIER ID|NEW WORKDAY SUPPLIER ID|WORKDAY ID
+    - WORKDAY ID|NEW WORKDAY ID|WORKDAY SUPPLIER ID|NEW WORKDAY SUPPLIER ID
   optional_headers:
+    - VENDOR ID
     - Reference Number
     - Full Name (As it appears on your bank account)|Full Name|Full Name As it appears on your bank account
     - Address
     - Postcode
-    - Category
-    - PE Approval
-    - PE Approval Date
     - Telephone No
     - Email Address
     - Bank Name
     - Sort Code|SortCode
     - Account Number
-    - Account number
-    - A N check
-    - Sort code
-    - S C check
     - Finance Processed Date
-    - AA|AK|CP|CW|ED|HH|MB|MM|MW|RJ|ST|GL|Raj
+    - Account num match
+    - SC MATCH
+    - GP ID to Supplier ID
 
 transform_constants:
   fixed_company_code: FA
@@ -95,15 +96,16 @@ transform_constants:
   company_fallback: THE FA GROUP - FA
   document_type_constant: INVOICE
   supplier_resolution:
-    source_column: NEW WORKDAY ID
+    source_column: Workday ID
     lookup_method: direct_passthrough
     note: >
-      AP/Finance team now curate the Workday S-XXXXXX supplier reference directly in
-      the source file as "NEW WORKDAY ID" col U 21.  The old Creditor-ID -> Supplier
-      Spreadsheet lookup is RETIRED.  VENDOR ID col H 8 is retained for audit trace
-      only; it is NOT used for Supplier resolution.  Rows whose VENDOR ID = "#NO MATCH"
-      are now accepted so long as NEW WORKDAY ID is populated (August 2026 exemplar
-      has 4 such rows for newly-onboarded referees).
+      AP/Finance team curate the Workday S-XXXXXX supplier reference directly in
+      the source file as "Workday ID" col R 18 on Sheet1 (was "NEW WORKDAY ID" col U 21
+      on the August 2026 analysis tab; both header names are accepted).  Written to EIB
+      col U.  The old Creditor-ID -> Supplier Spreadsheet lookup is RETIRED.  VENDOR ID
+      col H 8 and "GP ID to Supplier ID" col W 23 are NOT used for Supplier resolution.
+      Rows whose VENDOR ID = "#NO MATCH" are accepted so long as Workday ID is populated
+      (September 2026 file has 22 such rows).
     mandatory: true
   mapping_sheet: MAPPING MASTER
   worktag_business_objects:
@@ -132,10 +134,10 @@ transform_constants:
     program: HF
     project: HH
 shell_defaults:
-  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/referees/source/Copy of Approved 18_08_26_V2_LIVE_V2.xlsx
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/referees/source/referee expense sep 26.xlsx
   target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/referees/target/Submit_Supplier_Invoice_ap_referees_v2_output.xlsx
-  source_worksheet_name: analysis
+  source_worksheet_name: "Sheet1"
   source_worksheet_resolution: named
   source_header_row: 1
   source_data_start_row: 2

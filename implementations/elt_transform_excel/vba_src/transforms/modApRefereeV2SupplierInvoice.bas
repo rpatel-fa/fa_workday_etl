@@ -44,6 +44,8 @@ Private Const OUTPUT_TAX_RECOVERABILITY As String = "Nonrecoverable_Allocate"
 Private Const OUTPUT_TAX_OPTION As String = "CALC_TAX_DUE"
 Private Const OUTPUT_COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
+' GE / GF cell display format (transform_specs line_amount.number_format; display only, value not rounded).
+Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 
 '  -- Analysis-tab hardcoded sentinels --
 '  The Analysis tab has NO TaxAmount or TaxDetailID columns; these are the uniform
@@ -54,12 +56,10 @@ Private Const OUTPUT_TAX_DETAIL_ID As String = "POS"
 Private Const OUTPUT_DOCUMENT_TYPE As String = "INVOICE"
 Private Const OUTPUT_COMPANY_CODE As String = "FA"
 
-'  -- Analysis-tab approval sentinel --
-'  HH Final Approval must equal EXACTLY "Approved" (PascalCase).
-'  GP ID Match / Account number match / Sort code Match columns are RETIRED in the
-'  August 2026 refresh; the SOLE authoritative gate for Supplier + bank setup is
-'  "NEW WORKDAY ID" (col 21/U) being non-blank (Finance-curated S-XXXXXX).
-Private Const REQUIRED_APPROVAL_VALUE As String = "Approved"
+'  -- Approval gate RETIRED September 2026 --
+'  Sheet1 has no HH Final Approval column (the file is the Finance-approved extract),
+'  so every row is treated as approved.  The SOLE authoritative gate for Supplier is
+'  "Workday ID" (Sheet1 col 18/R; was NEW WORKDAY ID col 21/U) being non-blank.
 
 Private mSpendCategoryLookup As Collection
 Private mEventLookup As Collection
@@ -94,9 +94,18 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     Dim unmappedSpendCategoryRows As Long
     Dim blankWorkdayIdRows As Long
     Dim optionalWorktagBlankRows As Long
-    Dim unapprovedRows As Long
     Dim rowIndex As Long
-    '  -- analysis tab column indices (39 cols A..AM in August 2026 refresh) --
+    '  -- Sheet1 column indices (23 cols A..W in September 2026 refresh) --
+    '  A 1=INV number, B 2=Submission Date, C 3=Reference Number, D 4=Invoice Date,
+    '  E 5=Full Name, F 6=Details of Invoice, G 7=Invoice Total, H 8=VENDOR ID,
+    '  I 9=Address, J 10=Postcode, K 11=Cost Code, L 12=Telephone No, M 13=Email Address,
+    '  N 14=Bank Name, O 15=Sort Code, P 16=Account Number, Q 17=Finance Processed Date,
+    '  R 18=Workday ID (DIRECT supplier passthrough -> EIB U), S..V 19..22=bank checks,
+    '  W 23=GP ID to Supplier ID (NOT used).
+    '  No HH Final Approval / PE Approval / Category columns -> approval gate retired.
+    '  Columns are resolved by header name, so positions are informational only.
+    '
+    '  -- History: analysis tab column indices (39 cols A..AM in August 2026 refresh) --
     '  A 1=INV number, B 2=Submission Date, C 3=Reference Number, D 4=Invoice Date,
     '  E 5=Full Name (As it appears on your bank account),
     '  F 6=Details of Invoice (raw), G 7=Invoice Total,
@@ -122,10 +131,9 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     Dim invoiceDateColumn As Long            ' 4 D
     Dim detailsOfInvoiceColumn As Long       ' 6 F  Details of Invoice -- raw description, no JY cleaned col
     Dim invoiceTotalColumn As Long           ' 7 G  Invoice Total = PurchasesAmount
-    Dim vendorIdColumn As Long               ' 8 H  VENDOR ID (CreditorID, may be "#NO MATCH", retained for trace only)
-    Dim costCodeColumn As Long               ' 12 L Cost Code = 4-6-8-4 accounting string (previously N 14 in April v2)
-    Dim hhFinalApprovalColumn As Long        ' 13 M HH Final Approval = "Approved" gate
-    Dim newWorkdayIdColumn As Long           ' 21 U NEW WORKDAY ID = Supplier S-XXXXXX (DIRECT passthrough; mandatory)
+    Dim vendorIdColumn As Long               ' 8 H  VENDOR ID (OPTIONAL header, trace only; 0 when absent)
+    Dim costCodeColumn As Long               ' 11 K Cost Code = 4-6-8-4 accounting string (12 L in Aug 2026)
+    Dim newWorkdayIdColumn As Long           ' 18 R Workday ID = Supplier S-XXXXXX (DIRECT passthrough; mandatory; 21 U in Aug 2026)
     Dim supplierId As String
     Dim costCenterId As String
     Dim spendCategoryId As String
@@ -190,7 +198,7 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     '  LenB()=0 no-op if missing, since they are used for reject-context only.
     '  Source of truth: config/transforms/*.yaml source_layout.required_headers,
     '  written into Config "Required Headers Pipe Delimited" by build_runner.py.
-    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApRefereeV2SupplierInvoice", 9)
+    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApRefereeV2SupplierInvoice", 7)
 
     Set sourceWorkbook = OpenWorkbookReadOnly(sourceDataPath)
     Set sourceSheet = ResolveSourceWorksheet(sourceWorkbook, sheetToResolve)
@@ -244,10 +252,9 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
     invoiceDateColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Date")
     detailsOfInvoiceColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Details of Invoice")
     invoiceTotalColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Total")
-    vendorIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "VENDOR ID")
+    vendorIdColumn = SafeFindOptionalColumn(sourceTable, headerRowIndex, "VENDOR ID")
     costCodeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Cost Code")
-    hhFinalApprovalColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "HH Final Approval")
-    newWorkdayIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "NEW WORKDAY ID|WORKDAY SUPPLIER ID|NEW WORKDAY SUPPLIER ID|WORKDAY ID")
+    newWorkdayIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "WORKDAY ID|NEW WORKDAY ID|WORKDAY SUPPLIER ID|NEW WORKDAY SUPPLIER ID")
     '  Optional columns (FindColumnIndexInRow returns 0 if not present; we guard downstream).
     '  August 2026 refresh removed GP ID Match / Account number match / Sort code Match.
     '  NEW WORKDAY ID column is now the authoritative Supplier reference; bank-validation
@@ -290,7 +297,7 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
         '  -- Blank / empty row gate. --
         ElseIf RowIsEmptyOrTrailer(sourceTable, rowIndex, _
             Array(invNumberColumn, vendorIdColumn, detailsOfInvoiceColumn, costCodeColumn, _
-                  hhFinalApprovalColumn, newWorkdayIdColumn), _
+                  newWorkdayIdColumn), _
             Array(invoiceTotalColumn), _
             Array(invNumberColumn)) Then
             If RowIsTrulyEmpty(sourceTable, rowIndex, _
@@ -301,26 +308,18 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
             Else
                 consecutiveEmptyRows = 0
             End If
-        ElseIf IsUnapprovedRow(sourceTable, rowIndex, hhFinalApprovalColumn) Then
-            rowsSkipped = rowsSkipped + 1
-            unapprovedRows = unapprovedRows + 1
-            AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                "HH Final Approval != 'Approved' -- row not fully approved by Finance head", _
-                Trim$(CStr(sourceTable(rowIndex, invNumberColumn))), _
-                "HH Final Approval=" & Trim$(CStr(sourceTable(rowIndex, hhFinalApprovalColumn))) _
-                    & " | " & Trim$(CStr(sourceTable(rowIndex, detailsOfInvoiceColumn)))
         ElseIf RowIsSkippableV2(sourceTable, rowIndex, _
-            invNumberColumn, vendorIdColumn, detailsOfInvoiceColumn, _
+            invNumberColumn, detailsOfInvoiceColumn, _
             invoiceDateColumn, submissionDateColumn, _
             costCodeColumn, invoiceTotalColumn, newWorkdayIdColumn) Then
             rowsSkipped = rowsSkipped + 1
             missingFieldRows = missingFieldRows + 1
             AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                "Missing required analysis field (INV number blank / VENDOR ID blank / " _
+                "Missing required source field (INV number blank / " _
                     & "Details of Invoice blank / Invoice Date blank / Submission Date blank / " _
-                    & "Cost Code blank / NEW WORKDAY ID blank / Invoice Total <= 0)", _
-                Trim$(CStr(sourceTable(rowIndex, vendorIdColumn))), _
-                "NEW WORKDAY ID=" & Trim$(CStr(sourceTable(rowIndex, newWorkdayIdColumn))) _
+                    & "Cost Code blank / Workday ID blank / Invoice Total <= 0)", _
+                OptionalCellText(sourceTable, rowIndex, vendorIdColumn), _
+                "Workday ID=" & Trim$(CStr(sourceTable(rowIndex, newWorkdayIdColumn))) _
                     & " | Details=" & Trim$(CStr(sourceTable(rowIndex, detailsOfInvoiceColumn)))
         Else
             costCenterId = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(costCenterLookup, sourceTable(rowIndex, costCodeColumn))
@@ -344,7 +343,7 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
                     Dim resolvedCompanyId As String
                     resolvedCompanyId = ResolveMappedCompany(runnerWorkbook, OUTPUT_COMPANY_CODE, OUTPUT_COMPANY_DEFAULT_FALLBACK)
 
-                    '  Supplier = DIRECT passthrough of NEW WORKDAY ID col 21/U.
+                    '  Supplier = DIRECT passthrough of Workday ID (Sheet1 col 18/R) -> EIB U.
                     '  AP/Finance have already curated this S-XXXXXX reference.
                     '  Old Creditor-ID -> Supplier Spreadsheet lookup is RETIRED.
                     supplierId = Trim$(CStr(sourceTable(rowIndex, newWorkdayIdColumn)))
@@ -352,12 +351,12 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
                         rowsSkipped = rowsSkipped + 1
                         blankWorkdayIdRows = blankWorkdayIdRows + 1
                         AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                            "Supplier unresolved: NEW WORKDAY ID is blank.  AP/Finance must " _
+                            "Supplier unresolved: Workday ID is blank.  AP/Finance must " _
                                 & "allocate a Workday Supplier S-XXXXXX reference for each referee " _
-                                & "claim row and write it into NEW WORKDAY ID column U/21.", _
-                            Trim$(CStr(sourceTable(rowIndex, vendorIdColumn))), _
-                            "Company=FA | VENDOR ID for trace=" & Trim$(CStr(sourceTable(rowIndex, vendorIdColumn))) _
-                                & " | NEW WORKDAY ID=" & supplierId
+                                & "claim row and write it into the Workday ID column (R/18).", _
+                            OptionalCellText(sourceTable, rowIndex, vendorIdColumn), _
+                            "Company=FA | VENDOR ID for trace=" & OptionalCellText(sourceTable, rowIndex, vendorIdColumn) _
+                                & " | Workday ID=" & supplierId
                     Else
                         If WriteOutputRowV2( _
                             targetSheet, targetRow, rowsProcessed + 1, sourceTable, rowIndex, _
@@ -380,19 +379,15 @@ Public Sub RunApRefereeV2SupplierInvoice(ByVal runnerWorkbook As Workbook, ByVal
 
     If missingFieldRows > 0 Then
         issueParts.Add "Skipped " & CStr(missingFieldRows) _
-            & " source row(s) with missing INV number, VENDOR ID, Details of Invoice, Invoice Date," _
-            & " Submission Date, Cost Code, NEW WORKDAY ID, or Invoice Total <= 0."
-    End If
-    If unapprovedRows > 0 Then
-        issueParts.Add "Skipped " & CStr(unapprovedRows) _
-            & " source row(s) whose HH Final Approval != 'Approved' (not signed off by Finance head)."
+            & " source row(s) with missing INV number, Details of Invoice, Invoice Date," _
+            & " Submission Date, Cost Code, Workday ID, or Invoice Total <= 0."
     End If
     If blankWorkdayIdRows > 0 Then
         issueParts.Add "Skipped " & CStr(blankWorkdayIdRows) _
-            & " source row(s) whose NEW WORKDAY ID is blank -- AP/Finance must allocate a Workday Supplier" _
+            & " source row(s) whose Workday ID is blank -- AP/Finance must allocate a Workday Supplier" _
             & " S-XXXXXX reference for each such row.  This replaces the old ""#NO MATCH"" VENDOR ID" _
             & " pass gate: the Creditor/GP provisioning new-referee onboarding step is now FINISHED when" _
-            & " NEW WORKDAY ID column has an S-XXXXXX value (Supplier reference = new authority gate)."
+            & " Workday ID column has an S-XXXXXX value (Supplier reference = new authority gate)."
     End If
     If unmappedCostCenterRows > 0 Then
         issueParts.Add "Skipped " & CStr(unmappedCostCenterRows) _
@@ -471,7 +466,7 @@ End Sub
 '     K  InvoiceNumber  (m_batchIdToken + "-" + INV number; per-INVOICE unique)
 '     R  Company        (resolvedCompanyId -- constant FA -> entity via runner map)
 '     T  Currency       (GBP default)
-'     U  Supplier       (supplierId = NEW WORKDAY ID col 21/U direct passthrough, NO lookup)
+'     U  Supplier       (supplierId = Workday ID Sheet1 col 18/R direct passthrough, NO lookup)
 '     AF InvoiceDate    (per-row Analysis D Invoice Date via NormalizeSourceDate)
 '     AG ReceiptDate    (Invoice Received Date, m_receiptDateValue -- batch MAX(Submission Date) precomputed)
 '     BG SuppliersInvoiceNumber / voucher (INV number from Analysis A -- NOV17056 etc.)
@@ -479,7 +474,7 @@ End Sub
 '     EP ItemDescription (UPPER(TRIM(JY Details Analysis G)))
 '     EW Spend Category  (Cost Code low-hierarchy match; on_fail=reject, gated upstream)
 '     FE FF FH FK FL  tax defaults (uniform Outside of Scope / Zero Rated / CALC_TAX_DUE)
-'     GE Unit Cost / GF Extended Amount (Invoice Total Analysis I)
+'     GE Unit Cost / GF Extended Amount (Invoice Total; NumberFormat "0.00")
 '     GQ Memo (INV number + " " + Cost Code Analysis N)
 '     GR Reporting Type  (Cost Code second segment first char via ResolveReportingTypeFromFinalCode)
 '     GT Cost Centre     (Cost Code low-hierarchy match; on_fail=reject, gated upstream)
@@ -564,7 +559,9 @@ Private Function WriteOutputRowV2( _
     targetSheet.Cells(targetRow, ColumnIndex("FH")).Value = OUTPUT_TAX_POINT_DATE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex("FK")).Value = OUTPUT_TAX_RECOVERABILITY
     targetSheet.Cells(targetRow, ColumnIndex("FL")).Value = OUTPUT_TAX_OPTION
+    targetSheet.Cells(targetRow, ColumnIndex("GE")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GE")).Value = amount
+    targetSheet.Cells(targetRow, ColumnIndex("GF")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GF")).Value = amount
     targetSheet.Cells(targetRow, ColumnIndex("GQ")).Value = invNumberValue & " " & CStr(costCodeValue)
     targetSheet.Cells(targetRow, ColumnIndex("GR")).Value = ResolveReportingTypeFromFinalCode(costCodeValue)
@@ -627,18 +624,6 @@ Private Sub DeriveBatchConstants( _
 End Sub
 
 '  --------------------------------------------------------------
-'  IsUnapprovedRow -- HH Final Approval != "Approved" (PascalCase exact match).
-'  --------------------------------------------------------------
-Private Function IsUnapprovedRow( _
-    ByVal tableData As Variant, _
-    ByVal rowIndex As Long, _
-    ByVal hhFinalApprovalColumn As Long _
-) As Boolean
-    IsUnapprovedRow = (StrComp(Trim$(CStr(tableData(rowIndex, hhFinalApprovalColumn))), _
-        REQUIRED_APPROVAL_VALUE, vbBinaryCompare) <> 0)
-End Function
-
-'  --------------------------------------------------------------
 '  RowIsSilentTrailerAdminReferees -- Finance-appended trailing summary / SUM
 '  footer rows (not real referee claims).  Row 291 of the August 2026 exemplar
 '  contains only a single non-blank cell (col G = Invoice Total = SUM of the 289
@@ -668,9 +653,10 @@ End Function
 
 '  --------------------------------------------------------------
 '  RowIsSkippableV2 -- analysis-tab missing-field gate (August 2026 refresh).
-'  Blank INV number / VENDOR ID / Details of Invoice / Invoice Date /
-'  Submission Date / Cost Code / NEW WORKDAY ID / Invoice Total <= 0.
-'  The approval gate fires BEFORE this function.  The NEW WORKDAY ID
+'  Blank INV number / Details of Invoice / Invoice Date /
+'  Submission Date / Cost Code / Workday ID / Invoice Total <= 0.
+'  (VENDOR ID is an optional trace-only header since September 2026.)
+'  (Approval gate retired September 2026.)  The Workday ID
 '  blank check is a pre-condition of the direct-passthrough Supplier
 '  resolution (old "#NO MATCH" Creditor-ID sentinel + Supplier Spreadsheet
 '  lookup is RETIRED).
@@ -679,7 +665,6 @@ Private Function RowIsSkippableV2( _
     ByVal tableData As Variant, _
     ByVal rowIndex As Long, _
     ByVal invNumberColumn As Long, _
-    ByVal vendorIdColumn As Long, _
     ByVal detailsOfInvoiceColumn As Long, _
     ByVal invoiceDateColumn As Long, _
     ByVal submissionDateColumn As Long, _
@@ -689,13 +674,24 @@ Private Function RowIsSkippableV2( _
 ) As Boolean
     RowIsSkippableV2 = _
         LenB(Trim$(CStr(tableData(rowIndex, invNumberColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, vendorIdColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, detailsOfInvoiceColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, invoiceDateColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, submissionDateColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, costCodeColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, newWorkdayIdColumn)))) = 0 Or _
         ResolveAmount(tableData(rowIndex, invoiceTotalColumn)) <= 0#
+End Function
+
+'  --------------------------------------------------------------
+'  OptionalCellText -- trimmed cell text for an optional column; returns ""
+'  when the column is absent (index 0).
+'  --------------------------------------------------------------
+Private Function OptionalCellText( _
+    ByVal tableData As Variant, _
+    ByVal rowIndex As Long, _
+    ByVal columnIndex As Long _
+) As String
+    If columnIndex > 0 Then OptionalCellText = Trim$(CStr(tableData(rowIndex, columnIndex)))
 End Function
 
 '  --------------------------------------------------------------
