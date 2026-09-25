@@ -1,4 +1,4 @@
-# Transform spec — ap_referees_v2 (August 2026 refresh — analysis tab, NEW WORKDAY ID direct passthrough)
+# Transform spec — ap_referees_v2 (September 2026 refresh — Sheet1, Workday ID direct passthrough, no approval gate)
 #
 # Human decision record + the authoritative target-column mapping.
 # Lives in config/transform_specs/ (not config/transforms/, which the build globs as runnable profiles).
@@ -7,7 +7,46 @@
 # layout (worksheet, header row, required headers) — live in the build profile
 # config/transforms/ap_referees_v2.yaml.
 #
-# Source workbook: Copy of Approved 18_08_26_V2_LIVE_V2.xlsx
+# Source workbook: referee expense sep 26.xlsx
+# Data sheet: Sheet1 (header row 1, 23 cols A..W, 179 data rows in September 2026)
+#
+#   Col 1  A = INV number                  (e.g. NOV18504 — unique per row)
+#   Col 2  B = Submission Date             (form submission timestamp, 100% populated)
+#   Col 3  C = Reference Number            (form ref)
+#   Col 4  D = Invoice Date                (per-row actual match date)
+#   Col 5  E = Full Name (As it appears on your bank account)
+#   Col 6  F = Details of Invoice          (RAW form description)
+#   Col 7  G = Invoice Total               (net line amount)
+#   Col 8  H = VENDOR ID                   (CreditorID / "#NO MATCH" — OPTIONAL header, TRACE ONLY, NOT used for resolution)
+#   Col 9  I = Address
+#   Col 10 J = Postcode
+#   Col 11 K = Cost Code                   (accounting string; was L 12 on the August analysis tab)
+#   Col 12 L = Telephone No
+#   Col 13 M = Email Address
+#   Col 14 N = Bank Name
+#   Col 15 O = Sort Code
+#   Col 16 P = Account Number
+#   Col 17 Q = Finance Processed Date
+#   Col 18 R = Workday ID                  (AP/Finance curated S-XXXXXX ref — DIRECT supplier passthrough -> EIB U, MANDATORY)
+#   Col 19 S = ACCOUNT NUMBER, 20 T = Account num match, 21 U = Sort code, 22 V = SC MATCH (bank checks, informational)
+#   Col 23 W = GP ID to Supplier ID        (NOT used; differs from R on 1 row in Sep 2026 — R is authoritative)
+#
+# Key changes from the August 2026 analysis tab (September 2026 refresh):
+#   • Worksheet "analysis" -> "Sheet1"; 39 cols -> 23 cols.
+#   • HH Final Approval / PE Approval / PE Approval Date / Category and the approver-name
+#     columns are GONE.  Sheet1 is the Finance-approved extract, so the HH Final Approval
+#     = "Approved" gate is RETIRED (confirmed 2026-09-25) — every row is treated as approved.
+#     HH Final Approval was a reject filter only; it never mapped to an EIB column.
+#   • Supplier column renamed "NEW WORKDAY ID" (U 21) -> "Workday ID" (R 18).  Still a DIRECT
+#     passthrough to EIB col U (confirmed 2026-09-25).  Both header names are accepted.
+#   • VENDOR ID moved to optional_headers (confirmed 2026-09-25): it never maps to an EIB
+#     column, so a blank value (or a missing column) no longer rejects the row.  It is still
+#     shown in reject-log trace text when present.
+#   • Cost Code moves L 12 -> K 11.  Columns are resolved by header name, so no index change.
+#   • 2 rows carry a 5-segment Cost Code with a trailing "-FA" (1111-408002-PTPW0006-0000-FA);
+#     the segment-wise lowest-hierarchy lookup handles these unchanged.
+#
+# ---- August 2026 analysis-tab layout (superseded, kept for history) ----
 # Data sheet: analysis (header row 1, 39 cols A..AM in August 2026 refresh; was 59 cols A..BG in April 2026 v2)
 #
 #   Col 1  A = INV number                  (e.g. NOV17056 — unique per row)
@@ -75,12 +114,16 @@
 
 meta:
   key: ap_referees_v2
-  label: AP Referees V2 (Analysis tab, August 2026 refresh)
+  label: AP Referees V2 (Sheet1, September 2026 refresh)
   requester: Finance (AP)
-  date_confirmed: 2026-08-24
+  date_confirmed: 2026-09-25
   exemplar_to_fork: ap_referees
   note: >
-    August 2026 refresh of Referees V2: the "analysis" tab continues as the input (no
+    September 2026 refresh: source is "Sheet1" of "referee expense sep 26.xlsx" (23 cols
+    A..W).  HH Final Approval column absent -> approval gate RETIRED (file is pre-approved).
+    Supplier = "Workday ID" (col 18/R) direct passthrough to EIB U (renamed from NEW WORKDAY
+    ID).  Cost Code now col 11/K.  All other derivations unchanged.
+    History — August 2026 refresh of Referees V2: the "analysis" tab continues as the input (no
     Integration tab needed, identical to V1 refresh pipeline).  Columns REMOVED from
     April v2: JY Details (cleaned description), 30-length, GP ID, GP ID Match, Account
     number GP, Account number match, Sort code Check, Sort code Match — total 8 columns,
@@ -112,9 +155,14 @@ shared_helpers:
 parties:
   supplier:
     source_code: per_row
-    source_column: NEW WORKDAY ID        # analysis col 21/U (August 2026 new column)
+    source_column: Workday ID            # Sheet1 col 18/R -> EIB U (was NEW WORKDAY ID analysis col 21/U)
+    source_header_aliases: [Workday ID, NEW WORKDAY ID, WORKDAY SUPPLIER ID, NEW WORKDAY SUPPLIER ID]
+    target: u
     resolved_via: direct_passthrough
     note: >
+      September 2026: column renamed to "Workday ID" (Sheet1 col 18/R); still a DIRECT
+      passthrough to EIB col U.  "GP ID to Supplier ID" (col 23/W) is NOT used.
+      History (August 2026):
       DIRECT PASSTHROUGH of NEW WORKDAY ID (analysis col 21/U).  August 2026 refresh
       RETIRES the old April-v2 triple: (1) VENDOR ID == "NO MATCH" → skip (new-supplier
       flow), (2) GP ID Match != "match" → skip (bank validation), (3) Supplier Spreadsheet
@@ -174,10 +222,12 @@ fields:
   line_amount:
     source_column: Invoice Total           # analysis col 7/G (CHANGED from April v2: col 9/I)
     basis: net
-    note: Net line amount.  Column shift left because JY Details + 30-length cols were removed.  TaxAmount hardcoded 0 so CALC_TAX_DUE no-op.
+    targets: [GE, GF]
+    number_format: "0.00"
+    note: Net line amount.  Column shift left because JY Details + 30-length cols were removed.  TaxAmount hardcoded 0 so CALC_TAX_DUE no-op.  EIB GE / GF cell NumberFormat = 0.00 (2026-09-25; display only, stored value not rounded).
   spend_category:
     derivation: per_row_lookup
-    key_source_column: Cost Code           # analysis col 12/L (CHANGED from April v2: col 14/N)
+    key_source_column: Cost Code           # Sheet1 col 11/K (analysis col 12/L in Aug 2026; col 14/N in April v2)
     key_rule: lowest-hierarchy matching accounting-string segment
     # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
     use_shared_lookup: standard_9pack_lowest_specificity
@@ -302,14 +352,15 @@ skip_rule:
     #      = 26232.98, every other column blank).  These are admin housekeeping, not real claims.
     # 1. Truly-empty / trailing blank rows (counted in empty-trailer scan, not reject bucket).
     - INV number blank
-    # 2. Approval gate (must be HH Approved).
-    - HH Final Approval != "Approved"
-    # 3. Mandatory analysis-tab fields (August 2026).
+    # 2. Approval gate RETIRED September 2026 (HH Final Approval column absent from Sheet1;
+    #    the source file is the Finance-approved extract).
+    # 3. Mandatory fields (August 2026; NEW WORKDAY ID = "Workday ID" on Sheet1).
     #    CHANGED from April v2:
     #      • VENDOR ID == "NO MATCH" is NO LONGER a skip trigger (rows accepted when NEW WORKDAY ID populated)
     #      • GP ID Match != "match" is GONE (column removed from source)
     #      • NEW WORKDAY ID blank is the NEW authority gate for Supplier onboarding
-    - INV number blank / VENDOR ID blank / Details of Invoice blank / Invoice Date blank / Submission Date blank / Cost Code blank / NEW WORKDAY ID blank / Invoice Total <= 0
+    #    September 2026: VENDOR ID blank is NO LONGER a skip trigger (optional header, trace only).
+    - INV number blank / Details of Invoice blank / Invoice Date blank / Submission Date blank / Cost Code blank / NEW WORKDAY ID blank / Invoice Total <= 0
     # 4. Worktag / supplier resolution
     - cost_centre unresolved
     - spend_category unresolved
