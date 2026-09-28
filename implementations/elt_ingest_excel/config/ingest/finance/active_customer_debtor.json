@@ -78,26 +78,50 @@
     ]
   },
   {
-    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
     "workbookFileName": "ProClubs.csv",
     "fileType": "DELIMITED",
     "sheets": [
       {
         "headerRow": "1",
         "dataRow": "2",
-        "targetTableName": "crm_pro_club"
+        "targetTableName": "pff_pro_club"
       }
     ]
   },
   {
-    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
     "workbookFileName": "Discipline Customers.xlsx",
     "sheets": [
       {
         "sheetName": "Discipline Customers",
         "headerRow": "1",
         "dataRow": "2",
-        "targetTableName": "crm_gp_discipline_customer"
+        "targetTableName": "pff_gp_discipline_customer"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "Contact_Related_Entities_DataMapping.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Contact (Contact)",
+        "headerRow": "10",
+        "dataRow": "11",
+        "targetTableName": "crm_contact_entity_mapping"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "Licence and Sub Contract_Related_Entities_DataMapping.xlsx",
+    "sheets": [
+      {
+        "sheetName": "",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_license_entity_mapping"
       }
     ]
   }
