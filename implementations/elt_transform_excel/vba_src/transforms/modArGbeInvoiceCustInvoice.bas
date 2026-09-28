@@ -14,6 +14,15 @@ Private Const TARGET_DATA_START_ROW As Long = 6
 '  modApTravelPlacesSupInv.bas).
 Private Const PLAYER_REFERENCE_SPLIT_ANCHOR As String = "-FOOT"
 
+'  Customer Invoice Reference ID (D) = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
+'  (DECIDED 2026-09-28, see mapping.d). The mens/womens token is chosen from the Runner
+'  variant profile_key; any other selection key fails the run rather than guessing.
+Private Const REFERENCE_ID_PREFIX As String = "gbe_"
+Private Const VARIANT_KEY_MENS As String = "ar_gbe_invoice_mens"
+Private Const VARIANT_KEY_WOMENS As String = "ar_gbe_invoice_womens"
+Private Const VARIANT_TOKEN_MENS As String = "mens"
+Private Const VARIANT_TOKEN_WOMENS As String = "womens"
+
 '  -- source layout: header=1, data=2; worksheet is named per Runner variant --
 '  Values are read from Runner config at runtime (Source Worksheet Name / Resolution /
 '  Header Row / Data Start Row). ar_gbe_invoice ships TWO variant selections that share this
@@ -143,6 +152,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Dim workdayCustomerId As String
     Dim playerValue As String
     Dim referenceValue As String
+    Dim variantToken As String
     Dim missingReferenceRows As Long
     Dim gbeCompanyValue As String
     Dim gbeCostCentreValue As String
@@ -178,6 +188,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Set unresolvedKeys = New Collection
 
     On Error GoTo HandleFailure
+    variantToken = ResolveGbeVariantToken(selectionKey)
 
     runStartTime = Now
     BeginRun runnerWorkbook, controlSheet, selectionKey
@@ -270,8 +281,8 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     reportingTypeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Reporting Type")
     revenueCategoryColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Revenue Category")
     '  Optional columns: GBE carries no COST CODE / SALES ITEM / QUANTITY (kept optional -> 0 ->
-    '  inert). The VAT column is intentionally NOT read: its header is ABSENT on the Womens tab, so
-    '  the VAT rate is derived from Gross - Net (present on both tabs) in WriteOutputRow instead.
+    '  inert). The VAT column is intentionally NOT read: Line Tax Applicability (FA) / Line Tax
+    '  Code (FB) are left blank (DECIDED 2026-09-28), so no VAT rate is derived.
     salesItemColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "SALES ITEM CODE")
     qtyColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "QUANTITY")
     costCodeColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "COST CODE")
@@ -306,7 +317,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
             '  (col A). No lookup, no name matching - a blank ID rejects the row.
             workdayCustomerId = Trim$(CStr(sourceTable(rowIndex, customerIdColumn)))
             If LenB(referenceValue) = 0 Then
-                '  Reference drives D/G/BO/DB and the invoice-line grouping key, so a row whose
+                '  Reference drives G/DB and the invoice-line grouping key, so a row whose
                 '  Invoice Line Description does not contain the "-FOOT" anchor is rejected
                 '  rather than silently grouped under a blank key.
                 rowsSkipped = rowsSkipped + 1
@@ -331,7 +342,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
                     workdayCustomerId, gbeCompanyValue, gbeCostCentreValue, _
                     gbeReportingTypeValue, gbeRevenueCategoryValue, _
                     eventLookup, campLookup, faLearningLookup, commercialPartnerLookup, _
-                    grantLookup, programLookup, projectLookup
+                    grantLookup, programLookup, projectLookup, variantToken
                 targetRow = targetRow + 1
             End If
         End If
@@ -401,22 +412,19 @@ Private Sub WriteOutputRow( _
     ByVal reportingTypeValue As String, ByVal revenueCategoryValue As String, _
     ByVal eventLookup As Collection, ByVal campLookup As Collection, ByVal faLearningLookup As Collection, _
     ByVal commercialPartnerLookup As Collection, ByVal grantLookup As Collection, _
-    ByVal programLookup As Collection, ByVal projectLookup As Collection _
+    ByVal programLookup As Collection, ByVal projectLookup As Collection, _
+    ByVal variantToken As String _
 )
     Dim companyId As String
     Dim invoiceDate As String
     Dim grossAmount As Double
     Dim netAmount As Double
-    Dim vatAmount As Double
     Dim qtyValue As Double
     Dim costCodeValue As String
     Dim revenueCategory As String
     Dim costCenterRef As String
     Dim salesItemValue As String
     Dim lineDescValue As String
-    Dim vatRate As Long
-    Dim lineTaxApplicability As String
-    Dim lineTaxCode As String
     Dim reportingType As String
     Dim eventRef As String
     Dim campRef As String
@@ -430,6 +438,7 @@ Private Sub WriteOutputRow( _
     Dim worktagValue As Variant
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
+    Dim referenceId As String
 
     companyId = companyValue
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, dateColumn))
@@ -437,12 +446,6 @@ Private Sub WriteOutputRow( _
 
     If qtyColumn > 0 Then qtyValue = ResolveAmount(sourceTable(sourceRow, qtyColumn)) Else qtyValue = 1#
     If netColumn > 0 Then netAmount = ResolveAmount(sourceTable(sourceRow, netColumn)) Else netAmount = grossAmount
-    '  VAT rate is derived from GROSS - NET (the Womens tab header omits the VAT label, so a
-    '  VAT column read cannot be relied on). 20% -> Standard Rated, else Outside of Scope / Zero.
-    vatAmount = grossAmount - netAmount
-    vatRate = DeriveVatPercentage(vatAmount, netAmount)
-    lineTaxApplicability = TaxValueForRate(vatRate, TAX_APPLICABILITY_ZERO, TAX_APPLICABILITY_STANDARD)
-    lineTaxCode = TaxValueForRate(vatRate, TAX_CODE_ZERO, TAX_CODE_STANDARD)
 
     spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, referenceValue, mGrpNextKey, lineOrderValue)
     lineDescValue = BuildLineDescription(playerValue, CStr(sourceTable(sourceRow, typeColumn)))
@@ -477,11 +480,19 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_COMMENT)).Value = OUTPUT_AUTO_COMPLETE
+    '  Customer Invoice Reference ID (D) = gbe_{mens|womens}_{AJ without hyphens}_{BR as
+    '  YYYYMMDD}_{B} (e.g. C-000102 + 2026-03-17 + key 1 -> gbe_mens_C000102_20260317_1).
+    '  AJ keeps the original Customer ID. See mapping.d.
+    referenceId = REFERENCE_ID_PREFIX & variantToken & "_" & Replace(outputCustomerId, "-", vbNullString) & _
+        "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceId
     If LenB(referenceValue) > 0 Then
-        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceValue
         targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceValue
-        targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = referenceValue
     End If
+    '  Invoice Number (BO) intentionally left blank on every row per requester instruction
+    '  (2026-09-28). See mapping.bo.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LOCKED_IN_WORKDAY)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyId
@@ -505,8 +516,11 @@ Private Sub WriteOutputRow( _
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescValue
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = lineTaxApplicability
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = lineTaxCode
+    '  Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
+    '  per requester instruction (2026-09-28), same as ar_manual_invoice / ar_discipline_invoice.
+    '  See mapping.fa / mapping.fb.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     '  DECIDED 2026-09-17: Unit Cost (FL) and Extended Amount (FO) map to source col F (NET),
     '  not GROSS - matches Amount Due (CM) above, also NET as of 2026-09-17.
@@ -561,6 +575,21 @@ Private Sub WriteOutputRow( _
     End If
 End Sub
 
+'  mens / womens token for Customer Invoice Reference ID (D), from the Runner variant
+'  profile_key. Fails the run on any other key rather than guessing.
+Private Function ResolveGbeVariantToken(ByVal selectionKey As String) As String
+    Select Case LCase$(Trim$(selectionKey))
+        Case VARIANT_KEY_MENS
+            ResolveGbeVariantToken = VARIANT_TOKEN_MENS
+        Case VARIANT_KEY_WOMENS
+            ResolveGbeVariantToken = VARIANT_TOKEN_WOMENS
+        Case Else
+            Err.Raise vbObjectError + 1701, "modArGbeInvoiceCustInvoice.ResolveGbeVariantToken", _
+                "Cannot tell Mens from Womens for selection key '" & selectionKey & "'. Expected " & _
+                VARIANT_KEY_MENS & " or " & VARIANT_KEY_WOMENS & "."
+    End Select
+End Function
+
 '  Line Item Description (EN) + line Memo (FV) = Player + " - " + Type
 '  (e.g. "Boubacar Kamara - Extension"). Falls back to whichever part is present.
 Private Function BuildLineDescription( _
@@ -587,7 +616,7 @@ End Function
 '  Reference. Verified against every row of the 2026-09-17 AR file (see
 '  PLAYER_REFERENCE_SPLIT_ANCHOR declaration above for the verification note). outReference is
 '  "" when the anchor is absent, which the caller treats as a reject (Reference is load-bearing
-'  for D/G/BO/DB and the invoice-line grouping key - never guessed).
+'  for G/DB and the invoice-line grouping key - never guessed).
 Private Sub SplitPlayerAndReference( _
     ByVal rawDescription As String, _
     ByRef outPlayer As String, _
@@ -624,23 +653,6 @@ Private Function CleanMemoToSingleLine(ByVal rawText As String) As String
         temp = Replace$(temp, "  ", " ")
     Loop
     CleanMemoToSingleLine = Trim$(temp)
-End Function
-
-'  VAT rate percentage from a VAT amount and a NET base. GBE passes (Gross - Net) as the VAT
-'  amount so the derivation is independent of the (Womens-tab-absent) VAT column.
-Private Function DeriveVatPercentage(ByVal vatValue As Variant, ByVal netAmountValue As Variant) As Long
-    Dim vatAmount As Double
-    Dim netAmount As Double
-
-    vatAmount = ResolveAmount(vatValue)
-    netAmount = ResolveAmount(netAmountValue)
-
-    If netAmount <= 0# Then
-        DeriveVatPercentage = 0
-        Exit Function
-    End If
-
-    DeriveVatPercentage = CLng(Int((vatAmount / netAmount) * 100# + 0.5))
 End Function
 
 Private Function RowIsSkippable( _
