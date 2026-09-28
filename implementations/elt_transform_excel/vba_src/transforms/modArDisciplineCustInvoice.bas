@@ -7,7 +7,7 @@ Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const OUTPUT_SUBMIT As String = "Y"
 Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
-Private Const OUTPUT_INVOICE_TYPE As String = "DSC"
+Private Const OUTPUT_INVOICE_TYPE As String = "Standard"
 Private Const OUTPUT_ADD_ONLY As String = "Y"
 ' The target_format of the cm / fl / fo rows in config/transform_specs/ar_discipline_invoice.yaml.
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
@@ -63,9 +63,9 @@ Private mGrpNextKey As Long
 ' EIB. Company, Cost Centre, Reporting Type, and Revenue Category are read ONCE from the
 ' sheet's first data row (source columns M/N/O/P, populated on that row only) and
 ' broadcast to every output row. The Customer ID is read directly from source column B
-' ("WORKDAY ID") -- no reference-extract lookup. The source has no invoice/document-number
-' column, so EIB Customer Invoice Reference ID (D) and Invoice Number (BO) are both the
-' generated {Invoice Type}-{WORKDAY ID}-{YYYYMMDD} value; Memo (DB) is left blank. Line grouping (Spreadsheet
+' ("WORKDAY ID") -- no reference-extract lookup. EIB Customer Invoice Reference ID (D) is
+' the generated {WORKDAY ID without hyphens}{YYYYMMDD} value; Invoice Number (BO), Line Tax
+' Applicability (FA), Line Tax Code (FB) and Memo (DB) are left blank. Line grouping (Spreadsheet
 ' Key / Line Order) is keyed directly by source `WORKDAY ID`, which is already unique per row
 ' on this sheet. The field mapping mirrors the mapping: section in
 ' config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
@@ -252,11 +252,13 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_ADD_ONLY
-    ' Customer Invoice Reference ID (D) = {Invoice Type (CO)}-{WORKDAY ID}-{YYYYMMDD of BR}.
-    ' Invoice Number (BO) mirrors it. See mapping.d / mapping.bo.
-    referenceId = OUTPUT_INVOICE_TYPE & "-" & workdayId & "-" & Replace(invoiceDate, "-", vbNullString)
+    ' Customer Invoice Reference ID (D) = {WORKDAY ID without hyphens}{YYYYMMDD of BR}, no
+    ' separator (e.g. C-000190 + 2025-09-18 -> C00019020250918). Invoice Number (BO) left
+    ' blank. See mapping.d / mapping.bo.
+    referenceId = Replace(workdayId, "-", vbNullString) & Replace(invoiceDate, "-", vbNullString)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).Value = referenceId
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = referenceId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     ' I (Locked in Workday) intentionally left blank -- see mapping.i.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyBroadcast
@@ -281,12 +283,10 @@ Private Sub WriteOutputRow( _
     ' CY (Include Customer Worktags) intentionally left blank -- see mapping.cy.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
-    ' Fixed standard-rated tax triple -- discipline fines have no zero-rated case, so this
-    ' reuses the shared AR Customer-Invoice constants in modFinanceCommon.bas (same values
-    ' ar_gbe_invoice / ar_bulk_invoice use for their standard-rated lines) rather than a
-    ' per-row VAT-rate derivation. See mapping.fa / mapping.fb.
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = TAX_APPLICABILITY_STANDARD
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = TAX_CODE_STANDARD
+    ' Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
+    ' per requester instruction (2026-09-28), same as ar_manual_invoice. See mapping.fa / mapping.fb.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     If LenB(revenueCategoryBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategoryBroadcast
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = descriptionValue

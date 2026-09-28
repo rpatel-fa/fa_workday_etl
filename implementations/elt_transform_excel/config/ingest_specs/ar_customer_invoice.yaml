@@ -102,7 +102,7 @@ columns:
   required: true
   type: text
   description: >
-    Workday invoice type. The migration fixes this to Standard; ar_discipline_invoice uses DSC.
+    Workday invoice type. The migration fixes this to Standard; ar_discipline_invoice also uses Standard.
     AR-raised invoices may need others, so it is a column rather than a constant.
   default: Standard
   feeds: EIB column hc (Customer Invoice Type)
