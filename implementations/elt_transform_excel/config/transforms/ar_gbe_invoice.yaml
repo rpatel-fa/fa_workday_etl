@@ -25,9 +25,9 @@ transform:
     still has no per-row COST CODE column for the Mapping-MASTER hierarchy lookup. Amounts
     originally mirrored ar_multi_line / ar_bulk's GROSS-into-amounts convention; DECIDED
     2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from
-    NET (col F) instead of GROSS. VAT rate is derived per-row from (GROSS - NET) / NET so the
-    Womens tab - whose header row omits the "VAT" label - is still handled; 20% ->
-    GBR_Standard_Rated.
+    NET (col F) instead of GROSS. Invoice Number (BO), Line Tax Applicability (FA) and Line
+    Tax Code (FB) are left blank on every row. Customer Invoice Reference ID (D) is
+    gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}.
     Player and Reference are no longer separate source columns - both are embedded in one
     free-text "Invoice Line Description" cell (e.g. "Romain Jordan Faivre-FOOT01/22/S-2024-1669")
     and are split at runtime on the literal "-FOOT" anchor token (verified against all 584 rows
@@ -65,6 +65,8 @@ transform_constants:
   fixed_company_code: FA
   fixed_currency: GBP
   fixed_invoice_type: Standard
+  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
+  # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
   company_fallback: THE FA GROUP - FA
   # DECIDED 2026-09-17: AR now delivers a ready-made Workday Customer ID per row (source col A,
   # header "WORKDAY ID" on the Mens tab / "Customer ID" on the Womens tab). Customer resolution
@@ -115,10 +117,13 @@ transform_constants:
         the FY value actually written is the batch constant from source col M row 2, see
         batch_constant_columns.reporting_type
   customer_invoice_eib_columns:
-    # --- HEADER identifier columns (D, G, BO all populated with the GBE Reference) ---
+    # --- HEADER identifier columns (D composite ID; G populated with the GBE Reference; BO blank) ---
+    # D = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}, e.g.
+    # gbe_mens_C000102_20260317_1. The mens/womens token comes from the variant profile_key
+    # (ar_gbe_invoice_mens / ar_gbe_invoice_womens). See mapping.d in the spec.
     customer_invoice_ref_id: D
     customer_invoice_id: G
-    invoice_number: BO
+    invoice_number: BO                # intentionally left blank on every row
     # --- HEADER fields (Submit Customer Invoice v46.1) ---
     spreadsheet_key: B
     add_only: C
@@ -151,8 +156,8 @@ transform_constants:
     sales_item: EJ
     revenue_category: EM
     line_item_description: EN
-    line_tax_applicability: FA
-    line_tax_code: FB
+    line_tax_applicability: FA        # intentionally left blank on every row
+    line_tax_code: FB                 # intentionally left blank on every row
     line_quantity: FH
     line_unit_of_measure: FI
     line_unit_cost: FL

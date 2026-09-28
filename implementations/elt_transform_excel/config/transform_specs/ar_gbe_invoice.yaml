@@ -20,8 +20,8 @@
 #   G Invoice Line Description | H Invoice line part 2|Invoice Line Description 2 |
 #   I Invoice Memo | J (blank) | K Company | L Cost Centre | M Reporting Type | N Revenue Category
 #   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col E (the data is still
-#   present). VAT is therefore read as OPTIONAL and the VAT rate is derived from
-#   (Gross - Net) / Net, which is present on both tabs regardless of the VAT header.
+#   present). VAT is not read: as of 2026-09-28 Line Tax Applicability (FA) and Line Tax
+#   Code (FB) are left blank, so no VAT rate is derived.
 #   NOTE: col A's header differs by tab ("WORKDAY ID" Mens / "Customer ID" Womens) but both
 #   carry a ready-made Workday Customer ID per row (e.g. "C-000102").
 #   NOTE: K/L/M/N (Company / Cost Centre / Reporting Type / Revenue Category) are BATCH
@@ -61,8 +61,9 @@ meta:
         Type (FY) and Revenue Category (EM) are now supplied by AR as BATCH CONSTANTS in
         source columns K/L/M/N: only row 2 carries a value; it is read once and applied to
         every output row (as of 2026-09-17).
-    (3) VAT rate derived from (Gross - Net) / Net rather than a VAT column, so the Womens tab
-        (missing the VAT header) is handled identically.
+    (3) NO TAX (as of 2026-09-28). Line Tax Applicability (FA) and Line Tax Code (FB) are
+        left blank on every row, as is Invoice Number (BO). Previously FA/FB were driven by a
+        VAT rate derived from (Gross - Net) / Net.
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
@@ -89,17 +90,17 @@ notes: >
   GBE (Governing Body Endorsement) invoices bill football clubs for player-registration
   endorsement panels/extensions. The emitted invoice identifier is the Reference extracted
   from col G ("Invoice Line Description", split on the literal "-FOOT" anchor token - see
-  parties / mapping target `d` below), written to D / G / BO and used as the shared
+  mapping target `g` below), written to G and used as the shared
   invoice-line grouping key for Spreadsheet Key plus Row ID / Line Order. A repeated
   `Reference` therefore collapses to one Workday header with 1..N lines; a unique `Reference`
   remains the single-line case. v46.1 layout. Amounts mirrored ar_bulk_invoice /
   ar_multi_line_invoice's GROSS-into-amounts convention originally; DECIDED 2026-09-17: Amount
   Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from NET (col F) instead of
-  GROSS. Line Tax Applicability (FA) and Line Tax Code (FB) driven by the derived VAT rate
-  (20% -> GBR_Standard_Rated, else
-  GBR_Outside_of_Scope / GBR_Zero_Rated). The extracted
-  Reference is written verbatim to the three header identifier columns D / G / BO and to the
-  header Memo (DB). Line Item Description (EN) + line Memo (FV) = Player + " - " + Type,
+  GROSS. Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are left
+  blank on every row (DECIDED 2026-09-28). The extracted Reference is written verbatim to the
+  header identifier column G and to the header Memo (DB). Customer Invoice Reference ID (D) is
+  gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
+  (DECIDED 2026-09-28, see mapping target `d`). Line Item Description (EN) + line Memo (FV) = Player + " - " + Type,
   where Player is the text before the "-FOOT" split and Type comes from col H.
 
 fields:
@@ -113,8 +114,8 @@ fields:
       DECIDED 2026-09-17: Reference is no longer its own column - it is the part of col G
       ("Invoice Line Description") from the literal "-FOOT" anchor token onward (e.g.
       "FOOT01/22/S-2024-1669" out of "Romain Jordan Faivre-FOOT01/22/S-2024-1669"). Verified
-      against all 584 rows of the 2026-09-17 AR file. It is written verbatim to D / G / BO
-      and is also the grouping key for the shared invoice-line helper. A row whose col G has
+      against all 584 rows of the 2026-09-17 AR file. It is written verbatim to G and DB (D is
+      a composite ID and BO is left blank as of 2026-09-28) and is also the grouping key for the shared invoice-line helper. A row whose col G has
       no "-FOOT" token is rejected (never guessed) - see skip_rule.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
@@ -141,16 +142,12 @@ fields:
       Target DV is the grouped line order emitted from the shared invoice-line helper.
 
 tax:
-  mode: per_row_derived
-  driver: (Gross - Net) / Net           # VAT rate derived; col E "VAT" header is optional/absent on Womens tab
-  rate_20:
-    applicability: GBR_Standard_Rated
-    code: GBR_Standard_Rated
-    note: All current GBE exemplar rows are 20% standard-rated (100/500 and 1000/5000).
-  rate_0:
-    applicability: GBR_Outside_of_Scope
-    code: GBR_Zero_Rated
-    note: Future zero-rated GBE batches; derived automatically when VAT rate < 20.
+  mode: none
+  note: >
+    DECIDED 2026-09-28: Line Tax Applicability (FA) and Line Tax Code (FB) are left blank on
+    every row, same as ar_manual_invoice / ar_discipline_invoice. No VAT rate is derived.
+    Previously per_row_derived from (Gross - Net) / Net: 20% -> GBR_Standard_Rated (FA/FB),
+    else GBR_Outside_of_Scope (FA) / GBR_Zero_Rated (FB).
 
 accounting_string:
   driver: none
@@ -183,14 +180,27 @@ mapping:
 - target: i
   default: ""
 - target: d
-  source_column: Invoice Line Description
-  source_column_letter: G
-  function: split_on_anchor_token
-  split_anchor_token: "-FOOT"
-  split_part: after_anchor
+  derivation: composite_reference_id
+  output_format: "gbe_{variant}_{aj with hyphens removed}_{YYYYMMDD of br}_{b}"
+  variant_token:
+    ar_gbe_invoice_mens: mens
+    ar_gbe_invoice_womens: womens
+  examples:
+    - "gbe_mens_C000102_20260317_1"     # Mens GBE row 1: C-000102, 2026-03-17, Spreadsheet Key 1
+    - "gbe_mens_C000102_20260501_2"     # Mens GBE row 2: C-000102, 2026-05-01, Spreadsheet Key 2
+    - "gbe_womens_C000300_20260427_1"   # Womens GBE row 1: C-000300, 2026-04-27, Spreadsheet Key 1
+    - "gbe_womens_C000300_20260427_2"   # Womens GBE row 2: C-000300, 2026-04-27, Spreadsheet Key 2
   note: >
-    DECIDED 2026-09-17: Customer Invoice Reference ID = Reference extracted from col G (the
-    part from "-FOOT" onward), verbatim. Same value to D/G/BO. See fields.invoice_number.
+    Customer Invoice Reference ID -- per requester instruction (2026-09-28): literal "gbe_",
+    then the variant token ("mens" for AR Invoice GBE Mens / "womens" for AR Invoice GBE
+    Womens), then the Customer written to `aj` with its hyphen removed (`C-000102` ->
+    `C000102`), then the Invoice Date written to `br` as YYYYMMDD, then the Spreadsheet Key
+    written to `b`, joined by "_". The hyphen is removed only in D; `aj` keeps the original
+    Customer ID. Spreadsheet Key restarts at 1 on each tab, so the variant token keeps Mens
+    and Womens IDs distinct; within a tab the Spreadsheet Key keeps two invoices for the same
+    customer on the same date distinct. Should be written as text. Previously the Reference
+    extracted from col G (the part from "-FOOT" onward), verbatim; G and DB still carry that
+    Reference.
 - target: g
   source_column: Invoice Line Description
   source_column_letter: G
@@ -198,11 +208,11 @@ mapping:
   split_anchor_token: "-FOOT"
   split_part: after_anchor
 - target: bo
-  source_column: Invoice Line Description
-  source_column_letter: G
-  function: split_on_anchor_token
-  split_anchor_token: "-FOOT"
-  split_part: after_anchor
+  default: ""
+  optional: true
+  note: >
+    Invoice Number -- left blank on every row per requester instruction (2026-09-28).
+    Previously the extracted Reference (same value as G).
 - target: j
   source_column: Company
   source_column_letter: K
@@ -278,9 +288,19 @@ mapping:
     Description" (col G) BEFORE the "-FOOT" split token (see fields.invoice_number); Type is
     col H verbatim (e.g. "Boubacar Kamara - Extension").
 - target: fa
-  derivation: applicability_from_derived_vat_rate
+  default: ""
+  optional: true
+  note: >
+    Line Tax Applicability -- left blank on every row per requester instruction
+    (2026-09-28), same as ar_manual_invoice / ar_discipline_invoice. Previously derived from
+    the (Gross - Net) / Net VAT rate. See tax.
 - target: fb
-  derivation: tax_code_from_derived_vat_rate
+  default: ""
+  optional: true
+  note: >
+    Line Tax Code -- left blank on every row per requester instruction (2026-09-28), same as
+    ar_manual_invoice / ar_discipline_invoice. Previously derived from the (Gross - Net) / Net
+    VAT rate. See tax.
 - target: fl
   source_column: Net
   source_column_letter: F
@@ -303,9 +323,9 @@ mapping:
 
 unused_source_columns:
   # Columns present in the source that are NOT written to the EIB output.
-  - VAT:   # NOT written directly; only used (as Gross-Net cross-check) to derive the VAT rate. Header absent on Womens tab.
-  # NOTE: Net (col F) is NO LONGER unused as of 2026-09-17 - it is written directly to FL/FO
-  # (see mapping targets fl/fo above) in addition to still driving the VAT-rate derivation.
+  - VAT:   # NOT read. Header absent on Womens tab. FA/FB are blank as of 2026-09-28, so no VAT rate is derived.
+  # NOTE: Net (col F) is NO LONGER unused as of 2026-09-17 - it is written directly to
+  # CM/FL/FO (see mapping targets cm/fl/fo above).
 
 open_questions:
   - id: gbe_customer_id_from_ar
