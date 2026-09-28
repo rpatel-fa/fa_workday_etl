@@ -9,6 +9,9 @@ Private Const OUTPUT_PAYMENT_STATUS As String = "Unpaid"
 Private Const OUTPUT_DOCUMENT_STATUS As String = "Approved"
 Private Const OUTPUT_INVOICE_TYPE As String = "Standard"
 Private Const OUTPUT_ADD_ONLY As String = "Y"
+' The fixed prefix of the "d" (Customer Invoice Reference ID) row's output_format in
+' config/transform_specs/ar_discipline_invoice.yaml.
+Private Const REFERENCE_ID_PREFIX As String = "cfa_discipline_"
 ' The target_format of the cm / fl / fo rows in config/transform_specs/ar_discipline_invoice.yaml.
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 ' The "j" (Company) row in config/transform_specs/ar_discipline_invoice.yaml's mapping --
@@ -64,7 +67,8 @@ Private mGrpNextKey As Long
 ' sheet's first data row (source columns M/N/O/P, populated on that row only) and
 ' broadcast to every output row. The Customer ID is read directly from source column B
 ' ("WORKDAY ID") -- no reference-extract lookup. EIB Customer Invoice Reference ID (D) is
-' the generated {WORKDAY ID without hyphens}{YYYYMMDD} value; Invoice Number (BO), Line Tax
+' the generated cfa_discipline_{WORKDAY ID without hyphens}_{yyyyMMdd}_{Spreadsheet Key}
+' value; Invoice Number (BO), Line Tax
 ' Applicability (FA), Line Tax Code (FB) and Memo (DB) are left blank. Line grouping (Spreadsheet
 ' Key / Line Order) is keyed directly by source `WORKDAY ID`, which is already unique per row
 ' on this sheet. The field mapping mirrors the mapping: section in
@@ -252,10 +256,12 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_ADD_ONLY
-    ' Customer Invoice Reference ID (D) = {WORKDAY ID without hyphens}{YYYYMMDD of BR}, no
-    ' separator (e.g. C-000190 + 2025-09-18 -> C00019020250918). Invoice Number (BO) left
-    ' blank. See mapping.d / mapping.bo.
-    referenceId = Replace(workdayId, "-", vbNullString) & Replace(invoiceDate, "-", vbNullString)
+    ' Customer Invoice Reference ID (D) = cfa_discipline_{WORKDAY ID without hyphens}_
+    ' {yyyyMMdd of BR}_{Spreadsheet Key B} (e.g. C-000190 + 2026-09-18 + key 1 ->
+    ' cfa_discipline_C000190_20260918_1). Invoice Number (BO) left blank. See mapping.d / mapping.bo.
+    referenceId = REFERENCE_ID_PREFIX & Replace(workdayId, "-", vbNullString) _
+        & "_" & Replace(invoiceDate, "-", vbNullString) _
+        & "_" & CStr(spreadsheetKeyValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).Value = referenceId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString

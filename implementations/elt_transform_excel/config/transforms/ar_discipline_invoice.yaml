@@ -39,8 +39,10 @@ transform_constants:
   fixed_company_code: FA
   fixed_currency: GBP
   fixed_invoice_type: Standard
-  # EIB column D (Customer Invoice Reference ID) = WORKDAY ID with hyphens removed +
-  # invoice date YYYYMMDD, no separator (e.g. C-000190, 18.09.25 -> C00019020250918).
+  # EIB column D (Customer Invoice Reference ID) =
+  # cfa_discipline_<Customer>_<Invoice Date>_<Spreadsheet Key>, where Customer is the
+  # WORKDAY ID with hyphens removed and Invoice Date is yyyyMMdd
+  # (e.g. C-000190, 18.09.26, key 1 -> cfa_discipline_C000190_20260918_1).
   # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
   # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
   # See mapping.d/.bo/.fa/.fb in the spec.
