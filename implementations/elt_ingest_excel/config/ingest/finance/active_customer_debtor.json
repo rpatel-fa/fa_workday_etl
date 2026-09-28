@@ -76,5 +76,29 @@
         "targetTableName": "ref_workday_validate_customer_tax_id_type"
       }
     ]
-  }  
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "ProClubs.csv",
+    "fileType": "DELIMITED",
+    "sheets": [
+      {
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_pro_club"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "Discipline Customers.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Discipline Customers",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_gp_discipline_customer"
+      }
+    ]
+  }
 ]
