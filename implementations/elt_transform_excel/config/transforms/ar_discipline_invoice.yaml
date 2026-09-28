@@ -38,8 +38,12 @@ source_layout:
 transform_constants:
   fixed_company_code: FA
   fixed_currency: GBP
-  fixed_invoice_type: DSC
-  fixed_dsc_indicator: "Y"
+  fixed_invoice_type: Standard
+  # EIB column D (Customer Invoice Reference ID) = WORKDAY ID with hyphens removed +
+  # invoice date YYYYMMDD, no separator (e.g. C-000190, 18.09.25 -> C00019020250918).
+  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
+  # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
+  # See mapping.d/.bo/.fa/.fb in the spec.
   company_fallback: THE FA GROUP - FA
   # No COST CODE or accounting-string driver in the discipline extract, and no
   # Mapping-Master hierarchy lookup is used -- Revenue Category / Cost Centre /
