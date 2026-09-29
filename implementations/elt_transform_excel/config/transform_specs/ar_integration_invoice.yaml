@@ -66,6 +66,7 @@ notes: >
         One source row = one Workday Customer Invoice with a single line.
         Cost Centre (col O), Reporting Type (col P), and Revenue Category
         (col Q) are read DIRECTLY per row from this sheet -> EIB FX / FY / EM.
+        Reporting Type drops its leading "<number>: " prefix (see target fy).
     (2) "Codes" - as of the "Combined 30-34" workbook this is now a plain
         3-column dropdown reference list (Cost Centres / Reporting Type /
         Revenue Category, no Course key column) used for Excel data-validation
@@ -83,16 +84,20 @@ notes: >
   Mapping MASTER lowest-hierarchy lookup.
   An unresolved Course Name (no match in Codes) writes the Codes-tab-sourced
   worktags as BLANK (AR archetype rule: silent_blank, not row rejection) and
-  increments a flag counter shown in the run results. Tax is per-row: compute
-  VAT_rate = source_VAT/Net, then pick the tax triple: VAT_rate ~= 0% ->
-  zero-rated (Outside Scope), VAT_rate ~= 20% -> standard-rated (Domestic
-  200_VAT). 2026-09-22 amendment: the source Net column (not Gross) is now
+  increments a flag counter shown in the run results. Invoice Number (BO), Line
+  Tax Applicability (FA) and Line Tax Code (FB) are left blank on every row
+  (DECIDED 2026-09-29, same as ar_manual_invoice / ar_discipline_invoice /
+  ar_gbe_invoice); previously FA/FB were derived per row from the source
+  Net/VAT ratio. 2026-09-22 amendment: the source Net column (not Gross) is now
   the authoritative Amount Due (CM), Unit Cost (FL), and line Extended
   Amount (FO).
-  Shared invoice-line grouping is keyed by the same derived invoice identifier that
-  the build profile writes to D / G / BO. That makes the shared helper contract
+  Shared invoice-line grouping is keyed by the derived invoice identifier that
+  the build profile writes to G. That makes the shared helper contract
   explicit in YAML even though the identifier itself is assembled from PO / customer /
   date fallback logic in config/transforms/ar_integration_invoice.yaml.
+  Customer Invoice Reference ID (D) is
+  integration_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
+  (DECIDED 2026-09-29, mirrors ar_gbe_invoice; see mapping target `d`).
 
 fields:
   invoice_number:
@@ -100,9 +105,9 @@ fields:
     build_profile_reference: transform_constants.invoice_identifier
     note: >
       Canonical emitted invoice identifier. The build-profile `invoice_identifier`
-      block computes the exact value once per non-skipped source row and that same
-      string is written to D / G / BO and used as the grouping key for the shared
-      invoice-line helper.
+      block computes the exact value once per non-skipped source row; that string is
+      written to G and used as the grouping key for the shared invoice-line helper.
+      As of 2026-09-29 D is a composite ID (see mapping target `d`) and BO is blank.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
     group_key_field: invoice_number
@@ -224,48 +229,23 @@ course_based_hierarchy:
   business_objects_not_in_codes_tab:
     - Sales Item (EJ) - left blank (no source column)
     - Project (BN / GF) - left blank (Codes has no Project column; silent blank rule)
-    - Line Tax (FA / FB) - per-row VAT rate triple (separate rule)
+    - Line Tax (FA / FB) - left blank on every row (see tax_rules)
 
 tax_rules:
-  row_level_determination:
-    input_columns: ["Net \u00A3", "Vat \u00A3", "Gross Price \u00A3"]
-    input_column_aliases:
-      "Net \u00A3": ["Net PS", "Net"]
-      "Vat \u00A3": ["VAT \u00A3", "VAT PS", "VAT", "Vat PS", "Vat"]
-      "Gross Price \u00A3": ["Gross Price PS", "Gross Price"]
-    alias_note: >
-      The primary Integration template uses the literal pound-sign header "Net £".
-      Year tabs (21-22 Raised .. 26-27 season) carry the headers "Net" / "Vat" /
-      "Gross Price" (no suffix).  The internal "Net PS" name is a legacy semantic
-      alias from the AP archetype fork and must NEVER be used as a required header.
-      VBA resolves headers with a FindOptionalColumnIndexInRow fallback chain that
-      tries (1) primary £-suffix, (2) PS alias for back-compat, (3) bare name for
-      year-tab ingestion.
-    rule: |-
-      effective_net = ResolveAmount(source, Net_col)
-      effective_vat = ResolveAmount(source, Vat_col)
-      effective_gross = ResolveAmount(source, Gross_Price_col)
-      If effective_net > 0 And effective_vat = 0 Then
-          tax_triple = ZERO_RATED_SET
-      ElseIf effective_net > 0 And Abs((effective_vat / effective_net) - 0.2) < 0.01 Then
-          tax_triple = STANDARD_RATED_20PC_SET
-      ElseIf effective_net = 0 And effective_gross = 0 Then
-          tax_triple = ZERO_RATED_SET
-      Else
-          tax_triple = STANDARD_RATED_20PC_SET (sane default; flag in run results)
-      End If
-  standard_rated_20pc:
-    applicability: GBR_Domestic_Sale_of_Goods_and_Services
-    code: GBR_200_VAT
-    recoverability: Fully_Recoverable
-  zero_rated:
-    applicability: GBR_Domestic_Outside_the_Scope
-    code: GBR_000_No_VAT
-    recoverability: Fully_Recoverable
+  mode: none
+  note: >
+    DECIDED 2026-09-29: Line Tax Applicability (FA) and Line Tax Code (FB) are left
+    blank on every row, same as ar_manual_invoice / ar_discipline_invoice /
+    ar_gbe_invoice. No tax triple is derived. The Net / Vat / Gross columns are still
+    read for amounts (Net) and the zero-value skip rule (Net + Vat + Gross all 0).
+    Previously per-row: Net > 0 and VAT = 0 (or Net = 0 and Gross = 0) ->
+    GBR_Domestic_Outside_the_Scope / GBR_000_No_VAT; otherwise (VAT ~= 20% of Net,
+    or any other ratio) -> GBR_Domestic_Sale_of_Goods_and_Services / GBR_200_VAT.
 
 skip_rule:
   drop_when:
-    - Customer ID blank OR "#N/A" on source row (pre-check, before WORKDAY ID lookup)
+    - Customer ID blank on source row (pre-check, before WORKDAY ID lookup). An Excel
+      #N/A error value reads as blank, so it is dropped too.
     - >-
       WORKDAY ID blank on a source row that passed the pre-check above =
       unresolved customer = row rejected (2026-09-22: replaces the old
@@ -306,6 +286,21 @@ mapping:
 
 # --- Header identifiers ---
 - target: d
+  derivation: composite_reference_id
+  output_format: "integration_{aj with hyphens removed}_{YYYYMMDD of br}_{b}"
+  examples:
+    - "integration_C000190_20260918_1"   # C-000190, 2026-09-18, Spreadsheet Key 1
+    - "integration_C000190_20260918_2"   # same customer + date, next row, Spreadsheet Key 2
+  note: >
+    Customer Invoice Reference ID -- per requester instruction (2026-09-29), mirroring
+    ar_gbe_invoice: literal "integration_", then the Customer written to `aj` with its
+    hyphen removed (`C-000190` -> `C000190`), then the Invoice Date written to `br` as
+    YYYYMMDD, then the Spreadsheet Key written to `b`, joined by "_". The hyphen is
+    removed only in D; `aj` keeps the original Customer ID. The Spreadsheet Key is
+    assigned first (grouped on the invoice_identifier, see target `g`), then D is built.
+    Written as text. Previously D held the invoice_identifier (same value as G / BO).
+
+- target: g
   derivation: from_build_profile_invoice_identifier
   build_profile_reference: transform_constants.invoice_identifier
   evaluation_note: >
@@ -321,24 +316,16 @@ mapping:
       - Helper stubs required in the module: CollectionKeyExists /
         CollectionSetItemLong / CollectionGetItemLong (mirror the CFA Claims module
         bottom helpers exactly).
-      - Evaluate once per non-skipped source row; write the identical string
-        instance to D, G, BO simultaneously (no separate counter per column).
-
-- target: g
-  derivation: mirror_target_d
-  source_target: d
-  note: Customer Invoice ID G mirrors col D per v46.1 conventions.
+      - Evaluate once per non-skipped source row; write the string to G and use it
+        as the Spreadsheet Key grouping key (no separate counter per column).
+    As of 2026-09-29 this identifier is no longer written to D or BO.
 
 - target: bo
-  derivation: mirror_target_d
-  source_target: d
-  optional_override_source_column: Invoice N0
+  default: ""
+  optional: true
   note: >
-    Invoice Number BO mirrors D by default. If Finance adds an explicit
-    "Invoice N0" column to the Integration template (column M in some
-    year tabs carries NFCINV-style strings), prefer that source value
-    when non-blank. Otherwise inherit the counter-derived identifier
-    computed for col D from the build_profile invoice_identifier block.
+    Invoice Number -- left blank on every row per requester instruction (2026-09-29).
+    Previously mirrored D (the invoice_identifier).
 
 # --- Header fields ---
 - target: j
@@ -476,18 +463,20 @@ mapping:
     year-tab files).
 
 - target: fa
-  derivation: per_row_tax_applicability
-  rule: tax_rules.row_level_determination -> standard_rated_20pc.applicability or zero_rated.applicability
+  default: ""
+  optional: true
   note: >
-    Tax Applicability FA = per-row based on source Net/VAT ratio. 20% rows ->
-    GBR_Domestic_Sale_of_Goods_and_Services; 0% rows -> GBR_Domestic_Outside_the_Scope.
+    Line Tax Applicability -- left blank on every row per requester instruction
+    (2026-09-29), same as ar_manual_invoice / ar_discipline_invoice / ar_gbe_invoice.
+    Previously derived per row from the source Net/VAT ratio. See tax_rules.
 
 - target: fb
-  derivation: per_row_tax_code
-  rule: tax_rules.row_level_determination -> standard_rated_20pc.code or zero_rated.code
+  default: ""
+  optional: true
   note: >
-    Tax Code FB = per-row based on source Net/VAT ratio. 20% rows -> GBR_200_VAT;
-    0% rows -> GBR_000_No_VAT.
+    Line Tax Code -- left blank on every row per requester instruction (2026-09-29),
+    same as ar_manual_invoice / ar_discipline_invoice / ar_gbe_invoice. Previously
+    derived per row from the source Net/VAT ratio. See tax_rules.
 
 - target: fh
   source_column: Quantity
@@ -501,10 +490,10 @@ mapping:
   source_column_aliases: ["Net PS", "Net"]
   number_format: "0.00"
   note: >
-    Unit Cost FL = source "Net £" (col H). With Quantity (G) typically = 1 per
-    line, Unit Cost FL and Extended Amount FO converge to the same value on most
-    rows; when Quantity > 1 the VBA writes FL = (Net / Quantity) and FO = Net,
-    mirroring the ar_bulk_invoice convention. Year-tab variants use header "Net"
+    Unit Cost FL = source "Net £" (col H), the full Net amount on every row --
+    NOT divided by Quantity (DECIDED 2026-09-29, same as ar_discipline_invoice /
+    ar_gbe_invoice). FL, FO and CM therefore all carry the same Net value; Quantity
+    (FH) is written as-is from the source. Year-tab variants use header "Net"
     (no £); resolved via FindOptionalColumnIndexInRow fallback. Cell
     NumberFormat = "0.00" (2026-09-22; display only, stored value stays
     unrounded).
@@ -584,7 +573,11 @@ mapping:
     sub-header under the "Required Fields" group). 2026-09-22 amendment
     (Combined 30-34 workbook): read DIRECTLY per row, no longer looked up
     via the Codes tab. Overrides any seg2 first-char rule (there is none for
-    this profile).
+    this profile). 2026-09-29: col P carries a "<number>: " prefix before the
+    text; it is removed so only the text is written (e.g. "1: FA Operations" ->
+    "FA Operations"). Only stripped when the part before the first ":" is all
+    digits; otherwise the value is written unchanged (trimmed).
+  value_cleanup: strip_leading_number_colon_space
 
 - target: fz
   derivation: always_blank

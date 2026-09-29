@@ -12,15 +12,9 @@ Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - NFC"
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 
-'  --- Profile-local Tax Triple overrides (hybrid scope; shadows modFinanceCommon.bas shared defaults) ---
-'  These values come from ar_integration_invoice.yaml transform_constants.tax_triple_per_row and MUST
-'  NOT be replaced with the shared Public Const TAX_APPLICABILITY_ZERO / TAX_CODE_ZERO from
-'  modFinanceCommon.  Shared constants use legacy GBR_Outside_of_Scope / GBR_Zero_Rated which fail
-'  Workday validation.  AR Integration uses the domestic-specific 200_VAT / 000_No_VAT ref-IDs.
-Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Sale_of_Goods_and_Services"
-Private Const TAX_APPLICABILITY_ZERO As String = "GBR_Domestic_Outside_the_Scope"
-Private Const TAX_CODE_STANDARD As String = "GBR_200_VAT"
-Private Const TAX_CODE_ZERO As String = "GBR_000_No_VAT"
+'  Customer Invoice Reference ID (D) prefix -- see ar_integration_invoice.yaml
+'  transform_constants (column D comment) and transform_specs mapping.d.
+Private Const REFERENCE_ID_PREFIX As String = "integration_"
 
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 
@@ -441,17 +435,12 @@ Private Sub WriteOutputRow( _
     Dim companyId As String
     Dim invoiceDate As String
     Dim orderDate As String
-    Dim grossAmount As Double
     Dim netAmount As Double
     Dim qtyValue As Double
-    Dim vatAmount As Double
-    Dim vatRatio As Double
     Dim courseNameValue As String
     Dim descriptionValue As String
     Dim emailValue As String
     Dim orgNameValue As String
-    Dim taxApplicability As String
-    Dim taxCode As String
     Dim coursePacked As String
     Dim courseParts As Variant
     Dim revenueCategory As String
@@ -468,6 +457,7 @@ Private Sub WriteOutputRow( _
     Dim lineDescription As String
     Dim lineMemo As String
     Dim invoiceRefId As String
+    Dim referenceId As String
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
     Dim worktagIndex As Long
@@ -483,29 +473,8 @@ Private Sub WriteOutputRow( _
     If qtyValue <= 0# Then qtyValue = 1#
 
     If netColumn > 0 Then netAmount = SafeCellDbl(sourceTable(sourceRow, netColumn)) Else netAmount = 0#
-    If vatColumn > 0 Then vatAmount = SafeCellDbl(sourceTable(sourceRow, vatColumn)) Else vatAmount = 0#
-    If grossColumn > 0 Then
-        grossAmount = SafeCellDbl(sourceTable(sourceRow, grossColumn))
-    Else
-        grossAmount = netAmount + vatAmount
-    End If
-
-    If netAmount > 0# Then
-        vatRatio = vatAmount / netAmount
-    Else
-        vatRatio = 0#
-    End If
-
-    If (netAmount > 0# And vatAmount = 0#) Or (netAmount = 0# And grossAmount = 0#) Then
-        taxApplicability = TAX_APPLICABILITY_ZERO
-        taxCode = TAX_CODE_ZERO
-    ElseIf Abs(vatRatio - 0.2) < 0.01 Then
-        taxApplicability = TAX_APPLICABILITY_STANDARD
-        taxCode = TAX_CODE_STANDARD
-    Else
-        taxApplicability = TAX_APPLICABILITY_STANDARD
-        taxCode = TAX_CODE_STANDARD
-    End If
+    ' Line Tax Applicability (FA) / Line Tax Code (FB) are left blank on every row, so no
+    ' Net/VAT tax triple is derived here (see transform_specs tax_rules).
 
     courseNameValue = SafeCellStr(sourceTable(sourceRow, courseNameColumn))
     If descriptionColumn > 0 Then descriptionValue = SafeCellStr(sourceTable(sourceRow, descriptionColumn)) Else descriptionValue = vbNullString
@@ -546,7 +515,9 @@ Private Sub WriteOutputRow( _
     ' come from the Codes-tab course lookup above -- read directly off this row's own
     ' Integration-sheet columns (see worktagsHeaderRowIndex resolution in the caller).
     If costCentreColumn > 0 Then costCenterRef = SafeCellStr(sourceTable(sourceRow, costCentreColumn)) Else costCenterRef = vbNullString
-    If reportingTypeColumn > 0 Then reportingType = SafeCellStr(sourceTable(sourceRow, reportingTypeColumn)) Else reportingType = vbNullString
+    ' Reporting Type (FY): drop the leading "<number>: " prefix from col P (e.g.
+    ' "1: FA Operations" -> "FA Operations"). See derived_worktags.reporting_type.
+    If reportingTypeColumn > 0 Then reportingType = StripLeadingNumberPrefix(SafeCellStr(sourceTable(sourceRow, reportingTypeColumn))) Else reportingType = vbNullString
     If revenueCategoryColumn > 0 Then revenueCategory = SafeCellStr(sourceTable(sourceRow, revenueCategoryColumn)) Else revenueCategory = vbNullString
     If faLearningColumn > 0 Then faLearningRef = SafeCellStr(sourceTable(sourceRow, faLearningColumn)) Else faLearningRef = vbNullString
 
@@ -590,9 +561,16 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = "Y"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     ' Locked in Workday (I) is left blank per 2026-09-22 amendment (matches ar_discipline_invoice).
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = invoiceRefId
+    ' Customer Invoice Reference ID (D) = integration_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
+    ' (e.g. C-000190 + 2026-09-18 + key 1 -> integration_C000190_20260918_1), mirroring
+    ' ar_gbe_invoice. AJ keeps the original Customer ID. G keeps the invoice_identifier;
+    ' Invoice Number (BO) is left blank. See mapping.d / mapping.g / mapping.bo.
+    referenceId = REFERENCE_ID_PREFIX & Replace(outputCustomerId, "-", vbNullString) & _
+        "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = invoiceRefId
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = invoiceRefId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CURRENCY)).Value = OUTPUT_CURRENCY
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER)).Value = outputCustomerId
@@ -616,8 +594,8 @@ Private Sub WriteOutputRow( _
 
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescription
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = taxApplicability
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = taxCode
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     ' Unit of Measure (FI) is left blank per 2026-09-22 instruction.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
@@ -803,6 +781,21 @@ Private Function SafeCellByCol(ByVal tableData As Variant, ByVal rowIndex As Lon
     Else
         SafeCellByCol = SafeCellStr(tableData(rowIndex, columnIndex))
     End If
+End Function
+
+Private Function StripLeadingNumberPrefix(ByVal rawText As String) As String
+    ' "<number>: <text>" -> "<text>". Left unchanged when there is no ":" or the part
+    ' before the first ":" is not all digits.
+    Dim colonPos As Long
+    Dim prefixText As String
+
+    StripLeadingNumberPrefix = Trim$(rawText)
+    colonPos = InStr(1, StripLeadingNumberPrefix, ":")
+    If colonPos <= 1 Then Exit Function
+    prefixText = Trim$(Left$(StripLeadingNumberPrefix, colonPos - 1))
+    If LenB(prefixText) = 0 Then Exit Function
+    If prefixText Like "*[!0-9]*" Then Exit Function
+    StripLeadingNumberPrefix = Trim$(Mid$(StripLeadingNumberPrefix, colonPos + 1))
 End Function
 
 Private Function SafeCellStr(ByVal cellValue As Variant) As String

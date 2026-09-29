@@ -15,7 +15,9 @@ transform:
     group labels; row 2 = the actual sub-headers under those two groups), and data
     starts on ROW 3, not row 2. Revenue Category (Integration col Q), Cost Centre
     (col O), and Reporting Type (col P) are now read DIRECTLY per row from that
-    group (no lookup) and written to EIB EM / FX / FY respectively. Customer
+    group (no lookup) and written to EIB EM / FX / FY respectively. For FY the
+    leading "<number>: " prefix in col P is removed so only the text is written
+    (e.g. "1: FA Operations" -> "FA Operations"). Customer
     AJ is now read DIRECTLY from the new Integration col C ("WORKDAY ID"),
     replacing the old Customer ID (col B) -> Customer Spreadsheet extract
     lookup, which was rejecting rows with "CUSTOMER ID not found in customer
@@ -32,9 +34,12 @@ transform:
     instruction, no longer read from Codes at all and are intentionally
     always blank. Project and Sales Item have never had a source column and
     stay blank too.
-    Tax is determined per-row from the source Net/VAT split: rows with zero VAT use
-    the domestic-out-of-scope zero-rated set; rows with positive VAT use the
-    domestic 20% standard-rated set.
+    Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are
+    left blank on every row (as ar_manual_invoice / ar_discipline_invoice /
+    ar_gbe_invoice do); the per-row Net/VAT tax derivation no longer applies.
+    Customer Invoice Reference ID (D) is
+    integration_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
+    (mirrors ar_gbe_invoice).
 
 runtime:
   step_list_macro: RunArIntegrationCustomerInvoice
@@ -63,6 +68,18 @@ transform_constants:
   fixed_invoice_type: Standard
   company_fallback: THE FA GROUP - NFC
   mapping_sheet: MAPPING MASTER
+  # EIB column D (Customer Invoice Reference ID) =
+  # integration_<Customer>_<Invoice Date>_<Spreadsheet Key>, mirroring ar_gbe_invoice:
+  #   - Customer     = the AJ value (Integration col C "WORKDAY ID") with hyphens removed;
+  #                    AJ itself keeps the original Customer ID (hyphens intact).
+  #   - Invoice Date = the BR value formatted YYYYMMDD.
+  #   - Spreadsheet Key = B, assigned AFTER grouping on the invoice_identifier below
+  #                    (the same order GBE uses: group on the source-derived identifier,
+  #                    take B, then build D).
+  #   - D is written as text (NumberFormat "@").
+  # e.g. C-000190, 18.09.26, key 1 -> integration_C000190_20260918_1.
+  # D is no longer the invoice_identifier below; that identifier still drives G and the
+  # Spreadsheet Key / line grouping. BO (Invoice Number) is left blank.
 
   invoice_identifier:
     derivation: per_group_reset_counter
@@ -79,23 +96,24 @@ transform_constants:
       output_format: "{customer}-NOPO-{N}"
       example: "60005120-NOPO-1 (Customer ID, no PO, grouped by Customer + Invoice Date)"
     fallback_2_when_all_blank:
-      output_format: "AR-INT-{spreadsheet_key}"
+      output_format: "AR-INT-{row_sequence}"
       note: >
         Defensive catch-all — should never fire because the IntegrationRowIsSkippable
-        rule already rejects rows where both Customer ID and Date are blank.
-    writes_to_eib_columns: [D, G, BO]
+        rule already rejects rows where Customer ID or Date is blank. {row_sequence}
+        is the 1-based count of rows written so far (not the Spreadsheet Key).
+    writes_to_eib_columns: [G]
     evaluation: once_per_non_skipped_source_row
     note: >
-      SINGLE SOURCE OF TRUTH for how columns D (Customer Invoice Reference ID),
-      G (Customer Invoice ID), and BO (Invoice Number) receive their values.
+      SINGLE SOURCE OF TRUTH for how column G (Customer Invoice ID) receives its
+      value, and the grouping key for Spreadsheet Key (B) / line order. D (Customer
+      Invoice Reference ID) is no longer written from this identifier (see the
+      column D comment above), and BO (Invoice Number) is left blank on every row.
       The counter is evaluated exactly ONCE per non-skipped Integration source row
-      (before any per-column writes) so D, G, and BO all receive the exact same
-      string instance (no independent counter increments, no separator drift).
+      (before any per-column writes), so there are no independent counter
+      increments and no separator drift.
       Pattern is identical in structure to modApCfaClaimsSupplierInvoice Rule 8
       (per-group reset counter using VBA Collection as a keyed Long store — NO
-      Scripting.Dictionary so it runs on both Mac and PC Excel).  If Finance
-      later adds a dedicated Invoice N0 source column, BO can be independently
-      overridden via optional_override_source_column in the transform_spec.
+      Scripting.Dictionary so it runs on both Mac and PC Excel).
 
   source_lookups:
     course_hierarchy:
@@ -157,29 +175,38 @@ transform_constants:
   derived_worktags:
     reporting_type:
       derivation: "2026-09-22: read directly from Integration col P (row-2 sub-header 'Reporting Type'), not via Codes tab or Final Code seg2."
+      source_column: P
+      target_column: FY
+      value_cleanup: strip_leading_number_colon_space
+      value_cleanup_rule: >
+        Col P carries a number, a ":" and a space before the Reporting Type text
+        (for a one-digit number the text starts at the 4th character). When the
+        part before the first ":" is all digits, remove it and the ":", trim the
+        leading space(s), and write only the remaining text to FY. Otherwise (no
+        ":", or a non-numeric prefix) the value is written unchanged (trimmed); a
+        blank P leaves FY blank.
+      examples:
+        - "1: FA Operations -> FA Operations"
+        - "4: FA Investments -> FA Investments"
+        - "5: National Game Board (NGB) -> National Game Board (NGB)"
+        - "6: Professional Game Board (PGB) -> Professional Game Board (PGB)"
+        - "FA Operations -> FA Operations (no prefix, unchanged)"
   unmapped_handling: silent_blank
 
-  tax_triple_per_row:
-    source_net_column: "Net \u00A3"
-    source_vat_column: "Vat \u00A3"
-    source_gross_column: "Gross Price \u00A3"
-    header_aliases_net: ["Net PS", "Net"]
-    header_aliases_vat: ["VAT PS", "VAT \u00A3", "VAT", "Vat PS", "Vat"]
-    header_aliases_gross: ["Gross Price PS", "Gross Price"]
-    alias_resolution_order: primary_required_header_first_then_aliases_by_year_tab_variant
-    standard_rated:
-      applicability: GBR_Domestic_Sale_of_Goods_and_Services
-      code: GBR_200_VAT
-      recoverability: Fully_Recoverable
-    zero_rated:
-      applicability: GBR_Domestic_Outside_the_Scope
-      code: GBR_000_No_VAT
-      recoverability: Fully_Recoverable
+  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
+  # blank on every row -- no tax block (tax_triple_per_row) is declared here. Previously
+  # FA/FB were derived per row from the source Net/VAT split (zero VAT ->
+  # GBR_Domestic_Outside_the_Scope / GBR_000_No_VAT; positive VAT ->
+  # GBR_Domestic_Sale_of_Goods_and_Services / GBR_200_VAT).
 
   customer_invoice_eib_columns:
+    # --- HEADER identifier columns (D composite ID; G populated with the invoice_identifier; BO blank) ---
+    # D = integration_{AJ without hyphens}_{BR as YYYYMMDD}_{B}, e.g.
+    # integration_C000190_20260918_1. AJ keeps the original Customer ID. See the
+    # column D comment under transform_constants.
     customer_invoice_ref_id: D
     customer_invoice_id: G
-    invoice_number: BO
+    invoice_number: BO                # intentionally left blank on every row
     spreadsheet_key: B
     add_only: C
     header_comment: E
@@ -209,8 +236,8 @@ transform_constants:
     sales_item: EJ
     revenue_category: EM
     line_item_description: EN
-    line_tax_applicability: FA
-    line_tax_code: FB
+    line_tax_applicability: FA        # intentionally left blank on every row
+    line_tax_code: FB                 # intentionally left blank on every row
     line_quantity: FH
     line_unit_of_measure: FI
     line_unit_cost: FL
