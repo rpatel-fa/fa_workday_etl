@@ -37,6 +37,11 @@ transform:
     Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are
     left blank on every row (as ar_manual_invoice / ar_discipline_invoice /
     ar_gbe_invoice do); the per-row Net/VAT tax derivation no longer applies.
+    Amounts (2026-09-30): Amount Due (CM), Unit Cost (FL) and line Extended
+    Amount (FO) = source "Gross Price" (col K); line tax is blank, so no VAT is
+    added on top;
+    Quantity (FH) = source "Quantity" (col H), capped at 1 (a source value above
+    1 is written as 1); blank, text or <= 0 defaults to 1.
     Customer Invoice Reference ID (D) is
     integration_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
     (mirrors ar_gbe_invoice).
@@ -223,7 +228,7 @@ transform_constants:
     invoice_date: BR
     payment_status: CK
     document_status: CL
-    amount_due: CM
+    amount_due: CM                    # source "Gross Price" (col K), 2026-09-30
     customer_invoice_type: CO
     header_tax_code: CP
     customer_po_number: CQ
@@ -238,10 +243,10 @@ transform_constants:
     line_item_description: EN
     line_tax_applicability: FA        # intentionally left blank on every row
     line_tax_code: FB                 # intentionally left blank on every row
-    line_quantity: FH
+    line_quantity: FH                 # source "Quantity" (col H), capped at 1
     line_unit_of_measure: FI
-    line_unit_cost: FL
-    line_extended_amount: FO
+    line_unit_cost: FL                # source "Gross Price" (col K), 2026-09-30
+    line_extended_amount: FO          # source "Gross Price" (col K), 2026-09-30
     line_transaction_date: FP
     line_from_date: FQ
     line_to_date: FR

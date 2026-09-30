@@ -88,17 +88,20 @@ notes: >
   Tax Applicability (FA) and Line Tax Code (FB) are left blank on every row
   (DECIDED 2026-09-29, same as ar_manual_invoice / ar_discipline_invoice /
   ar_gbe_invoice); previously FA/FB were derived per row from the source
-  Net/VAT ratio. 2026-09-22 amendment: the source Net column (not Gross) is now
-  the authoritative Amount Due (CM), Unit Cost (FL), and line Extended
-  Amount (FO).
-  Customer Invoice ID (G) is left blank on every row (DECIDED 2026-09-30).
+  Net/VAT ratio. 2026-09-30 amendment: Amount Due (CM), Unit Cost (FL) and line
+  Extended Amount (FO) all come from the source Gross Price column (col K)
+  (reverting the 2026-09-22 switch to Net), and Quantity (FH) from the source
+  Quantity column (col H), capped at 1. With line tax blank, Workday adds no VAT
+  and the customer is charged the Gross amount.
   Shared invoice-line grouping is keyed by the derived invoice identifier that
-  the build profile computes (no longer written to G). That makes the shared helper contract
-  explicit in YAML even though the identifier itself is assembled from PO / customer /
-  date fallback logic in config/transforms/ar_integration_invoice.yaml.
-  Customer Invoice Reference ID (D) is
+  the build profile computes (not written to any output column). That makes the
+  shared helper contract explicit in YAML even though the identifier itself is
+  assembled from PO / customer / date fallback logic in
+  config/transforms/ar_integration_invoice.yaml.
+  Customer Invoice ID (G) is
   integration_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
-  (DECIDED 2026-09-29, mirrors ar_gbe_invoice; see mapping target `d`).
+  and Customer Invoice Reference ID (D) is left blank (DECIDED 2026-09-30; see
+  mapping targets `d` and `g`).
 
 fields:
   invoice_number:
@@ -108,8 +111,8 @@ fields:
       Canonical emitted invoice identifier. The build-profile `invoice_identifier`
       block computes the exact value once per non-skipped source row; that string is
       used as the grouping key for the shared invoice-line helper. It is not written
-      to any output column: as of 2026-09-29 D is a composite ID (see mapping target
-      `d`) and BO is blank; as of 2026-09-30 G is blank.
+      to any output column: as of 2026-09-30 D and BO are blank and G holds the
+      composite integration_... ID (see mapping target `g`).
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
     group_key_field: invoice_number
@@ -239,7 +242,7 @@ tax_rules:
     DECIDED 2026-09-29: Line Tax Applicability (FA) and Line Tax Code (FB) are left
     blank on every row, same as ar_manual_invoice / ar_discipline_invoice /
     ar_gbe_invoice. No tax triple is derived. The Net / Vat / Gross columns are still
-    read for amounts (Net) and the zero-value skip rule (Net + Vat + Gross all 0).
+    read for amounts (Gross, as of 2026-09-30) and the zero-value skip rule (Net + Vat + Gross all 0).
     Previously per-row: Net > 0 and VAT = 0 (or Net = 0 and Gross = 0) ->
     GBR_Domestic_Outside_the_Scope / GBR_000_No_VAT; otherwise (VAT ~= 20% of Net,
     or any other ratio) -> GBR_Domestic_Sale_of_Goods_and_Services / GBR_200_VAT.
@@ -288,31 +291,34 @@ mapping:
 
 # --- Header identifiers ---
 - target: d
+  default: ""
+  optional: true
+  note: >
+    Customer Invoice (Customer_Invoice_Reference_ID) -- left blank on every row
+    (DECIDED 2026-09-30). In Submit Customer Invoice this column is a lookup of an
+    EXISTING Workday invoice (update path); a new ID here fails the load with an
+    invalid Customer_Invoice_Reference_ID error. New invoices take their ID from G.
+    Previously held the composite integration_... ID (2026-09-29) and before that
+    the invoice_identifier (same value as G / BO).
+
+- target: g
   derivation: composite_reference_id
   output_format: "integration_{aj with hyphens removed}_{YYYYMMDD of br}_{b}"
   examples:
     - "integration_C000190_20260918_1"   # C-000190, 2026-09-18, Spreadsheet Key 1
     - "integration_C000190_20260918_2"   # same customer + date, next row, Spreadsheet Key 2
   note: >
-    Customer Invoice Reference ID -- per requester instruction (2026-09-29), mirroring
-    ar_gbe_invoice: literal "integration_", then the Customer written to `aj` with its
-    hyphen removed (`C-000190` -> `C000190`), then the Invoice Date written to `br` as
-    YYYYMMDD, then the Spreadsheet Key written to `b`, joined by "_". The hyphen is
-    removed only in D; `aj` keeps the original Customer ID. The Spreadsheet Key is
-    assigned first (grouped on the invoice_identifier, see target `g`), then D is built.
-    Written as text. Previously D held the invoice_identifier (same value as G / BO).
-
-- target: g
-  default: ""
-  optional: true
-  note: >
-    Customer Invoice ID -- left blank on every row per requester instruction
-    (2026-09-30). Previously held the invoice_identifier from the build profile's
-    `transform_constants.invoice_identifier` block. That identifier is STILL
-    evaluated once per non-skipped source row and used internally as the Spreadsheet
-    Key (B) / line-group grouping key (see fields.invoice_number); it is simply no
-    longer written to any output column (not D, G, or BO). Build-profile authoring
-    intent for the identifier is unchanged:
+    Customer Invoice ID (DECIDED 2026-09-30, moved from D): literal "integration_",
+    then the Customer written to `aj` with its hyphen removed (`C-000190` ->
+    `C000190`), then the Invoice Date written to `br` as YYYYMMDD, then the
+    Spreadsheet Key written to `b`, joined by "_". The hyphen is removed only in G;
+    `aj` keeps the original Customer ID. Written as text. This is the ID Workday
+    assigns to the new invoice; because Customer Invoice IDs must be unique,
+    re-loading the same file is rejected instead of creating duplicates.
+    The Spreadsheet Key is assigned first by grouping on the build profile's
+    `transform_constants.invoice_identifier` (see fields.invoice_number), then G is
+    built. That identifier is no longer written to any output column (not D, G, or
+    BO). Build-profile authoring intent for the identifier is unchanged:
       - Canonical implementation pattern = modApCfaClaimsSupplierInvoice Rule 8
         (per-group reset counter using a plain VBA Collection; NO Scripting.Dictionary
         — Mac-safe no-ActiveX rule).
@@ -325,7 +331,7 @@ mapping:
   optional: true
   note: >
     Invoice Number -- left blank on every row per requester instruction (2026-09-29).
-    Previously mirrored D (the invoice_identifier).
+    Previously held the invoice_identifier (same value as D / G).
 
 # --- Header fields ---
 - target: j
@@ -382,17 +388,18 @@ mapping:
   note: Document Status CL = Approved per house default.
 
 - target: cm
-  source_column: "Net \u00A3"
-  source_column_aliases: ["Net PS", "Net"]
+  source_column: "Gross Price £"
+  source_column_aliases: ["Gross Price PS", "Gross Price"]
   number_format: "0.00"
   note: >
-    Amount Due CM = source "Net £" (col H). 2026-09-22 amendment: switched
-    from Gross to Net (previously used Gross Price £). One row = one invoice
-    so header-level amount equals the single line net. Year-tab variants
-    carry header "Net" (no £); resolved via FindOptionalColumnIndexInRow
-    fallback chain. Cell NumberFormat = "0.00" (2026-09-22; display only,
-    stored value stays unrounded), matching ar_discipline_invoice's
-    convention.
+    Amount Due CM = source "Gross Price £" (col K), per requester instruction
+    (2026-09-30). Reverts the 2026-09-22 amendment that had switched CM from Gross
+    to Net. One row = one invoice, so CM equals the line's FO (and FH x FL, with
+    FH capped at 1). Line tax (FA/FB) is blank, so Workday adds no VAT on top and
+    the customer is charged the Gross amount; VAT is not recorded separately.
+    Year-tab variants carry header "Gross Price" (no £); resolved via
+    FindOptionalColumnIndexInRow fallback chain. Cell NumberFormat = "0.00"
+    (display only, stored value stays unrounded).
 
 - target: co
   default: Standard
@@ -480,35 +487,39 @@ mapping:
 
 - target: fh
   source_column: Quantity
-  note: Quantity FH = source "Quantity" (col G).
+  note: >
+    Quantity FH = source "Quantity" (col H) (confirmed 2026-09-30; earlier note
+    said col G, which is Course Date). Capped at 1 per requester instruction
+    (2026-09-30): a source Quantity above 1 is written as 1, because Unit Cost FL
+    carries the full row Gross (not divided by Quantity) and FH x FL must equal the
+    row total. Blank, text (e.g. "Bespoke") or <= 0 defaults to 1.
 
 - target: fi
   note: Unit of Measure FI is left blank per 2026-09-22 instruction (previously defaulted to "Each").
 
 - target: fl
-  source_column: "Net \u00A3"
-  source_column_aliases: ["Net PS", "Net"]
+  source_column: "Gross Price £"
+  source_column_aliases: ["Gross Price PS", "Gross Price"]
   number_format: "0.00"
   note: >
-    Unit Cost FL = source "Net £" (col H), the full Net amount on every row --
-    NOT divided by Quantity (DECIDED 2026-09-29, same as ar_discipline_invoice /
-    ar_gbe_invoice). FL, FO and CM therefore all carry the same Net value; Quantity
-    (FH) is written as-is from the source. Year-tab variants use header "Net"
-    (no £); resolved via FindOptionalColumnIndexInRow fallback. Cell
-    NumberFormat = "0.00" (2026-09-22; display only, stored value stays
-    unrounded).
+    Unit Cost FL = source "Gross Price £" (col K), per requester instruction
+    (2026-09-30; previously Net). The full row amount, NOT divided by Quantity;
+    Quantity (FH) is capped at 1 (see target `fh`) so FH x FL = FO = CM.
+    Year-tab variants use header "Gross Price" (no £); resolved via
+    FindOptionalColumnIndexInRow fallback. Cell NumberFormat = "0.00" (display
+    only, stored value stays unrounded).
 
 - target: fo
-  source_column: "Net \u00A3"
-  source_column_aliases: ["Net PS", "Net"]
+  source_column: "Gross Price £"
+  source_column_aliases: ["Gross Price PS", "Gross Price"]
   number_format: "0.00"
   note: >
-    Extended Amount FO = source "Net £" (col H). 2026-09-22 amendment: switched
-    from Gross to Net (previously used Gross Price £), matching Amount Due CM
-    and Unit Cost FL. Workday validates FO against the sum of Amount Due CM
-    across lines; with one line per invoice archetype CM and FO are the same
-    numeric value per row. Cell NumberFormat = "0.00" (display only, stored
-    value stays unrounded).
+    Extended Amount FO = source "Gross Price £" (col K), per requester instruction
+    (2026-09-30). Reverts the 2026-09-22 amendment that had switched FO from Gross
+    to Net. FL, FO and CM all carry the same Gross value. Year-tab variants use
+    header "Gross Price" (no £); resolved via FindOptionalColumnIndexInRow
+    fallback. Cell NumberFormat = "0.00" (display only, stored value stays
+    unrounded).
 
 - target: fp
   derivation: mirror_br
