@@ -91,8 +91,9 @@ notes: >
   Net/VAT ratio. 2026-09-22 amendment: the source Net column (not Gross) is now
   the authoritative Amount Due (CM), Unit Cost (FL), and line Extended
   Amount (FO).
+  Customer Invoice ID (G) is left blank on every row (DECIDED 2026-09-30).
   Shared invoice-line grouping is keyed by the derived invoice identifier that
-  the build profile writes to G. That makes the shared helper contract
+  the build profile computes (no longer written to G). That makes the shared helper contract
   explicit in YAML even though the identifier itself is assembled from PO / customer /
   date fallback logic in config/transforms/ar_integration_invoice.yaml.
   Customer Invoice Reference ID (D) is
@@ -106,8 +107,9 @@ fields:
     note: >
       Canonical emitted invoice identifier. The build-profile `invoice_identifier`
       block computes the exact value once per non-skipped source row; that string is
-      written to G and used as the grouping key for the shared invoice-line helper.
-      As of 2026-09-29 D is a composite ID (see mapping target `d`) and BO is blank.
+      used as the grouping key for the shared invoice-line helper. It is not written
+      to any output column: as of 2026-09-29 D is a composite ID (see mapping target
+      `d`) and BO is blank; as of 2026-09-30 G is blank.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
     group_key_field: invoice_number
@@ -301,24 +303,22 @@ mapping:
     Written as text. Previously D held the invoice_identifier (same value as G / BO).
 
 - target: g
-  derivation: from_build_profile_invoice_identifier
-  build_profile_reference: transform_constants.invoice_identifier
-  evaluation_note: >
-    BUILD-PROFILE DRIVEN. The counter logic, group keying, scope, reset, start value,
-    output format, and two fallbacks are ALL declared exclusively in the build
-    profile's `transform_constants.invoice_identifier` block. Do NOT derive any
-    counter behaviour from reading this transform_spec alone — always consult the
-    build profile FIRST for the canonical group/format/fallback values. This spec
-    entry only captures authoring-level intent:
+  default: ""
+  optional: true
+  note: >
+    Customer Invoice ID -- left blank on every row per requester instruction
+    (2026-09-30). Previously held the invoice_identifier from the build profile's
+    `transform_constants.invoice_identifier` block. That identifier is STILL
+    evaluated once per non-skipped source row and used internally as the Spreadsheet
+    Key (B) / line-group grouping key (see fields.invoice_number); it is simply no
+    longer written to any output column (not D, G, or BO). Build-profile authoring
+    intent for the identifier is unchanged:
       - Canonical implementation pattern = modApCfaClaimsSupplierInvoice Rule 8
         (per-group reset counter using a plain VBA Collection; NO Scripting.Dictionary
         — Mac-safe no-ActiveX rule).
       - Helper stubs required in the module: CollectionKeyExists /
         CollectionSetItemLong / CollectionGetItemLong (mirror the CFA Claims module
         bottom helpers exactly).
-      - Evaluate once per non-skipped source row; write the string to G and use it
-        as the Spreadsheet Key grouping key (no separate counter per column).
-    As of 2026-09-29 this identifier is no longer written to D or BO.
 
 - target: bo
   default: ""

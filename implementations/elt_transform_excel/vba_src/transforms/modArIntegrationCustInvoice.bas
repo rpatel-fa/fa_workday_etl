@@ -563,13 +563,14 @@ Private Sub WriteOutputRow( _
     ' Locked in Workday (I) is left blank per 2026-09-22 amendment (matches ar_discipline_invoice).
     ' Customer Invoice Reference ID (D) = integration_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
     ' (e.g. C-000190 + 2026-09-18 + key 1 -> integration_C000190_20260918_1), mirroring
-    ' ar_gbe_invoice. AJ keeps the original Customer ID. G keeps the invoice_identifier;
-    ' Invoice Number (BO) is left blank. See mapping.d / mapping.g / mapping.bo.
+    ' ar_gbe_invoice. AJ keeps the original Customer ID. Customer Invoice ID (G) and
+    ' Invoice Number (BO) are left blank; the invoice_identifier (invoiceRefId) is used
+    ' only as the line-group key above. See mapping.d / mapping.g / mapping.bo.
     referenceId = REFERENCE_ID_PREFIX & Replace(outputCustomerId, "-", vbNullString) & _
         "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceId
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = invoiceRefId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CURRENCY)).Value = OUTPUT_CURRENCY
