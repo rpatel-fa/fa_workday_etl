@@ -12,8 +12,8 @@ Private Const OUTPUT_CURRENCY As String = "GBP"
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - NFC"
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 
-'  Customer Invoice Reference ID (D) prefix -- see ar_integration_invoice.yaml
-'  transform_constants (column D comment) and transform_specs mapping.d.
+'  Customer Invoice ID (G) prefix -- see ar_integration_invoice.yaml
+'  transform_constants and transform_specs mapping.g. (D is left blank.)
 Private Const REFERENCE_ID_PREFIX As String = "integration_"
 
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
@@ -435,7 +435,7 @@ Private Sub WriteOutputRow( _
     Dim companyId As String
     Dim invoiceDate As String
     Dim orderDate As String
-    Dim netAmount As Double
+    Dim grossAmount As Double
     Dim qtyValue As Double
     Dim courseNameValue As String
     Dim descriptionValue As String
@@ -469,10 +469,17 @@ Private Sub WriteOutputRow( _
     ' Transaction Date FP mirrors Invoice Date BR (both = source "Date"); see transform_specs target: fp.
     orderDate = invoiceDate
 
+    ' Quantity (FH) = source "Quantity" (col H), capped at 1 per 2026-09-30 instruction:
+    ' Unit Cost (FL) carries the full row Gross, so FH x FL must equal the row total.
+    ' Blank, text or <= 0 defaults to 1.
     If qtyColumn > 0 Then qtyValue = SafeCellDbl(sourceTable(sourceRow, qtyColumn)) Else qtyValue = 1#
     If qtyValue <= 0# Then qtyValue = 1#
+    If qtyValue > 1# Then qtyValue = 1#
 
-    If netColumn > 0 Then netAmount = SafeCellDbl(sourceTable(sourceRow, netColumn)) Else netAmount = 0#
+    ' Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) = source Gross Price
+    ' (col K) per 2026-09-30 instruction. Line tax (FA/FB) is blank, so Workday adds no
+    ' VAT on top. See transform_specs targets cm/fl/fo.
+    If grossColumn > 0 Then grossAmount = SafeCellDbl(sourceTable(sourceRow, grossColumn)) Else grossAmount = 0#
     ' Line Tax Applicability (FA) / Line Tax Code (FB) are left blank on every row, so no
     ' Net/VAT tax triple is derived here (see transform_specs tax_rules).
 
@@ -561,15 +568,17 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = "Y"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     ' Locked in Workday (I) is left blank per 2026-09-22 amendment (matches ar_discipline_invoice).
-    ' Customer Invoice Reference ID (D) = integration_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
-    ' (e.g. C-000190 + 2026-09-18 + key 1 -> integration_C000190_20260918_1), mirroring
-    ' ar_gbe_invoice. AJ keeps the original Customer ID. G keeps the invoice_identifier;
-    ' Invoice Number (BO) is left blank. See mapping.d / mapping.g / mapping.bo.
+    ' Customer Invoice ID (G) = integration_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
+    ' (e.g. C-000190 + 2026-09-18 + key 1 -> integration_C000190_20260918_1).
+    ' AJ keeps the original Customer ID. Customer Invoice Reference ID (D) is left
+    ' blank: it looks up an EXISTING Workday invoice, so a new ID there fails the load.
+    ' Invoice Number (BO) is left blank; the invoice_identifier (invoiceRefId) is used
+    ' only as the line-group key above. See mapping.d / mapping.g / mapping.bo.
     referenceId = REFERENCE_ID_PREFIX & Replace(outputCustomerId, "-", vbNullString) & _
         "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).NumberFormat = "@"
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceId
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = invoiceRefId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COMPANY)).Value = companyId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CURRENCY)).Value = OUTPUT_CURRENCY
@@ -582,7 +591,7 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = grossAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     If LenB(poNumberValue) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = poNumberValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INCLUDE_CUSTOMER_WORKTAGS)).Value = "Y"
@@ -599,9 +608,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     ' Unit of Measure (FI) is left blank per 2026-09-22 instruction.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = grossAmount
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = grossAmount
 
     If LenB(orderDate) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"
