@@ -8,86 +8,87 @@
 # layout (worksheet, header row, required headers) - live in the build profile
 # config/transforms/ap_travel_places.yaml (the build-consumed source of truth). Not restated here.
 #
-# Source workbook: "FA Invoice listing 010826 to 090826 incl Event pivots.xlsx" (weekly).
-# Data sheet = "DATA" (Finance-prepared supplier-invoice upload; the other
+# Source workbook: "FA Invoice listing 210926 to 270926 incl Event pivots.xlsx" (weekly; file name pattern
+#   "FA Invoice listing DDMMYY to DDMMYY incl Event pivots.xlsx"; CHANGED 2026-10-01, previously the 010826-090826 week).
+# Data sheet = "Travel Places upload vMR" (Finance-prepared supplier-invoice upload; the other
 #   ~20 tabs are the agency's aged-debt / sales reporting views and are ignored).
-# Header row 1, data rows 2..20 (19 rows in the 01.08-09.08 week; 16 columns A-P).
+# Header row 1, data rows 2..120 (119 rows in the 21.09-27.09 week; 18 columns A-R on the vMR tab).
 #
-# This is a FORK of ap_taxi. The 16-column A-P "Upload Format" layout is shared with
-# ap_taxi / ap_stationery. Three deltas only:
-#   Delta 1 (worksheet)    : "DATA"  (taxi = "Upload Format")
-#   Delta 2 (header names) : col D "SL Date" (= InvoiceDate), col E "Date sent" (= ReceivedDate),
-#                            col O "Description" (taxi = "Description/BOOKED BY").
-#   Delta 3 (STRUCTURAL)   : the accounting/coding string is in col Q "String Reformatted"
+# This is a FORK of ap_taxi. The vMR tab is 18 columns A-R: the 16-column A-P "Upload Format" shared with
+# ap_taxi / ap_stationery, plus "Workday Supplier ID" (C) and "String Reformatted" (R). Three deltas only:
+#   Delta 1 (worksheet)    : "Travel Places upload vMR"  (taxi = "Upload Format")
+#   Delta 2 (header names) : col E "SL Date" (= InvoiceDate), col F "Date sent" (= ReceivedDate),
+#                            col P "Description" (taxi = "Description/BOOKED BY").
+#   Delta 3 (STRUCTURAL)   : the accounting/coding string is in col R "String Reformatted"
 #                            (e.g. "1099-208102-CM152606-0000") -- the finance-cleaned coding
-#                            column that supersedes col I "PONumber" (formulas + hardcoded fixes +
+#                            column that supersedes col J "PONumber" (formulas + hardcoded fixes +
 #                            "*XX" booker suffix; not derivable). So every worktag + Reporting Type
-#                            keys off col Q here. cols R-AJ are the finance user's OWN derived/test
+#                            keys off col R here. any columns after R are the finance user's OWN derived/test
 #                            columns (Cost Centre/Spend Category/worktags) and are NOT read.
 #
 #   A  Template     (col A: GP template tag = "DINV" on all rows; not mapped)
-#   B  SupplierID   (col B: "FA-TRA009" on all rows; split "{Company}-{CreditorID}")
-#   C  InvoiceNumber(col C: IV043470, IA701498, CM134541, ... 19/19 distinct)
-#   D  SL Date      (col D: per-row invoice timestamp = InvoiceDate)
-#   E  Date sent    (col E: uniform 11/08/2026 = ReceivedDate)
-#   F  Currency     (col F: GBP on all rows)
-#   G  Tray         (col G: agency tray label e.g. "Hilton"; not mapped)
-#   H  Createdby    (col H: e.g. "FA\NVargas"; not mapped)
-#   I  PONumber     (col I: LEGACY coding string -- formulas + hardcoded fixes + "*XX" suffix; NO LONGER the key)
-#   Q  String Reformatted (col Q: finance-cleaned coding string -- THE WORKTAG KEY as of 24.08.26)
-#   J  Itemcode     (col J: GP line-type code "VAL"; not mapped)
-#   K  Account      (col K: BLANK on every row -- intentionally unused)
-#   L  Net          (col L: line net; == Gross this feed since Tax=0)
-#   M  Tax          (col M: 0 on every row)
-#   N  Gross        (col N: line gross)
-#   O  Description  (col O: event/booking description e.g. "FA Mens U16 Florence August 2026 EC")
-#   P  Taxcode      (col P: "PZ" on every row -> rate_0 zero/outside-scope)
+#   B  SupplierID   (col B: "FA-TRA009" on all rows; split "{Company}-{CreditorID}" -> Company only)
+#   C  Workday Supplier ID (col C: Workday Supplier ID e.g. "S-007201" -> EIB U DIRECT; ADDED 2026-10-01)
+#   D  InvoiceNumber(col D on the vMR tab, CHANGED 2026-10-01: IV043470, IA701498, CM134541, ... -> EIB K + BG)
+#   E  SL Date      (col E: per-row invoice timestamp = InvoiceDate)
+#   F  Date sent    (col F: uniform 11/08/2026 = ReceivedDate)
+#   G  Currency     (col G: GBP on all rows)
+#   H  Tray         (col H: agency tray label e.g. "Hilton"; not mapped)
+#   I  Createdby    (col I: e.g. "FA\NVargas"; not mapped)
+#   J  PONumber     (col J: LEGACY coding string -- formulas + hardcoded fixes + "*XX" suffix; NO LONGER the key)
+#   K  Itemcode     (col K: GP line-type code "VAL"; not mapped)
+#   L  Account      (col L: BLANK on every row -- intentionally unused)
+#   M  Net          (col M: line net; == Gross this feed since Tax=0)
+#   N  Tax          (col N: 0 on every row)
+#   O  Gross        (col O: line gross)
+#   P  Description  (col P on the vMR tab, CHANGED 2026-10-01: event/booking description e.g. "FA Mens U16 Florence August 2026 EC")
+#   Q  Taxcode      (col Q: "PZ" on every row -> rate_0 zero/outside-scope)
+#   R  String Reformatted (col R: finance-cleaned coding string -- THE WORKTAG KEY as of 24.08.26)
 #
 # Derived-field rules (Upload -> EIB mapping):
 #
 #   Rule 1 - Company (EIB L): split SupplierID (B) on first "-", LEFT segment ("FA").
 #            Resolves Workday company ref-id via Runner mapping sheet (entity=company).
 #            Fallback "THE FA GROUP - FA". Uniform "FA" this feed; per-row keeps NFCL/WNSL working.
-#   Rule 2 - Supplier (EIB O): 2-part precedence on the RIGHT segment (bare creditor "TRA009"):
-#              1: "{CreditorID}-{Company}"   e.g. "TRA009-FA"   (exact per-company, HIGHER)
-#              2: "{CreditorID}"             e.g. "TRA009"      (bare fallback, LOWER)
-#            The Supplier extract Reference ID is pipe-delimited "TRA002-NFC|TRA009"; the bare
-#            "TRA009" alternate resolves -> Supplier ID S-007201. NOTE: the literal source token
-#            "FA-TRA009" is NOT itself a Reference ID -- resolution MUST go via the split.
-#   Rule 3 - Invoice Number (EIB G): col C "InvoiceNumber" RAW DIRECT (19/19 distinct this week).
-#   Rule 4 - Invoice Date (EIB u): col D "SL Date" per-row, coerced to YYYY-MM-DD at write.
+#   Rule 2 - Supplier (EIB U): CHANGED 2026-10-01 -- col C "Workday Supplier ID" DIRECT passthrough
+#            (Trim only; no Supplier Spreadsheet lookup). Blank col C -> reject (supplier unresolved).
+#            Previously: 2-part precedence on the SupplierID RIGHT segment (bare creditor "TRA009")
+#            via the pipe-delimited Reference ID "TRA002-NFC|TRA009" -> S-007201 -- RETIRED.
+#   Rule 3 - Invoice Number (EIB K): col D "InvoiceNumber" RAW DIRECT (19/19 distinct this week).
+#   Rule 4 - Invoice Date (EIB u): col E "SL Date" per-row, coerced to YYYY-MM-DD at write.
 #   Rule 5 - Receipt Date (EIB AG): CHANGED 2026-09-09. LEAVE BLANK (Empty).
-#            Do NOT read source "Date sent" col E; do NOT fall back to InvoiceDate when
+#            Do NOT read source "Date sent" col F; do NOT fall back to InvoiceDate when
 #            blank. AP confirmed "same for all of them" after Will's hand-edited Aug
 #            Ambassador Taxi EIB has 14/14 AG=None. AG is non-mandatory when B
 #            Spreadsheet Key multi-line grouping is in effect.
-#   Rule 6 - Suppliers Invoice Number (EIB BG): = Rule 3 (same value; no separate GP voucher ref).
-#   Rule 7 - Cost Code / accounting string (EIB worktags EW/GT/GV..HH): col Q "String Reformatted",
+#   Rule 6 - Suppliers Invoice Number (EIB BG): col D "InvoiceNumber" DIRECT (= Rule 3; no separate GP voucher ref).
+#   Rule 7 - Cost Code / accounting string (EIB worktags EW/GT/GV..HH): col R "String Reformatted",
 #            then VBA-normalize separators (trim; collapse space/dash/dot/underscore runs to single "-").
 #            Split on "-": Seg1=Cost Centre, Seg2=Spend Cat, Seg3=Project/CommPartner/Grant,
 #            Seg4=Program. Lowest-hierarchy Mapping MASTER lookup (Core vs Prism = Core) per BO.
-#            col Q is the finance-CLEANED coding string (e.g. "1099-208102-CM152606-0000") -- it has
-#            NO "*XX" booker suffix (that noise lives only on the legacy col I "PONumber"). Resolver
+#            col R is the finance-CLEANED coding string (e.g. "1099-208102-CM152606-0000") -- it has
+#            NO "*XX" booker suffix (that noise lives only on the legacy col J "PONumber"). Resolver
 #            is segment-tolerant of irregular widths (e.g. Seg2 = 7 digits "1168-2018108-...").
-#            cols R-AJ are the finance user's OWN derived/test worktag columns and are NOT read.
-#   Rule 8 - Item Description (EIB EP): col O "Description" DIRECT, UCase(Trim()).
-#   Rule 9 - Memo (EIB GQ): InvoiceNumber (C) + ' ' + SupplierID (B) + ' ' + CostCodeString (col Q).
-#   Rule 10 - Line Amount (EIB GE unit cost, GF extended): col L Net + col M Tax + col N Gross.
-#             If col L blank/zero -> fall back to (Gross - Tax). BOTH GE and GF = net only.
+#            any columns after R are the finance user's OWN derived/test worktag columns and are NOT read.
+#   Rule 8 - Item Description (EIB EP): col P "Description" DIRECT, UCase(Trim()). (CHANGED 2026-10-01: col P.)
+#   Rule 9 - Memo (EIB GQ): CHANGED 2026-10-01 -- mirrors ap_referees_v2: InvoiceNumber (D) + ' ' + raw
+#            coding string (String Reformatted). SupplierID no longer in the Memo.
+#   Rule 10 - Line Amount (EIB GE unit cost, GF extended): col M Net + col N Tax + col O Gross.
+#             If col M blank/zero -> fall back to (Gross - Tax). BOTH GE and GF = net only.
 #             CALC_TAX_DUE (FL) leaves Workday to re-derive VAT from the tax triple.
 #             AP confirmed 2026-09-09 Unit Cost MUST equal Extended Amount across ALL AP transforms (same Stationery fix).
-#   Rule 11 - Tax classification: per-row via col P "Taxcode". This feed = 100% PZ -> rate_0
+#   Rule 11 - Tax classification: per-row via col Q "Taxcode". This feed = 100% PZ -> rate_0
 #             (Outside of Scope / Zero Rated / Nonrecoverable). P20 branch retained for future —
 #             CHANGED 2026-09-09: P20 = GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard /
 #             Fully_Recoverable (same Stationery Ambassador Taxi correction: Purchasing domain Purchase
 #             ref-IDs, not generic Standard_Rated which is for AR/Customer domain).
-#   Rule 12 - Currency (EIB T): col F DIRECT (GBP), fallback GBP.
-#   Rule 13 - PO Number (EIB BH): LEFT EMPTY. col Q is the accounting coding string (used for
-#             worktags per Rule 7); the legacy col I "PONumber" is unclean and NOT a reliable Workday
+#   Rule 12 - Currency (EIB T): col G DIRECT (GBP), fallback GBP.
+#   Rule 13 - PO Number (EIB BH): LEFT EMPTY. col R is the accounting coding string (used for
+#             worktags per Rule 7); the legacy col J "PONumber" is unclean and NOT a reliable Workday
 #             PO reference -- so nothing is written to EIB BH. (Contrast ap_taxi, where col I is a
 #             genuine PO ref and IS written.) Future: revert to a clean PONumber once the business
 #             can populate it.
-#   Rule 14 - Reporting Type (EIB GR): LEFT(Seg2, 1) of the Rule-7 col Q code via
+#   Rule 14 - Reporting Type (EIB GR): LEFT(Seg2, 1) of the Rule-7 col R code via
 #             ResolveReportingTypeCode.
 #
 # Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md);
@@ -100,14 +101,14 @@ meta:
   date_confirmed: 2026-08-17
   exemplar_to_fork: ap_taxi
   note: >
-    Fork of ap_taxi (same 16-column A-P Upload Format layout). Sole structural delta: the
-    accounting/coding string is in col Q "String Reformatted" (finance-cleaned; supersedes col I "PONumber").
+    Fork of ap_taxi (taxi 16-column A-P Upload Format, extended to 18 columns A-R on the vMR tab). Sole structural delta: the
+    accounting/coding string is in col R "String Reformatted" (finance-cleaned; supersedes col J "PONumber").
     Single Travel Places supplier this feed (FA-TRA009 -> S-007201). Kept as its own profile
     rather than folded into the generic ap_taxi to avoid a PONumber-vs-Account key-column branch
     and a "SL Date"/"Date sent" alias chain polluting the generic taxi config.
 
 shared_helpers:
-  supplier_resolution: per_row_split_company_creditor
+  supplier_resolution: direct_workday_id_passthrough
   company_resolution: per_row_split_from_supplier_id
   accounting_string_derivation: direct_column_separator_normalized
   worktag_hierarchy_lookup: standard_9pack_lowest_specificity
@@ -118,21 +119,15 @@ shared_helpers:
 
 parties:
   supplier:
-    source_code: per_row_split
-    source_column: SupplierID                 # Upload col B: "{Company}-{Creditor}", e.g. "FA-TRA009"
-    split_on_first_hyphen: true
-    right_segment: CreditorID                 # e.g. "TRA009"
-    resolved_via: Supplier Spreadsheet
-    key_column: Reference ID
-    value_column: Supplier ID
-    key_precedence:
-      1: "{CreditorID}-{Company}"             # exact per-company match (HIGHER, SQL s_exact)
-      2: "{CreditorID}"                       # bare fallback (SQL s_bare)
-    reference_id_delimiter: pipe
-    note: >
-      "FA-TRA009" -> company="FA", creditor="TRA009". Supplier extract Reference ID is
-      "TRA002-NFC|TRA009" (pipe alternates for the same S-007201 record across companies);
-      the bare "TRA009" alternate resolves. The literal "FA-TRA009" is not a Reference ID.
+    source_code: per_row_direct_passthrough
+    source_column: Workday Supplier ID        # Upload col C, e.g. "S-007201"
+    source_column_letter: C
+    resolved_via: >
+      CHANGED 2026-10-01: Workday Supplier ID read DIRECT from col C (no Supplier Spreadsheet
+      lookup). Blank col C -> reject + unresolvedSupplierRows. The previous SupplierID-split
+      2-part precedence ("TRA009-FA" then bare "TRA009" against Reference ID "TRA002-NFC|TRA009")
+      is RETIRED; col B SupplierID is still read for Company (Rule 1) only.
+    reject_if_unresolved: true
   company:
     source_code: per_row_split
     source_column: SupplierID                 # Rule 1 -- same col B, LEFT segment
@@ -144,12 +139,12 @@ parties:
 
 fields:
   invoice_number:                             # EIB G
-    source_column: InvoiceNumber              # Rule 3 = col C DIRECT
+    source_column: InvoiceNumber              # Rule 3 = col D DIRECT
     note: >
       19/19 distinct this week (IV043470, IA701498, CM134541, ...). These are real per-invoice
       GP references, globally unique, so no batch-token prefix is needed (unlike CFA/Referees).
   invoice_date:                               # EIB u
-    source_column: SL Date                    # Rule 4 = col D
+    source_column: SL Date                    # Rule 4 = col E
     format: >
       MIXED SOURCE FORMATS within the same workbook — the shared helper
       source_date_normalization.excel_serial_and_dmy_text handles ALL of:
@@ -174,7 +169,7 @@ fields:
     format_fallbacks_note: >
       A third source form has been observed in production: pure numeric
       TEXT serials in CSV-cut intermediate files (e.g. the agency exports
-      to CSV → someone pastes back into the DATA sheet). The shared helper
+      to CSV → someone pastes back into the "Travel Places upload vMR" sheet). The shared helper
       branch 1 text-serial scan (0..9 + single decimal separator only,
       range [1, 100000]) catches these without additional per-profile
       work. No transform-specific fallback is needed beyond selecting the
@@ -185,27 +180,27 @@ fields:
     note: >
       Rule 5 CHANGED 2026-09-09. NO source-col read; NO InvoiceDate fallback. Write Empty.
       Will's Aug Ambassador Taxi reference: 14/14 rows AG blank. Matches Stationery + Taxi.
-  suppliers_invoice_number:                   # EIB AU
-    source_column: InvoiceNumber              # Rule 6 same source as InvoiceNumber
-  item_description:                           # EIB DI
-    source_column: Description                # Rule 8 = col O
+  suppliers_invoice_number:                   # EIB BG
+    source_column: InvoiceNumber              # Rule 6 = col D DIRECT (same source as InvoiceNumber)
+  item_description:                           # EIB EP
+    source_column: Description                # Rule 8 = col P (CHANGED 2026-10-01)
     post_process: UCase(Trim(value))
-  memo:                                       # EIB EO
-    rule: InvoiceNumber + ' ' + SupplierID + ' ' + CostCodeString   # Rule 9
-    concat_with_space: [InvoiceNumber, SupplierID, CostCodeString]
+  memo:                                       # EIB GQ
+    rule: InvoiceNumber + ' ' + CostCodeString   # Rule 9 -- CHANGED 2026-10-01: mirrors ap_referees_v2
+    concat_with_space: [InvoiceNumber, CostCodeString]
   line_amount:                                # EIB ED net, EE gross
-    source_column_net: Net                    # col L
-    source_column_tax: Tax                    # col M (0 this feed)
-    source_column_gross: Gross                # col N
+    source_column_net: Net                    # col M
+    source_column_tax: Tax                    # col N (0 this feed)
+    source_column_gross: Gross                # col O
     basis: net
     fallback_net_from_gross_minus_tax: true
   currency:
-    source_column: Currency                   # Rule 12 = col F (GBP)
+    source_column: Currency                   # Rule 12 = col G (GBP)
     fallback: GBP
   purchase_order_reference:                   # EIB AP
-    source_column: null                       # Rule 13 -- LEFT EMPTY (col I is the coding string,
+    source_column: null                       # Rule 13 -- LEFT EMPTY (col J is the coding string,
     on_blank: leave_empty                     #   not a Workday PO ref; consumed by worktags only)
-  spend_category:                             # EIB DP = Seg2 of the col Q "String Reformatted" code via Mapping MASTER
+  spend_category:                             # EIB DP = Seg2 of the col R "String Reformatted" code via Mapping MASTER
     derivation: per_row_lookup
     key_source_column: String Reformatted               # <-- DELTA vs taxi (taxi = Account col K)
     key_rule: segment 2 (Seg2), lowest-hierarchy match via Mapping MASTER
@@ -214,7 +209,7 @@ fields:
     worktag_business_object_key: Spend Category
     specificity_standard: classic_lowest_specificity
     on_unresolved: reject_and_report
-  cost_centre:                                # EIB EQ = Seg1 of the col Q "String Reformatted" code via Mapping MASTER
+  cost_centre:                                # EIB EQ = Seg1 of the col R "String Reformatted" code via Mapping MASTER
     derivation: per_row_lookup
     key_source_column: String Reformatted
     key_rule: segment 1 (Seg1), lowest-hierarchy match
@@ -280,7 +275,7 @@ fields:
     on_unresolved: skip_ok
 
 tax:
-  driver_column: Taxcode                      # col P, per-row STRING
+  driver_column: Taxcode                      # col Q, per-row STRING
   sets:
     - driver_value_match: { when_value_eq: PZ }
       applicability: GBR_Outside_of_Scope
@@ -301,14 +296,14 @@ tax:
 skip_rule:
   # reject_when -> row goes to the REJECT FILE (a genuine data error the operator must fix).
   reject_when:
-    - InvoiceNumber (col C) blank
+    - InvoiceNumber (col D) blank
     - SupplierID (col B) blank OR does not contain at least one "-"   # split guard
-    - String Reformatted (col Q) blank                               # no coding -> no worktags
-    - SL Date (col D) blank                                           # EIB req'd field
-    - Taxcode (col P) blank                                           # can't classify tax triple
+    - String Reformatted (col R) blank                               # no coding -> no worktags
+    - SL Date (col E) blank                                           # EIB req'd field
+    - Taxcode (col Q) blank                                           # can't classify tax triple
     - cost_centre unresolved
     - spend_category unresolved
-    - supplier unresolved (TRA009 with -FA precedence, then bare, not on Supplier Spreadsheet)
+    - supplier unresolved (col C "Workday Supplier ID" blank)   # CHANGED 2026-10-01: direct passthrough
   # silent_skip_when -> row is SILENTLY skipped: not written, NOT in the reject file; surfaced
   # only as an informational count so the run stays auditable (avoids false negatives).
   silent_skip_when:
@@ -322,12 +317,12 @@ skip_rule:
 
 unused_source_columns:
   - Template   (col A: GP template tag "DINV")
-  - Tray       (col G: agency tray label, e.g. "Hilton")
-  - Createdby  (col H: Windows logon, e.g. "FA\NVargas")
-  - Itemcode   (col J: GP line-type code "VAL")
-  - Account    (col K: BLANK on every row -- coding lives in String Reformatted col Q)
-  - PONumber   (col I: legacy coding string -- formulas + hardcoded fixes; superseded by col Q)
-  - "cols R-AJ (Division Lookup / Seg1-4 / Cost Centre / Reporting Type / Ledger / Account Set / Revenue Category / Spend Category / worktag cols): finance user's OWN derived/test columns -- NOT read; we re-derive from col Q via Mapping MASTER"
+  - Tray       (col H: agency tray label, e.g. "Hilton")
+  - Createdby  (col I: Windows logon, e.g. "FA\NVargas")
+  - Itemcode   (col K: GP line-type code "VAL")
+  - Account    (col L: BLANK on every row -- coding lives in String Reformatted col R)
+  - PONumber   (col J: legacy coding string -- formulas + hardcoded fixes; superseded by col R)
+  - "any columns after R (Division Lookup / Seg1-4 / Cost Centre / Reporting Type / Ledger / Account Set / Revenue Category / Spend Category / worktag cols): finance user's OWN derived/test columns -- NOT read; we re-derive from col R via Mapping MASTER"
 
 confirmed_decisions:
   - >-
@@ -341,10 +336,9 @@ confirmed_decisions:
 
 open_questions:
   - >-
-    [RECONCILE-TIME VERIFY, not blocking] Supplier resolution goes via the bare creditor "TRA009"
-    (pipe alternate of Reference ID
-    "TRA002-NFC|TRA009") -> S-007201. Confirm at reconcile that FA-TRA009 rows all resolve, and
-    that future NFCL/WNSL weeks carry a SupplierID whose bare-creditor split also resolves.
+    [RECONCILE-TIME VERIFY, not blocking] Supplier (EIB U) is now col C "Workday Supplier ID"
+    DIRECT (CHANGED 2026-10-01). Confirm at reconcile that col C is populated on every row with a
+    valid Workday Supplier ID (expected S-007201 for FA-TRA009).
   - >-
     Worktag segment roles: Seg1=Cost Centre, Seg2=Spend Cat/Reporting-Type-source, Seg3=named
     codes (Commercial Partner / Grant / Project), Seg4=Program -- inherited from ap_taxi. Some
@@ -359,17 +353,17 @@ mapping:
   #   dz=CALC_TAX_DUE.
   "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED 2026-09-14 from per-row sequenceNumber)" }
   "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
-  "K":  { source: InvoiceNumber, rule: "Rule 3 (col C DIRECT)" }
+  "K":  { source: InvoiceNumber, rule: "Rule 3 (col D DIRECT)" }
   "R":  { source: company_resolved_reference_id, rule: "parties.company constant FA via mapping entity=company; fallback = THE FA GROUP - FA (same ResolveMappedCompany('FA') path as single-company batches)" }
-  "T":  { source: Currency, rule: "Rule 12 (col F DIRECT; fallback = GBP)" }
-  "U":  { source: supplier_resolved_supplier_id, rule: "parties.supplier Rule 2 (split RIGHT, 2-part precedence TRA009-FA then TRA009; resolved via Supplier Spreadsheet pipe alternate)" }
-  "AF":  { source: "SL Date", rule: "Rule 4 (col D, per-row; coerced to YYYY-MM-DD at write)" }
+  "T":  { source: Currency, rule: "Rule 12 (col G DIRECT; fallback = GBP)" }
+  "U":  { source: "Workday Supplier ID", rule: "parties.supplier Rule 2 (CHANGED 2026-10-01: col C DIRECT passthrough, Trim only; no Supplier Spreadsheet lookup; blank -> reject)" }
+  "AF":  { source: "SL Date", rule: "Rule 4 (col E, per-row; coerced to YYYY-MM-DD at write)" }
   "AG": { source: receipt_date (fields.receipt_date),
           rule: "Rule 5 (CHANGED 2026-09-09 — LEAVE BLANK / EMPTY per Will's hand-edited Aug EIB:
                  14/14 rows AG=None. Do NOT read from source Date sent; do NOT fall back to InvoiceDate.
                  AP confirmed \"same for all of them\"; matches Stationery + Taxi.)" }
-  "BG": { source: InvoiceNumber, rule: "Rule 6 (same as G -- no separate GP voucher ref)" }
-  # EIB "ap" (PO Number) intentionally NOT written -- Rule 13 (col I is the coding string, not a PO ref).
+  "BG": { source: InvoiceNumber, rule: "Rule 6 (col D DIRECT; same as K -- no separate GP voucher ref)" }
+  # EIB "ap" (PO Number) intentionally NOT written -- Rule 13 (col J is the coding string, not a PO ref).
   # EM Line Order not explicitly written → default blank matches Will's Aug EIB (EM=None all rows;
   #    Workday derives from B Spreadsheet Key group + row position) — CHANGED 2026-09-09 documented.
   "EK": { source: invoice_line_grouping (line order),
@@ -377,22 +371,22 @@ mapping:
                  (CHANGED 2026-09-14 from hardcoded 1 -- now the same shared grouping as every transform)" }
   "EM": { source: invoice_line_grouping (line order),
           rule: "Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14" }
-  "EP": { source: Description, rule: Rule 8 (col O; UCase(Trim(...))) }
+  "EP": { source: Description, rule: Rule 8 (col P; UCase(Trim(...))) }
   "FE": { source: per_row_tax.*.applicability, rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Outside_of_Scope; P20->GBR_Domestic_Purchase_Of_Goods_And_Services — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }
   "FF": { source: per_row_tax.*.code,          rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Zero_Rated; P20->GBR_Standard — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }
   "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
   "FK": { source: per_row_tax.*.recoverability, rule: Rule 11 via Taxcode switch (PZ/P0->Nonrecoverable_Allocate; P20->Fully_Recoverable — CHANGED 2026-09-09 P20 was Recoverable_Allocate per AP) }
   "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
-  "GE": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Unit Cost; net amount only (no VAT). Same as GF — both columns MUST be identical per AP 2026-09-09. }
-  "GF": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Extended Amount; CHANGED 2026-09-09 to match GE exactly (net only = no VAT pre-add). AP confirmed Unit Cost (GE) MUST equal Extended Amount (GF). CALC_TAX_DUE re-derives VAT from FE/FF/FK triple. }
-  "GQ": { source: Memo, rule: "Rule 9 concat: InvoiceNumber + ' ' + SupplierID + ' ' + CostCodeString" }
-  "EW": { source: Spend Category, rule: Rule 7 Seg2 of the col Q "String Reformatted" code via Mapping MASTER (reject if no-hit) }
+  "GE": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Unit Cost; net amount only (no VAT). Same as GF — both columns MUST be identical per AP 2026-09-09. Cell NumberFormat = 0.00 (2026-10-01; display only, stored value not rounded). }
+  "GF": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Extended Amount; CHANGED 2026-09-09 to match GE exactly (net only = no VAT pre-add). AP confirmed Unit Cost (GE) MUST equal Extended Amount (GF). CALC_TAX_DUE re-derives VAT from FE/FF/FK triple. Cell NumberFormat = 0.00 (2026-10-01; display only, stored value not rounded). }
+  "GQ": { source: Memo, rule: "Rule 9 concat (CHANGED 2026-10-01, mirrors ap_referees_v2): InvoiceNumber + ' ' + CostCodeString (raw)" }
+  "EW": { source: Spend Category, rule: Rule 7 Seg2 of the col R "String Reformatted" code via Mapping MASTER (reject if no-hit) }
   "GR": { source: Reporting Type, rule: Rule 14 = LEFT(Seg2, 1) via ResolveReportingTypeCode }
-  "GT": { source: Cost Center, rule: Rule 7 Seg1 of the col Q "String Reformatted" code via Mapping MASTER (reject no-hit) }
-  "GV": { source: Event, rule: Rule 7 of the col Q "String Reformatted" code -- Events - Custom Org (optional, skip if no-hit) }
-  "GX": { source: Camp, rule: Rule 7 of the col Q "String Reformatted" code -- Camps - Custom Org (optional, skip) }
-  "GZ": { source: FA Learning, rule: Rule 7 of the col Q "String Reformatted" code -- FA Learning - Custom Org (optional, skip) }
-  "HB": { source: Commercial Partner, rule: Rule 7 Seg3 of the col Q "String Reformatted" code -- Commercial Partners (optional, skip) }
-  "HD": { source: Grant, rule: Rule 7 Seg3 of the col Q "String Reformatted" code -- Grant (optional, skip) }
-  "HF": { source: Program, rule: Rule 7 Seg4 of the col Q "String Reformatted" code -- Program - Delivered Org (optional, skip) }
-  "HH": { source: Project (Opex), rule: Rule 7 Seg3 of the col Q "String Reformatted" code -- Projects (Opex) (optional, skip) }
+  "GT": { source: Cost Center, rule: Rule 7 Seg1 of the col R "String Reformatted" code via Mapping MASTER (reject no-hit) }
+  "GV": { source: Event, rule: Rule 7 of the col R "String Reformatted" code -- Events - Custom Org (optional, skip if no-hit) }
+  "GX": { source: Camp, rule: Rule 7 of the col R "String Reformatted" code -- Camps - Custom Org (optional, skip) }
+  "GZ": { source: FA Learning, rule: Rule 7 of the col R "String Reformatted" code -- FA Learning - Custom Org (optional, skip) }
+  "HB": { source: Commercial Partner, rule: Rule 7 Seg3 of the col R "String Reformatted" code -- Commercial Partners (optional, skip) }
+  "HD": { source: Grant, rule: Rule 7 Seg3 of the col R "String Reformatted" code -- Grant (optional, skip) }
+  "HF": { source: Program, rule: Rule 7 Seg4 of the col R "String Reformatted" code -- Program - Delivered Org (optional, skip) }
+  "HH": { source: Project (Opex), rule: Rule 7 Seg3 of the col R "String Reformatted" code -- Projects (Opex) (optional, skip) }
