@@ -103,25 +103,25 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
-    "workbookFileName": "Contact_Related_Entities_DataMapping.xlsx",
+    "workbookFileName": "Account Advanced Find View.xlsx",
     "sheets": [
       {
-        "sheetName": "Contact (Contact)",
-        "headerRow": "10",
-        "dataRow": "11",
-        "targetTableName": "crm_contact_entity_mapping"
+        "sheetName": "Account Advanced Find View",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_account"
       }
     ]
   },
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
-    "workbookFileName": "Licence and Sub Contract_Related_Entities_DataMapping.xlsx",
+    "workbookFileName": "Licence Advanced Find View.xlsx",
     "sheets": [
       {
-        "sheetName": "",
+        "sheetName": "Licence Advanced Find View",
         "headerRow": "1",
         "dataRow": "2",
-        "targetTableName": "crm_license_entity_mapping"
+        "targetTableName": "crm_license"
       }
     ]
   }
