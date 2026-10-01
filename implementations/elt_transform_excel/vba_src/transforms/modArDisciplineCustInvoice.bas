@@ -32,6 +32,7 @@ Private Const SRC_COL_INVOICE_DATE As String = "A"
 Private Const TGT_SPREADSHEET_KEY As String = "B"
 Private Const TGT_ADD_ONLY As String = "C"
 Private Const TGT_CUSTOMER_INVOICE_REFERENCE_ID As String = "D"
+Private Const TGT_CUSTOMER_INVOICE_ID As String = "G"
 Private Const TGT_SUBMIT As String = "H"
 Private Const TGT_COMPANY As String = "J"
 Private Const TGT_CURRENCY As String = "AI"
@@ -256,14 +257,15 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_ADD_ONLY
-    ' Customer Invoice Reference ID (D) = cfa_discipline_{WORKDAY ID without hyphens}_
-    ' {yyyyMMdd of BR}_{Spreadsheet Key B} (e.g. C-000190 + 2026-09-18 + key 1 ->
-    ' cfa_discipline_C000190_20260918_1). Invoice Number (BO) left blank. See mapping.d / mapping.bo.
+    ' Customer Invoice ID (G) = cfa_discipline_{WORKDAY ID without hyphens}_{yyyyMMdd of BR}_{Spreadsheet Key B}
+    ' (e.g. C-000190 + 2026-09-18 + key 1 -> cfa_discipline_C000190_20260918_1).
+    ' Customer Invoice Reference ID (D) is intentionally left blank. See mapping.g / mapping.d / mapping.bo.
     referenceId = REFERENCE_ID_PREFIX & Replace(workdayId, "-", vbNullString) _
         & "_" & Replace(invoiceDate, "-", vbNullString) _
         & "_" & CStr(spreadsheetKeyValue)
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).NumberFormat = "@"
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).Value = referenceId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REFERENCE_ID)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SUBMIT)).Value = OUTPUT_SUBMIT
     ' I (Locked in Workday) intentionally left blank -- see mapping.i.

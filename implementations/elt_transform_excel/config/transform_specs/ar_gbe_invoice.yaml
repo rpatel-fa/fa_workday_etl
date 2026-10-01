@@ -88,20 +88,20 @@ parties:
 
 notes: >
   GBE (Governing Body Endorsement) invoices bill football clubs for player-registration
-  endorsement panels/extensions. The emitted invoice identifier is the Reference extracted
-  from col G ("Invoice Line Description", split on the literal "-FOOT" anchor token - see
-  mapping target `g` below), written to G and used as the shared
-  invoice-line grouping key for Spreadsheet Key plus Row ID / Line Order. A repeated
-  `Reference` therefore collapses to one Workday header with 1..N lines; a unique `Reference`
-  remains the single-line case. v46.1 layout. Amounts mirrored ar_bulk_invoice /
-  ar_multi_line_invoice's GROSS-into-amounts convention originally; DECIDED 2026-09-17: Amount
-  Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from NET (col F) instead of
-  GROSS. Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are left
-  blank on every row (DECIDED 2026-09-28). The extracted Reference is written verbatim to the
-  header identifier column G and to the header Memo (DB). Customer Invoice Reference ID (D) is
-  gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}
-  (DECIDED 2026-09-28, see mapping target `d`). Line Item Description (EN) + line Memo (FV) = Player + " - " + Type,
-  where Player is the text before the "-FOOT" split and Type comes from col H.
+  endorsement panels/extensions. The composite customer-invoice identifier is written to G
+  as gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key},
+  while D is intentionally left blank because Workday treats it as an existing-invoice lookup
+  and rejects a new ID there. The extracted Reference from col G ("Invoice Line Description",
+  split on the literal "-FOOT" anchor token - see mapping target `g` below) remains the shared
+  invoice-line grouping key for Spreadsheet Key plus Row ID / Line Order and is still copied
+  into the header Memo (DB). A repeated `Reference` therefore collapses to one Workday header
+  with 1..N lines; a unique `Reference` remains the single-line case. v46.1 layout. Amounts
+  mirrored ar_bulk_invoice / ar_multi_line_invoice's GROSS-into-amounts convention originally;
+  DECIDED 2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come
+  from NET (col F) instead of GROSS. Invoice Number (BO), Line Tax Applicability (FA) and
+  Line Tax Code (FB) are left blank on every row (DECIDED 2026-09-28). Line Item Description
+  (EN) + line Memo (FV) = Player + " - " + Type, where Player is the text before the "-FOOT"
+  split and Type comes from col H.
 
 fields:
   invoice_number:
@@ -114,9 +114,9 @@ fields:
       DECIDED 2026-09-17: Reference is no longer its own column - it is the part of col G
       ("Invoice Line Description") from the literal "-FOOT" anchor token onward (e.g.
       "FOOT01/22/S-2024-1669" out of "Romain Jordan Faivre-FOOT01/22/S-2024-1669"). Verified
-      against all 584 rows of the 2026-09-17 AR file. It is written verbatim to G and DB (D is
-      a composite ID and BO is left blank as of 2026-09-28) and is also the grouping key for the shared invoice-line helper. A row whose col G has
-      no "-FOOT" token is rejected (never guessed) - see skip_rule.
+      against all 584 rows of the 2026-09-17 AR file. It remains the shared grouping key for
+      the invoice-line helper and is copied to DB; G holds the composite gbe_... identifier and
+      D remains blank. A row whose col G has no "-FOOT" token is rejected (never guessed) - see skip_rule.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
     group_key_source_column: Reference
@@ -180,6 +180,14 @@ mapping:
 - target: i
   default: ""
 - target: d
+  default: ""
+  optional: true
+  note: >
+    Customer Invoice Reference ID -- intentionally left blank on every row. In Submit
+    Customer Invoice this field looks up an EXISTING Workday invoice, so a new ID here fails
+    the load with an invalid Customer_Invoice_Reference_ID error. The composite invoice ID is
+    written to G instead.
+- target: g
   derivation: composite_reference_id
   output_format: "gbe_{variant}_{aj with hyphens removed}_{YYYYMMDD of br}_{b}"
   variant_token:
@@ -191,22 +199,16 @@ mapping:
     - "gbe_womens_C000300_20260427_1"   # Womens GBE row 1: C-000300, 2026-04-27, Spreadsheet Key 1
     - "gbe_womens_C000300_20260427_2"   # Womens GBE row 2: C-000300, 2026-04-27, Spreadsheet Key 2
   note: >
-    Customer Invoice Reference ID -- per requester instruction (2026-09-28): literal "gbe_",
+    Customer Invoice ID -- per requester instruction (2026-09-28): literal "gbe_",
     then the variant token ("mens" for AR Invoice GBE Mens / "womens" for AR Invoice GBE
     Womens), then the Customer written to `aj` with its hyphen removed (`C-000102` ->
     `C000102`), then the Invoice Date written to `br` as YYYYMMDD, then the Spreadsheet Key
-    written to `b`, joined by "_". The hyphen is removed only in D; `aj` keeps the original
+    written to `b`, joined by "_". The hyphen is removed only in G; `aj` keeps the original
     Customer ID. Spreadsheet Key restarts at 1 on each tab, so the variant token keeps Mens
     and Womens IDs distinct; within a tab the Spreadsheet Key keeps two invoices for the same
-    customer on the same date distinct. Should be written as text. Previously the Reference
-    extracted from col G (the part from "-FOOT" onward), verbatim; G and DB still carry that
-    Reference.
-- target: g
-  source_column: Invoice Line Description
-  source_column_letter: G
-  function: split_on_anchor_token
-  split_anchor_token: "-FOOT"
-  split_part: after_anchor
+    customer on the same date distinct. Should be written as text. The extracted Reference
+    from col G (the part from "-FOOT" onward) remains the grouping key and is still written to
+    the header Memo (DB).
 - target: bo
   default: ""
   optional: true
