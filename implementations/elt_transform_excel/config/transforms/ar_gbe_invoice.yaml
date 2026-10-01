@@ -26,8 +26,10 @@ transform:
     originally mirrored ar_multi_line / ar_bulk's GROSS-into-amounts convention; DECIDED
     2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from
     NET (col F) instead of GROSS. Invoice Number (BO), Line Tax Applicability (FA) and Line
-    Tax Code (FB) are left blank on every row. Customer Invoice Reference ID (D) is
-    gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key}.
+    Tax Code (FB) are left blank on every row. Customer Invoice ID (G) is
+    gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key};
+    Customer Invoice Reference ID (D) is left blank on every row (D looks up an EXISTING
+    Workday invoice, so a new ID there fails the load - mirrors ar_integration_invoice).
     Player and Reference are no longer separate source columns - both are embedded in one
     free-text "Invoice Line Description" cell (e.g. "Romain Jordan Faivre-FOOT01/22/S-2024-1669")
     and are split at runtime on the literal "-FOOT" anchor token (verified against all 584 rows
@@ -117,11 +119,16 @@ transform_constants:
         the FY value actually written is the batch constant from source col M row 2, see
         batch_constant_columns.reporting_type
   customer_invoice_eib_columns:
-    # --- HEADER identifier columns (D composite ID; G populated with the GBE Reference; BO blank) ---
-    # D = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}, e.g.
-    # gbe_mens_C000102_20260317_1. The mens/womens token comes from the variant profile_key
-    # (ar_gbe_invoice_mens / ar_gbe_invoice_womens). See mapping.d in the spec.
-    customer_invoice_ref_id: D
+    # --- HEADER identifier columns (D blank; G composite ID; BO blank) ---
+    # G = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}, e.g.
+    # gbe_mens_C000102_20260317_1, written as text. AJ keeps the original Customer ID. The
+    # mens/womens token comes from the variant profile_key (ar_gbe_invoice_mens /
+    # ar_gbe_invoice_womens). G previously held the GBE Reference (the "-FOOT" part of
+    # Invoice Line Description); that Reference is still written to Header Memo (DB).
+    # D is left blank on every row: in Submit Customer Invoice it looks up an EXISTING
+    # Workday invoice, so a new ID there fails the load with an invalid
+    # Customer_Invoice_Reference_ID error (mirrors ar_integration_invoice).
+    customer_invoice_ref_id: D        # intentionally left blank on every row
     customer_invoice_id: G
     invoice_number: BO                # intentionally left blank on every row
     # --- HEADER fields (Submit Customer Invoice v46.1) ---

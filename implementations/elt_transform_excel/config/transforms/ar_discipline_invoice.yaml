@@ -39,13 +39,17 @@ transform_constants:
   fixed_company_code: FA
   fixed_currency: GBP
   fixed_invoice_type: Standard
-  # EIB column D (Customer Invoice Reference ID) =
+  # EIB column G (Customer Invoice ID) =
   # cfa_discipline_<Customer>_<Invoice Date>_<Spreadsheet Key>, where Customer is the
   # WORKDAY ID with hyphens removed and Invoice Date is yyyyMMdd
-  # (e.g. C-000190, 18.09.26, key 1 -> cfa_discipline_C000190_20260918_1).
+  # (e.g. C-000190, 18.09.26, key 1 -> cfa_discipline_C000190_20260918_1), written as
+  # text. AJ keeps the original WORKDAY ID.
+  # EIB column D (Customer Invoice Reference ID) is left blank on every row: in Submit
+  # Customer Invoice it looks up an EXISTING Workday invoice, so a new ID there fails the
+  # load with an invalid Customer_Invoice_Reference_ID error (mirrors ar_integration_invoice).
   # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
   # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
-  # See mapping.d/.bo/.fa/.fb in the spec.
+  # See mapping.d/.g/.bo/.fa/.fb in the spec.
   company_fallback: THE FA GROUP - FA
   # No COST CODE or accounting-string driver in the discipline extract, and no
   # Mapping-Master hierarchy lookup is used -- Revenue Category / Cost Centre /
@@ -57,6 +61,12 @@ transform_constants:
   unmapped_handling: silent_blank
   mapping_sheet: MAPPING MASTER
   customer_invoice_eib_columns:
+    # --- HEADER identifier columns (D blank; G composite ID; BO blank) ---
+    # G = cfa_discipline_{WORKDAY ID without hyphens}_{BR as yyyyMMdd}_{B}, e.g.
+    # cfa_discipline_C000190_20260918_1. See the column G / D comment above.
+    customer_invoice_ref_id: D        # intentionally left blank on every row
+    customer_invoice_id: G
+    invoice_number: BO                # intentionally left blank on every row
     revenue_category: EM
     billable_project_header: BN
     billable_project_line: BN

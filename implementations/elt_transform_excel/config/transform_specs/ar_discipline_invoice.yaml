@@ -28,19 +28,20 @@ notes: >
   from the pre-v46 layout; see eib_population_defaults.yaml for the canonical registry.
   Reworked for the new AR source file layout (`3. CFA Discipline Invoicing -Rolling.xlsx`,
   sheet `Rolling`): one row per customer per month, no `Document Number` / invoice-number
-  column. EIB Customer Invoice Reference ID (D) is generated as
+  column. The composite customer invoice ID is written to G as
   cfa_discipline_{WORKDAY ID, hyphen removed}_{invoice date yyyyMMdd}_{Spreadsheet Key};
-  Invoice Number (BO), Line Tax Applicability (FA),
-  Line Tax Code (FB) and Memo (DB) are left blank. Spreadsheet Key plus line order are grouped by source `WORKDAY ID`, which is
-  already unique per row on this sheet. Company (J), Cost Centre (FX), Reporting Type (FY),
-  and Revenue Category (EM) are read once from the sheet's first data row (row 2, source
-  columns M/N/O/P — populated on row 2 only, blank on every later row) and broadcast to
-  every output row.
+  Customer Invoice Reference ID (D) is left blank on every row because Workday treats it as
+  an existing-invoice lookup and rejects a new ID there. Invoice Number (BO), Line Tax
+  Applicability (FA), Line Tax Code (FB) and Memo (DB) are left blank. Spreadsheet Key plus
+  line order are grouped by source `WORKDAY ID`, which is already unique per row on this
+  sheet. Company (J), Cost Centre (FX), Reporting Type (FY), and Revenue Category (EM) are
+  read once from the sheet's first data row (row 2, source columns M/N/O/P — populated on
+  row 2 only, blank on every later row) and broadcast to every output row.
 
 fields:
   invoice_number:
     default: ""
-    note: No source invoice-number column on the new source layout. Invoice Number (BO) is left blank; Customer Invoice Reference ID (D) is generated (see `mapping.d` / `mapping.bo`).
+    note: No source invoice-number column on the new source layout. Invoice Number (BO) is left blank; Customer Invoice ID (G) is generated (see `mapping.g` / `mapping.bo`).
   invoice_date:     {source_column: Date, source_column_letter: A, note: "Source column A (dd.mm.yy text) -- see mapping.br landmine note: column F is also headered 'DATE'."}
   amount_due:       {source_column: NET, basis: net}
   line_amount:      {source_column: NET, basis: net}
@@ -85,19 +86,25 @@ mapping:
     Add Only flag -- fixed "Y" for an insert-only EIB (never update existing), matching
     every other active AR Customer Invoice profile's house default.
 - target: d
+  default: ""
+  optional: true
+  note: >
+    Customer Invoice Reference ID -- intentionally left blank on every row. In Submit Customer
+    Invoice this field looks up an EXISTING Workday invoice, so a new ID here fails the load
+    with an invalid Customer_Invoice_Reference_ID error. The composite customer-invoice ID is
+    written to G instead.
+- target: g
   derivation: composite_reference_id
   output_format: "cfa_discipline_{WORKDAY ID with hyphens removed}_{yyyyMMdd of br}_{b}"
   example: "cfa_discipline_C000190_20260918_1"
   note: >
-    Customer Invoice Reference ID -- per requester instruction (2026-09-28): the fixed
-    prefix `cfa_discipline_`, then the source `WORKDAY ID` with its hyphen removed
-    (`C-000190` -> `C000190`), then the Invoice Date written to `br` as yyyyMMdd, then the
-    Spreadsheet Key written to `b`, each joined by `_`. The hyphen is removed only in D;
-    `aj` (Customer) keeps the original WORKDAY ID. Written as text so Excel keeps it as-is.
-    Unique within a run because `b` is unique per invoice; a re-run of the same source in
-    the same row order yields the same IDs. Previously
-    `{WORKDAY ID with hyphens removed}{YYYYMMDD of br}` (e.g. `C00019020250918`), before that
-    `{co}-{WORKDAY ID}-{YYYYMMDD}`, then blank.
+    Customer Invoice ID -- per requester instruction (2026-09-28): the fixed prefix
+    `cfa_discipline_`, then the source `WORKDAY ID` with its hyphen removed (`C-000190` ->
+    `C000190`), then the Invoice Date written to `br` as yyyyMMdd, then the Spreadsheet Key
+    written to `b`, each joined by `_`. The hyphen is removed only in G; `aj` (Customer)
+    keeps the original WORKDAY ID. Written as text so Excel keeps it as-is. Unique within a
+    run because `b` is unique per invoice; a re-run of the same source in the same row order
+    yields the same IDs.
 - target: h
   default: "Y"
 - target: i

@@ -14,9 +14,11 @@ Private Const TARGET_DATA_START_ROW As Long = 6
 '  modApTravelPlacesSupInv.bas).
 Private Const PLAYER_REFERENCE_SPLIT_ANCHOR As String = "-FOOT"
 
-'  Customer Invoice Reference ID (D) = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
-'  (DECIDED 2026-09-28, see mapping.d). The mens/womens token is chosen from the Runner
-'  variant profile_key; any other selection key fails the run rather than guessing.
+'  Customer Invoice ID (G) = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
+'  (DECIDED 2026-09-28, see mapping.g). D is intentionally left blank because Workday uses
+'  it as an EXISTING-invoice lookup and rejects a new ID there. The mens/womens token is
+'  chosen from the Runner variant profile_key; any other selection key fails the run rather
+'  than guessing.
 Private Const REFERENCE_ID_PREFIX As String = "gbe_"
 Private Const VARIANT_KEY_MENS As String = "ar_gbe_invoice_mens"
 Private Const VARIANT_KEY_WOMENS As String = "ar_gbe_invoice_womens"
@@ -480,16 +482,14 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_SPREADSHEET_KEY)).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ADD_ONLY)).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_COMMENT)).Value = OUTPUT_AUTO_COMPLETE
-    '  Customer Invoice Reference ID (D) = gbe_{mens|womens}_{AJ without hyphens}_{BR as
-    '  YYYYMMDD}_{B} (e.g. C-000102 + 2026-03-17 + key 1 -> gbe_mens_C000102_20260317_1).
-    '  AJ keeps the original Customer ID. See mapping.d.
+    '  Customer Invoice ID (G) = gbe_{mens|womens}_{AJ without hyphens}_{BR as YYYYMMDD}_{B}
+    '  (e.g. C-000102 + 2026-03-17 + key 1 -> gbe_mens_C000102_20260317_1).
+    '  AJ keeps the original Customer ID. D is intentionally left blank; see mapping.g / mapping.d.
     referenceId = REFERENCE_ID_PREFIX & variantToken & "_" & Replace(outputCustomerId, "-", vbNullString) & _
         "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).NumberFormat = "@"
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = referenceId
-    If LenB(referenceValue) > 0 Then
-        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceValue
-    End If
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).NumberFormat = "@"
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceId
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = vbNullString
     '  Invoice Number (BO) intentionally left blank on every row per requester instruction
     '  (2026-09-28). See mapping.bo.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_NUMBER)).Value = vbNullString
