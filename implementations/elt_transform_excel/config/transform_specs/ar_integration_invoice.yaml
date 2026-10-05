@@ -15,9 +15,9 @@ meta:
   archetype_note: >
     Fork structure from ar_bulk_invoice (one source row = one single-line Customer
     Invoice) but REPLACE the entire account-string / COST CODE / Final Code /
-    Mapping-MASTER pipeline with a direct Course-Name to Codes-sheet lookup.
+    Mapping-MASTER pipeline with a direct Course-Name to Code lists sheet lookup.
     NO final code derivation. NO Mapping MASTER worktag lookups. NO seg2 Reporting
-    Type char-map. Everything comes from the source workbook's "Codes" secondary tab.
+    Type char-map. Everything comes from the source workbook's "Code lists" secondary tab.
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
@@ -43,14 +43,14 @@ parties:
     derivation: course_lookup_priority_with_fallback
     primary:
       lookup_file: Source Data
-      lookup_sheet: Codes
-      lookup_key: source_column(Course Name) -> Codes!Course
+      lookup_sheet: Code lists
+      lookup_key: source_column(Course Name) -> 'Code lists'!Course
       return_column: Company
     fallback_value: THE FA GROUP - NFC
     resolved_via: source_lookup_sheet (not mapping tab)
     note: >
-      Company comes FIRST from Codes!C (Company) column matched on Course Name.
-      If Codes row company is blank or the Course lookup fails, fall back to
+      Company comes FIRST from 'Code lists'!C (Company) column matched on Course Name.
+      If Code lists row company is blank or the Course lookup fails, fall back to
       uniform company "THE FA GROUP - NFC" (not FA - this is NFC). No mapping-tab
       entity lookup is used for this profile.
 
@@ -67,22 +67,22 @@ notes: >
         Cost Centre (col O), Reporting Type (col P), and Revenue Category
         (col Q) are read DIRECTLY per row from this sheet -> EIB FX / FY / EM.
         Reporting Type drops its leading "<number>: " prefix (see target fy).
-    (2) "Codes" - as of the "Combined 30-34" workbook this is now a plain
+    (2) "Code lists" - as of the "Combined 30-34" workbook this is now a plain
         3-column dropdown reference list (Cost Centres / Reporting Type /
         Revenue Category, no Course key column) used for Excel data-validation
         only. It NO LONGER supports the old Course-Name -> full-hierarchy
         lookup this transform originally relied on. The VBA lookup is coded
-        to fail soft against a Codes tab shaped like this (rather than crash).
+        to fail soft against a Code lists tab shaped like this (rather than crash).
         Company still attempts this lookup and falls back to company_fallback
         when it (always) misses. FA Learning Course (target gc) is read
         DIRECTLY from Integration col S, same pattern as Cost Centre/
         Reporting Type/Revenue Category. Camp, Event, Commercial Partner,
         Grant, and Programme (targets fz/ga/gb/gd/ge) are, per 2026-09-22
-        Finance instruction, no longer read from Codes at all and are
+        Finance instruction, no longer read from Code lists at all and are
         intentionally always blank -- not "pending a fix."
   There is NO COST CODE column, NO Final Code 4-6-8-4 segmentation, and NO
   Mapping MASTER lowest-hierarchy lookup.
-  An unresolved Course Name (no match in Codes) writes the Codes-tab-sourced
+  An unresolved Course Name (no match in Code lists) writes the Code lists tab-sourced
   worktags as BLANK (AR archetype rule: silent_blank, not row rejection) and
   increments a flag counter shown in the run results. Invoice Number (BO), Line
   Tax Applicability (FA) and Line Tax Code (FB) are left blank on every row
@@ -140,7 +140,7 @@ fields:
 
 source_lookup_sheets:
   course_hierarchy:
-    sheet_name: Codes
+    sheet_name: Code lists
     workbook: Source Data
     header_row: 1
     data_start_row: 2
@@ -150,7 +150,7 @@ source_lookup_sheets:
       match: case_insensitive_exact
       on_unresolved: flag_and_blank_worktags
     semantic_columns:
-      # 2026-09-22 (Combined 30-34 workbook): the Codes tab no longer has a "Course"
+      # 2026-09-22 (Combined 30-34 workbook): the Code lists tab no longer has a "Course"
       # column, so this lookup can never resolve. Company is the ONLY target still
       # wired to attempt it (fails soft -> company_fallback). Cost Centre / Reporting
       # Type / Revenue Category / FA Learning Course now come DIRECTLY from the
@@ -200,7 +200,7 @@ eib_house_defaults:
     The Mapping MASTER workbook and mapping_sheet_name are registered in the shell
     config for archetype parity ONLY. ar_integration_invoice never opens or reads
     Mapping MASTER at runtime. 2026-09-22: worktag resolution no longer comes from
-    the Codes tab either, except for Company's (always-missing) fallback attempt -
+    the Code lists tab either, except for Company's (always-missing) fallback attempt -
     Cost Centre/Reporting Type/Revenue Category/FA Learning Course are read directly
     off the Integration sheet's own row 2; Camp/Event/Commercial Partner/Grant/
     Programme are intentionally always blank.
@@ -210,7 +210,7 @@ course_based_hierarchy:
   lookup: source_lookup_sheets.course_hierarchy
   resolution: direct_verbatim_write_to_eib_columns
   note: >
-    NON-CANONICAL. This transform uses a direct Course-Name -> Codes-tab verbatim
+    NON-CANONICAL. This transform uses a direct Course-Name -> Code lists tab verbatim
     write rather than the canonical account-string -> Final-Code-segment ->
     Mapping-MASTER lowest-hierarchy pipeline. Decision rationale: the source data
     has no cost-code column and Finance have already curated the complete worktag
@@ -219,8 +219,8 @@ course_based_hierarchy:
     synthetic old-code for every course.
   business_objects_covered:
     # 2026-09-22 (Combined 30-34 workbook): only Company still goes through this
-    # Codes lookup (and always falls back, since Codes has no Course column anymore).
-    - Company (J) - from Codes!C + fallback NFC (Codes lookup always misses; always fallback)
+    # Code lists lookup (and always falls back, since Code lists has no Course column anymore).
+    - Company (J) - from 'Code lists'!C + fallback NFC (Code lists lookup always misses; always fallback)
   business_objects_superseded_2026_09_22:
     - Revenue Category (EM) - now read directly from Integration col Q (target em)
     - Cost Centre (FX) - now read directly from Integration col O (target fx)
@@ -233,7 +233,7 @@ course_based_hierarchy:
     - Programme (GE) - intentionally always blank (target ge)
   business_objects_not_in_codes_tab:
     - Sales Item (EJ) - left blank (no source column)
-    - Project (BN / GF) - left blank (Codes has no Project column; silent blank rule)
+    - Project (BN / GF) - left blank (Code lists has no Project column; silent blank rule)
     - Line Tax (FA / FB) - left blank on every row (see tax_rules)
 
 tax_rules:
@@ -261,11 +261,11 @@ skip_rule:
       archetype, do NOT drop - but count as a flagged row)
   warn_only:
     - >-
-      Course Name has no matching row in Codes tab (flag counter; as of
+      Course Name has no matching row in Code lists tab (flag counter; as of
       2026-09-22 this only affects Company, which falls back to
-      company_fallback - all other former Codes-tab worktags are either
+      company_fallback - all other former Code lists tab worktags are either
       read directly from the Integration sheet or intentionally always blank)
-    - Any Codes-tab Company value is blank for a matched Course Name (silent blank, falls back)
+    - Any Code lists tab Company value is blank for a matched Course Name (silent blank, falls back)
 
 mapping:
 # --- EIB scaffolding columns ---
@@ -338,17 +338,17 @@ mapping:
   derivation: course_lookup_with_fallback
   lookup:
     file: Source Data
-    sheet_name: Codes
+    sheet_name: Code lists
     lookup_input: source_column(Course Name)
     match_column: Course
     return_column: Company
     on_unresolved: use_fallback
   fallback_value: THE FA GROUP - NFC
   note: >
-    Company J = Codes!Company (col C) matched on Course Name. If Codes row has
-    blank Company, or Course Name not in Codes, fall back to uniform
+    Company J = 'Code lists'!Company (col C) matched on Course Name. If Code lists row has
+    blank Company, or Course Name not in Code lists, fall back to uniform
     "THE FA GROUP - NFC". NOT looked up via mapping tab entity=company because
-    the Codes value is already the Workday company display name/reference.
+    the Code lists value is already the Workday company display name/reference.
 
 - target: ai
   default: GBP
@@ -455,7 +455,7 @@ mapping:
     Revenue Category EM = Integration col Q ("Revenue Category", the row-2
     sub-header under the "Required Fields" group). 2026-09-22 amendment
     (Combined 30-34 workbook): read DIRECTLY per row, no longer looked up
-    via the Codes tab (that tab no longer carries a Course-keyed hierarchy;
+    via the Code lists tab (that tab no longer carries a Course-keyed hierarchy;
     see transform-level note).
 
 - target: en
@@ -546,14 +546,14 @@ mapping:
   derivation: course_lookup_verbatim
   lookup:
     file: Source Data
-    sheet_name: Codes
+    sheet_name: Code lists
     lookup_input: source_column(Course Name)
     match_column: Course
     return_column: Project
     on_unresolved: silent_blank
   note: >
-    Billable Project BN = Codes lookup for "Project" column. The Codes tab CURRENTLY
-    has no explicit Project column. When Finance adds one to a future Codes tab
+    Billable Project BN = Code lists lookup for "Project" column. The Code lists tab CURRENTLY
+    has no explicit Project column. When Finance adds one to a future Code lists tab
     revision (e.g. a new column Q labeled "Project"), the VBA picks up the value
     by header-name match and writes it here. Until then BN is silent blank.
 
@@ -562,7 +562,7 @@ mapping:
   source_target: bn
   note: >
     Project (line-level worktag) GF mirrors header BN per one-line archetype.
-    Currently blank for all rows (no Project in Codes tab).
+    Currently blank for all rows (no Project in Code lists tab).
 
 # --- 9-pack worktags FX..GF ---
 - target: fx
@@ -571,7 +571,7 @@ mapping:
   note: >
     Cost Centre FX = Integration col O ("Cost Centre", the row-2 sub-header
     under the "Required Fields" group). 2026-09-22 amendment (Combined 30-34
-    workbook): read DIRECTLY per row, no longer looked up via the Codes tab.
+    workbook): read DIRECTLY per row, no longer looked up via the Code lists tab.
     NOTE: requested as "Column Q" but Q is Revenue Category (see target em);
     Cost Centre's actual column, matched by header name, is O -- flagged for
     confirmation, not silently guessed.
@@ -583,7 +583,7 @@ mapping:
     Reporting Type FY = Integration col P ("Reporting Type", the row-2
     sub-header under the "Required Fields" group). 2026-09-22 amendment
     (Combined 30-34 workbook): read DIRECTLY per row, no longer looked up
-    via the Codes tab. Overrides any seg2 first-char rule (there is none for
+    via the Code lists tab. Overrides any seg2 first-char rule (there is none for
     this profile). 2026-09-29: col P carries a "<number>: " prefix before the
     text; it is removed so only the text is written (e.g. "1: FA Operations" ->
     "FA Operations"). Only stripped when the part before the first ":" is all
@@ -594,21 +594,21 @@ mapping:
   derivation: always_blank
   note: >
     Camp FZ is intentionally left blank. 2026-09-22 instruction: no longer
-    read from the Codes tab (which no longer supports the Course-keyed
+    read from the Code lists tab (which no longer supports the Course-keyed
     hierarchy lookup this used) or any other source.
 
 - target: ga
   derivation: always_blank
   note: >
     Event GA is intentionally left blank. 2026-09-22 instruction: no longer
-    read from the Codes tab (which no longer supports the Course-keyed
+    read from the Code lists tab (which no longer supports the Course-keyed
     hierarchy lookup this used) or any other source.
 
 - target: gb
   derivation: always_blank
   note: >
     Commercial Partner GB is intentionally left blank. 2026-09-22 instruction:
-    no longer read from the Codes tab (which no longer supports the
+    no longer read from the Code lists tab (which no longer supports the
     Course-keyed hierarchy lookup this used, including its "Commerical
     Partners" (sic) column) or any other source.
 
@@ -619,18 +619,18 @@ mapping:
     FA Learning Course GC = Integration col S ("FA Learning Course", the
     row-2 sub-header under the "Optional Fields" group). 2026-09-22
     amendment: read DIRECTLY per row, same pattern as Cost Centre/Reporting
-    Type/Revenue Category, no longer via the Codes tab.
+    Type/Revenue Category, no longer via the Code lists tab.
 
 - target: gd
   derivation: always_blank
   note: >
     Grant GD is intentionally left blank. 2026-09-22 instruction: no longer
-    read from the Codes tab (which no longer supports the Course-keyed
+    read from the Code lists tab (which no longer supports the Course-keyed
     hierarchy lookup this used) or any other source.
 
 - target: ge
   derivation: always_blank
   note: >
     Programme GE is intentionally left blank. 2026-09-22 instruction: no
-    longer read from the Codes tab (which no longer supports the Course-keyed
+    longer read from the Code lists tab (which no longer supports the Course-keyed
     hierarchy lookup this used) or any other source.
