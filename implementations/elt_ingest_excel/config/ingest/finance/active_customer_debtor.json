@@ -12,7 +12,7 @@
     ]
   },
   {
-    "workbookPathName": "~/Documents/__data/excel/workday/extract",
+    "workbookPathName": "~/Documents/__data/excel/workday/extract/customer",
     "workbookFileName": "Extract_Customers_20260810_1615.xlsx",
     "sheets": [
       {
@@ -20,6 +20,18 @@
         "headerRow": "11",
         "dataRow": "12",
         "targetTableName": "fin_workday_extract_customer"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/workday/extract/ar_invoices",
+    "workbookFileName": "Submit_Customer_Invoice_v46.1_ar_manual_invoice_output - WS_Copy_28.09v2 1.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Submit Customer Invoice",
+        "headerRow": "5",
+        "dataRow": "6",
+        "targetTableName": "fin_workday_ar_invoice"
       }
     ]
   },
