@@ -23,15 +23,15 @@ transform:
     lookup, which was rejecting rows with "CUSTOMER ID not found in customer
     extract" once the source's Customer ID values stopped lining up with the
     extract.
-    Company still goes through the legacy Course-Name -> "Codes" tab hierarchy
-    lookup, which the Combined 30-34 workbook's Codes tab NO LONGER SUPPORTS
+    Company still goes through the legacy Course-Name -> "Code lists" tab hierarchy
+    lookup, which the Combined 30-34 workbook's Code lists tab NO LONGER SUPPORTS
     (it's now a plain 3-column dropdown reference list with no "Course" key
     column) -- that lookup is coded to fail soft rather than crash the run,
     so Company always falls back to company_fallback ("THE FA GROUP - NFC").
     FA Learning Course (GC) is read DIRECTLY from Integration col S, same
     pattern as Revenue Category/Cost Centre/Reporting Type. Camp, Event,
     Commercial Partner, Grant, and Programme are, per 2026-09-22 Finance
-    instruction, no longer read from Codes at all and are intentionally
+    instruction, no longer read from Code lists at all and are intentionally
     always blank. Project and Sales Item have never had a source column and
     stay blank too.
     Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are
@@ -126,7 +126,7 @@ transform_constants:
 
   source_lookups:
     course_hierarchy:
-      worksheet_name: Codes
+      worksheet_name: Code lists
       header_row: 1
       data_start_row: 2
       lookup_key_source_column: Course Name
@@ -134,12 +134,12 @@ transform_constants:
       description: >
         LEGACY, MOSTLY DEFUNCT as of 2026-09-22 (Combined 30-34 workbook):
         this was originally a direct course-to-hierarchy lookup authored by
-        Finance on the source workbook's "Codes" tab, matching each row's
-        Course Name (Integration col E) case-insensitively against Codes!A
+        Finance on the source workbook's "Code lists" tab, matching each row's
+        Course Name (Integration col E) case-insensitively against 'Code lists'!A
         and writing the matched row's Company/Cost centre/Reporting Type/
         FA Learning courses/Camp/Commerical Partners/Events/Grant/Program/
         Revenue Cat verbatim into the EIB. The Combined 30-34 workbook's
-        Codes tab no longer has a "Course" column at all (it's now a plain
+        Code lists tab no longer has a "Course" column at all (it's now a plain
         3-column dropdown reference list), so this lookup can never resolve
         against it. Company (target J) is the ONLY field still wired to
         attempt this lookup; it fails soft and always falls back to
@@ -160,7 +160,7 @@ transform_constants:
     note: >
       NON-CANONICAL RESOLUTION PIPELINE for this profile only, and now LARGELY
       SUPERSEDED as of 2026-09-22 (see source_lookups.course_hierarchy above):
-      Company is the only field still attempting this Codes-lookup pipeline
+      Company is the only field still attempting this Code lists lookup pipeline
       (fails soft, falls back to company_fallback). Cost Centre / Reporting
       Type / Revenue Category / FA Learning Course are read directly off the
       Integration sheet's own row 2. Camp / Event / Commercial Partner /
@@ -183,7 +183,7 @@ transform_constants:
     sales_item: "Sales Item"
   derived_worktags:
     reporting_type:
-      derivation: "2026-09-22: read directly from Integration col P (row-2 sub-header 'Reporting Type'), not via Codes tab or Final Code seg2."
+      derivation: "2026-09-22: read directly from Integration col P (row-2 sub-header 'Reporting Type'), not via Code lists tab or Final Code seg2."
       source_column: P
       target_column: FY
       value_cleanup: strip_leading_number_colon_space

@@ -74,7 +74,7 @@ Private Const TGT_GRANT As String = "GD"
 Private Const TGT_PROGRAMME As String = "GE"
 Private Const TGT_PROJECT_LINE_WORKTAG As String = "GF"
 
-'  --- Codes-tab return value packing order inside courseHierarchyLookup pipe-delimited string ---
+'  --- Code lists tab return value packing order inside courseHierarchyLookup pipe-delimited string ---
 '  Indexes are 1-based after Split(pipeDelimited, "|").  Keep in lock-step with
 '  ar_integration_invoice.yaml transform_constants.source_lookups.course_hierarchy.return_columns.
 Private Const COURSE_PACK_COMPANY As Long = 1
@@ -206,7 +206,7 @@ Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
     resolvedIntegrationSheetName = resolvedIntegrationSheet.Name
     integrationTable = ReadWorksheetTable(resolvedIntegrationSheet)
 
-    Set resolvedCodesSheet = ResolveSourceWorksheet(sourceWorkbook, "Codes")
+    Set resolvedCodesSheet = ResolveSourceWorksheet(sourceWorkbook, "Code lists")
     codesTable = ReadWorksheetTable(resolvedCodesSheet)
 
     sourceWorkbook.Close SaveChanges:=False
@@ -267,14 +267,14 @@ Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
     ' names plus the "Required Fields"/"Optional Fields" group labels; row 2 carries the
     ' real sub-headers for the fields grouped under those labels (Cost Centre, Reporting
     ' Type, Revenue Category, ...). 2026-09-22: Cost Centre / Reporting Type / Revenue
-    ' Category are read directly off that row 2, per row, instead of via the Codes tab.
+    ' Category are read directly off that row 2, per row, instead of via the Code lists tab.
     worktagsHeaderRowIndex = headerRowIndex + 1
     costCentreColumn = FindOptionalColumnIndexInRow(integrationTable, worktagsHeaderRowIndex, "Cost Centre")
     reportingTypeColumn = FindOptionalColumnIndexInRow(integrationTable, worktagsHeaderRowIndex, "Reporting Type")
     revenueCategoryColumn = FindOptionalColumnIndexInRow(integrationTable, worktagsHeaderRowIndex, "Revenue Category")
     faLearningColumn = FindOptionalColumnIndexInRow(integrationTable, worktagsHeaderRowIndex, "FA Learning Course")
 
-    ' NOTE (2026-09-22): the "Combined 30-34" source workbook's Codes tab is a plain
+    ' NOTE (2026-09-22): the "Combined 30-34" source workbook's Code lists tab is a plain
     ' 3-column dropdown reference list (Cost Centres / Reporting Type / Revenue Category)
     ' with NO "Course" key column, so this Course-Name-keyed hierarchy lookup can no
     ' longer resolve against it. Every lookup below is made OPTIONAL (was required) so
@@ -285,7 +285,7 @@ Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
     ' / faLearningColumn above, read directly off the Integration sheet's own row 2.
     ' Camp, Event, Commercial Partner, Grant, and Programme are intentionally always
     ' blank per 2026-09-22 Finance instruction (see WriteOutputRow). Company still
-    ' relies on this Codes lookup and so stays on its fallback. Project and Sales Item
+    ' relies on this Code lists lookup and so stays on its fallback. Project and Sales Item
     ' have no source column and stay blank.
     codesHeaderRowIndex = 1
     codesDataStartRowIndex = 2
@@ -363,7 +363,7 @@ Public Sub RunArIntegrationCustomerInvoice(ByVal runnerWorkbook As Workbook, ByV
         issues.Add BuildRejectedLookupIssue(unresolvedCounts, unresolvedKeys, "WORKDAY ID")
     End If
     If unresolvedCourseRows > 0 Then
-        issues.Add "Course Name did not resolve in Codes tab for " & CStr(unresolvedCourseRows) & _
+        issues.Add "Course Name did not resolve in Code lists tab for " & CStr(unresolvedCourseRows) & _
                   " row(s) - those rows were written with blank worktags (silent_blank rule)."
     End If
 
@@ -510,8 +510,8 @@ Private Sub WriteOutputRow( _
     End If
 
     ' 2026-09-22: Camp / Event / Commercial Partner / Grant / Programme are
-    ' intentionally left blank -- no longer read from the Codes-tab course
-    ' lookup (per Finance instruction; Codes tab no longer supports it).
+    ' intentionally left blank -- no longer read from the Code lists tab course
+    ' lookup (per Finance instruction; Code lists tab no longer supports it).
     campRef = vbNullString
     commercialPartnerRef = vbNullString
     eventRef = vbNullString
@@ -519,7 +519,7 @@ Private Sub WriteOutputRow( _
     programRef = vbNullString
 
     ' Cost Centre / Reporting Type / Revenue Category / FA Learning Course no longer
-    ' come from the Codes-tab course lookup above -- read directly off this row's own
+    ' come from the Code lists tab course lookup above -- read directly off this row's own
     ' Integration-sheet columns (see worktagsHeaderRowIndex resolution in the caller).
     If costCentreColumn > 0 Then costCenterRef = SafeCellStr(sourceTable(sourceRow, costCentreColumn)) Else costCenterRef = vbNullString
     ' Reporting Type (FY): drop the leading "<number>: " prefix from col P (e.g.
@@ -679,7 +679,7 @@ Private Function BuildCourseHierarchyLookup( _
     Set lookup = New Collection
 
     If codesCourseColumn = 0 Then
-        ' Codes tab has no "Course" header (2026-09-22: "Combined 30-34" workbook's Codes
+        ' Code lists tab has no "Course" header (2026-09-22: "Combined 30-34" workbook's Code lists
         ' tab is a plain dropdown reference list, not a Course-keyed hierarchy) -- return an
         ' empty lookup so every row falls through to the unresolved-course / silent_blank path.
         Set BuildCourseHierarchyLookup = lookup
