@@ -29,7 +29,8 @@ transform:
     (Previously U was resolved from the bare creditor "TRA009" via 2-part precedence against the
     Supplier extract Reference ID "TRA002-NFC|TRA009" -> S-007201.)
     Tax is per-row from col Q "Taxcode": this feed is 100% "PZ" (Tax=0, Net==Gross on every row),
-    routed through rate_0 (Outside of Scope / Zero Rated / Nonrecoverable). P20 branch retained
+    routed through rate_0 (Outside of Scope / Zero Rated / Fully_Recoverable -- CHANGED 2026-10-05,
+    ap_travel_places only; was Nonrecoverable_Allocate). P20 branch retained
     for future mixed batches — CHANGED 2026-09-09: P20 = GBR_Domestic_Purchase_Of_Goods_And_Services /
     GBR_Standard / Fully_Recoverable (same Stationery Ambassador Taxi fix — AP confirmed
     GBR_Standard_Rated/GBR_Standard_Rated/Recoverable_Allocate incorrect for Purchasing domain).
@@ -120,7 +121,7 @@ transform_constants:
     rate_0:
       applicability: GBR_Outside_of_Scope
       code: GBR_Zero_Rated
-      recoverability: Nonrecoverable_Allocate
+      recoverability: Fully_Recoverable   # CHANGED 2026-10-05 (ap_travel_places only; was Nonrecoverable_Allocate)
     rate_20:
       applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
       code: GBR_Standard
