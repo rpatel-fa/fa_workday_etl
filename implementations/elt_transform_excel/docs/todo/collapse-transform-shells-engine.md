@@ -57,6 +57,9 @@
 - **One transform's output at risk at a time.** No big-bang. Each step is independently revertible.
 - **CRLF-only for `.bas`.** Mac Excel's VBA importer aborts on LF-only lines; any programmatic `.bas`
   write must re-normalise to CRLF (`b.replace(b"\r\n",b"\n").replace(b"\n",b"\r\n")`).
+- **Tax-recoverability delta (2026-10-05):** `ap_travel_places` PZ/P0 rows write FK = `Fully_Recoverable`;
+  `ap_taxi`/`ap_stationery` PZ/P0 rows keep `Nonrecoverable_Allocate`. A shared taxi/travel engine must
+  carry the zero-rated tax values as a per-transform delta, not a shared constant.
 - **≥300-char `.bas` lines are a hard build error**; keep engine lines under ~250 with `_` continuation.
 - **Spec↔code column gate is now enforced** (`build_runner.py _parse_spec_mapping_targets`): every
   transform_spec `mapping:` target must be written by its module. The engine must keep this true —

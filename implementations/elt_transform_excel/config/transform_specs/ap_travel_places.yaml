@@ -78,7 +78,8 @@
 #             CALC_TAX_DUE (FL) leaves Workday to re-derive VAT from the tax triple.
 #             AP confirmed 2026-09-09 Unit Cost MUST equal Extended Amount across ALL AP transforms (same Stationery fix).
 #   Rule 11 - Tax classification: per-row via col Q "Taxcode". This feed = 100% PZ -> rate_0
-#             (Outside of Scope / Zero Rated / Nonrecoverable). P20 branch retained for future —
+#             (Outside of Scope / Zero Rated / Fully_Recoverable -- CHANGED 2026-10-05, ap_travel_places
+#             ONLY; was Nonrecoverable_Allocate; taxi/stationery unchanged). P20 branch retained for future —
 #             CHANGED 2026-09-09: P20 = GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard /
 #             Fully_Recoverable (same Stationery Ambassador Taxi correction: Purchasing domain Purchase
 #             ref-IDs, not generic Standard_Rated which is for AR/Customer domain).
@@ -280,11 +281,12 @@ tax:
     - driver_value_match: { when_value_eq: PZ }
       applicability: GBR_Outside_of_Scope
       code: GBR_Zero_Rated
-      recoverability: Nonrecoverable_Allocate
+      recoverability: Fully_Recoverable
+      note: CHANGED 2026-10-05 — was Nonrecoverable_Allocate. New rule for ap_travel_places ONLY (user decision; applies to PZ and P0).
     - driver_value_match: { when_value_eq: P0 }
       applicability: GBR_Outside_of_Scope
       code: GBR_Zero_Rated
-      recoverability: Nonrecoverable_Allocate
+      recoverability: Fully_Recoverable   # CHANGED 2026-10-05 (was Nonrecoverable_Allocate)
     - driver_value_match: { when_value_eq: P20 }
       applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
       code: GBR_Standard
@@ -333,6 +335,12 @@ confirmed_decisions:
   - >-
     [CONFIRMED 2026-08-17 by Finance/user] Taxcode "PZ" = GBR_Outside_of_Scope / GBR_Zero_Rated /
     Nonrecoverable_Allocate (the taxi/stationery rate_0 branch). This feed is 100% PZ.
+    SUPERSEDED 2026-10-05: recoverability for PZ (and P0) is now Fully_Recoverable -- see next entry.
+  - >-
+    [CONFIRMED 2026-10-05 by user] NEW RULE, ap_travel_places ONLY: Taxcode PZ and P0 =
+    GBR_Outside_of_Scope / GBR_Zero_Rated / Fully_Recoverable (FK changed from
+    Nonrecoverable_Allocate). P20 unchanged. ap_taxi / ap_stationery and all other AP feeds keep
+    Nonrecoverable_Allocate on zero-rated rows.
 
 open_questions:
   - >-
@@ -375,7 +383,7 @@ mapping:
   "FE": { source: per_row_tax.*.applicability, rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Outside_of_Scope; P20->GBR_Domestic_Purchase_Of_Goods_And_Services — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }
   "FF": { source: per_row_tax.*.code,          rule: Rule 11 via Taxcode switch (PZ/P0->GBR_Zero_Rated; P20->GBR_Standard — CHANGED 2026-09-09 P20 was Standard_Rated per AP) }
   "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
-  "FK": { source: per_row_tax.*.recoverability, rule: Rule 11 via Taxcode switch (PZ/P0->Nonrecoverable_Allocate; P20->Fully_Recoverable — CHANGED 2026-09-09 P20 was Recoverable_Allocate per AP) }
+  "FK": { source: per_row_tax.*.recoverability, rule: Rule 11 via Taxcode switch (PZ/P0->Fully_Recoverable — CHANGED 2026-10-05 was Nonrecoverable_Allocate, travel_places only; P20->Fully_Recoverable — CHANGED 2026-09-09 P20 was Recoverable_Allocate per AP) }
   "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
   "GE": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Unit Cost; net amount only (no VAT). Same as GF — both columns MUST be identical per AP 2026-09-09. Cell NumberFormat = 0.00 (2026-10-01; display only, stored value not rounded). }
   "GF": { source: "Net (fallback: Gross - Tax)", rule: Rule 10 — line Extended Amount; CHANGED 2026-09-09 to match GE exactly (net only = no VAT pre-add). AP confirmed Unit Cost (GE) MUST equal Extended Amount (GF). CALC_TAX_DUE re-derives VAT from FE/FF/FK triple. Cell NumberFormat = 0.00 (2026-10-01; display only, stored value not rounded). }

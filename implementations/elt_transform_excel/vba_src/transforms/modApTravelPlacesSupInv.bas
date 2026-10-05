@@ -40,7 +40,9 @@ Private Const TAX_APPLICABILITY_ZERO As String = "GBR_Outside_of_Scope"
 Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
 Private Const TAX_CODE_ZERO As String = "GBR_Zero_Rated"
 Private Const TAX_RECOVERABILITY_STANDARD As String = "Fully_Recoverable"
-Private Const TAX_RECOVERABILITY_ZERO As String = "Nonrecoverable_Allocate"
+'  CHANGED 2026-10-05 (ap_travel_places ONLY): PZ/P0 recoverability = Fully_Recoverable (was
+'  Nonrecoverable_Allocate). Applicability/Code unchanged. Taxi/Stationery keep Nonrecoverable_Allocate.
+Private Const TAX_RECOVERABILITY_ZERO As String = "Fully_Recoverable"
 
 '  9 worktag lookups: 2 mandatory (Cost Center, Spend Category) + 7 optional.
 Private mSpendCategoryLookup As Collection
