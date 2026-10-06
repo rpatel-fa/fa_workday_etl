@@ -28,6 +28,7 @@ source_layout:
     - WORKDAY ID
     - Date
     - NET
+    - VAT
     - DESCRIPTION
     - QTY
     - Company
@@ -47,10 +48,28 @@ transform_constants:
   # EIB column D (Customer Invoice Reference ID) is left blank on every row: in Submit
   # Customer Invoice it looks up an EXISTING Workday invoice, so a new ID there fails the
   # load with an invalid Customer_Invoice_Reference_ID error (mirrors ar_integration_invoice).
-  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
-  # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
-  # See mapping.d/.g/.bo/.fa/.fb in the spec.
+  # BO (Invoice Number), CM (Amount Due) and FO (Extended Amount) are left blank on
+  # every row (CM/FO 2026-10-06, as ar_integration_invoice). FA (Line Tax Applicability) and
+  # FB (Line Tax Code) are set per row from the source NET/VAT split -- same rule and
+  # values as ar_integration_invoice (2026-10-06). See tax_triple_per_row below and
+  # mapping.d/.g/.bo/.fa/.fb in the spec.
   company_fallback: THE FA GROUP - FA
+  # FA / FB per-row tax triple (2026-10-06), mirroring ar_integration_invoice: rows with
+  # NET > 0 and VAT = 0 (or NET = GROSS = 0) use the zero-rated set; every other row uses
+  # the standard-rated set. GROSS is optional (absent -> NET + VAT). The .bas holds these
+  # values as profile-local Private Consts -- keep both in step.
+  tax_triple_per_row:
+    source_net_column: NET
+    source_vat_column: VAT
+    source_gross_column: GROSS
+    standard_rated:
+      applicability: GBR_Domestic_Sale_of_Goods_and_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    zero_rated:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
   # No COST CODE or accounting-string driver in the discipline extract, and no
   # Mapping-Master hierarchy lookup is used -- Revenue Category / Cost Centre /
   # Reporting Type are read directly from the source sheet's first-data-row
