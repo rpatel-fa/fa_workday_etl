@@ -88,11 +88,11 @@ notes: >
   left blank on every row (DECIDED 2026-09-29). Line Tax Applicability (FA) and
   Line Tax Code (FB) are derived per row from the source Net/VAT ratio (see
   tax_rules) -- restored 2026-10-06 after being left blank from 2026-09-29.
-  2026-10-06 amendment: Amount Due (CM), Unit Cost (FL) and line Extended Amount
-  (FO) all come from the source Net column (col I) again (reverting the
-  2026-09-30 switch to Gross), and Quantity (FH) from the source Quantity column
-  (col H), capped at 1. Workday adds VAT from the line Tax Code (FB), so the
-  invoice total comes out at Gross.
+  2026-10-06 amendment: Unit Cost (FL) comes from the source Net column (col I)
+  again (reverting the 2026-09-30 switch to Gross), and Quantity (FH) from the
+  source Quantity column (col H), capped at 1. Workday adds VAT from the line Tax
+  Code (FB). Amount Due (CM) and line Extended Amount (FO) are left blank on
+  every row.
   Shared invoice-line grouping is keyed by the derived invoice identifier that
   the build profile computes (not written to any output column). That makes the
   shared helper contract explicit in YAML even though the identifier itself is
@@ -418,17 +418,11 @@ mapping:
   note: Document Status CL = Approved per house default.
 
 - target: cm
-  source_column: "Net £"
-  source_column_aliases: ["Net PS", "Net"]
-  number_format: "0.00"
+  default: ""
+  optional: true
   note: >
-    Amount Due CM = source "Net £" (col I), restored 2026-10-06 together with the
-    line tax (FA/FB); reverts the 2026-09-30 switch to Gross. One row = one
-    invoice, so CM equals the line's FO (and FH x FL, with FH capped at 1).
-    Workday adds VAT from the line Tax Code (FB), so the invoice total comes out
-    at Gross. Year-tab variants carry header "Net" (no £); resolved via
-    FindOptionalColumnIndexInRow fallback chain. Cell NumberFormat = "0.00"
-    (display only, stored value stays unrounded).
+    Amount Due -- left blank on every row per requester instruction (2026-10-06).
+    Previously source "Net £" (col I) (Gross 2026-09-30 to 2026-10-06).
 
 - target: co
   default: Standard
@@ -534,21 +528,17 @@ mapping:
     Unit Cost FL = source "Net £" (col I), restored 2026-10-06 together with the
     line tax (FA/FB; Gross 2026-09-30 to 2026-10-06). The full row amount, NOT
     divided by Quantity; Quantity (FH) is capped at 1 (see target `fh`) so
-    FH x FL = FO = CM. Year-tab variants use header "Net" (no £); resolved via
+    FH x FL = the row Net. Year-tab variants use header "Net" (no £); resolved via
     FindOptionalColumnIndexInRow fallback. Cell NumberFormat = "0.00" (display
     only, stored value stays unrounded).
 
 - target: fo
-  source_column: "Net £"
-  source_column_aliases: ["Net PS", "Net"]
-  number_format: "0.00"
+  default: ""
+  optional: true
   note: >
-    Extended Amount FO = source "Net £" (col I), restored 2026-10-06 together with
-    the line tax (FA/FB); reverts the 2026-09-30 switch to Gross. FL, FO and CM all
-    carry the same Net value; Workday adds VAT from the line Tax Code (FB).
-    Year-tab variants use header "Net" (no £); resolved via
-    FindOptionalColumnIndexInRow fallback. Cell NumberFormat = "0.00" (display
-    only, stored value stays unrounded).
+    Extended Amount -- left blank on every row per requester instruction
+    (2026-10-06). Previously source "Net £" (col I) (Gross 2026-09-30 to
+    2026-10-06).
 
 - target: fp
   derivation: mirror_br

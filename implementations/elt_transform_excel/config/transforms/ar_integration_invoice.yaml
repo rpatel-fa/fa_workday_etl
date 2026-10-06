@@ -39,9 +39,9 @@ transform:
     (restored 2026-10-06; blank 2026-09-29 to 2026-10-06): rows with zero VAT use
     the domestic-out-of-scope zero-rated set; rows with positive VAT use the
     domestic 20% standard-rated set. See tax_triple_per_row.
-    Amounts (2026-10-06): Amount Due (CM), Unit Cost (FL) and line Extended
-    Amount (FO) = source "Net" (col I); Workday adds VAT from the line Tax Code
-    (FB), so the invoice total comes out at Gross (Gross 2026-09-30 to 2026-10-06);
+    Amounts (2026-10-06): Unit Cost (FL) = source "Net" (col I); Workday adds VAT
+    from the line Tax Code (FB) (Gross 2026-09-30 to 2026-10-06). Amount Due (CM)
+    and line Extended Amount (FO) are left blank on every row;
     Quantity (FH) = source "Quantity" (col H), capped at 1 (a source value above
     1 is written as 1); blank, text or <= 0 defaults to 1.
     Customer Invoice ID (G) is
@@ -248,7 +248,7 @@ transform_constants:
     invoice_date: BR
     payment_status: CK
     document_status: CL
-    amount_due: CM                    # source "Net" (col I), 2026-10-06
+    amount_due: CM                    # intentionally left blank on every row (2026-10-06)
     customer_invoice_type: CO
     header_tax_code: CP
     customer_po_number: CQ
@@ -266,7 +266,7 @@ transform_constants:
     line_quantity: FH                 # source "Quantity" (col H), capped at 1
     line_unit_of_measure: FI
     line_unit_cost: FL                # source "Net" (col I), 2026-10-06
-    line_extended_amount: FO          # source "Net" (col I), 2026-10-06
+    line_extended_amount: FO          # intentionally left blank on every row (2026-10-06)
     line_transaction_date: FP
     line_from_date: FQ
     line_to_date: FR

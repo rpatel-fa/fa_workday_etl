@@ -492,9 +492,9 @@ Private Sub WriteOutputRow( _
     If qtyValue <= 0# Then qtyValue = 1#
     If qtyValue > 1# Then qtyValue = 1#
 
-    ' Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) = source Net (col I)
-    ' (restored 2026-10-06 with the line tax): Workday adds VAT from the line Tax Code (FB),
-    ' so the invoice total comes out at Gross. See transform_specs targets cm/fl/fo.
+    ' Unit Cost (FL) = source Net (col I) (restored 2026-10-06 with the line tax): Workday
+    ' adds VAT from the line Tax Code (FB). Amount Due (CM) and Extended Amount (FO) are
+    ' left blank per 2026-10-06 instruction. See transform_specs targets cm/fl/fo.
     If netColumn > 0 Then netAmount = SafeCellDbl(sourceTable(sourceRow, netColumn)) Else netAmount = 0#
     If vatColumn > 0 Then vatAmount = SafeCellDbl(sourceTable(sourceRow, vatColumn)) Else vatAmount = 0#
     If grossColumn > 0 Then
@@ -629,8 +629,8 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
+    ' Amount Due (CM) is left blank per 2026-10-06 instruction.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     If LenB(poNumberValue) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = poNumberValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INCLUDE_CUSTOMER_WORKTAGS)).Value = "Y"
@@ -648,8 +648,8 @@ Private Sub WriteOutputRow( _
     ' Unit of Measure (FI) is left blank per 2026-09-22 instruction.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
+    ' Extended Amount (FO) is left blank per 2026-10-06 instruction.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = vbNullString
 
     If LenB(orderDate) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"
