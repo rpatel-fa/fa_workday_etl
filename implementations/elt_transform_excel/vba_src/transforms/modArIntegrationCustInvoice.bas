@@ -16,6 +16,17 @@ Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 '  transform_constants and transform_specs mapping.g. (D is left blank.)
 Private Const REFERENCE_ID_PREFIX As String = "integration_"
 
+'  --- Profile-local Tax Triple overrides (hybrid scope; shadows modFinanceCommon.bas shared defaults) ---
+'  These values come from ar_integration_invoice.yaml transform_constants.tax_triple_per_row; keep
+'  them profile-local so a change to the shared modFinanceCommon defaults does not alter this
+'  transform.  Ref-IDs set 2026-10-06 (previously GBR_200_VAT / GBR_000_No_VAT /
+'  GBR_Domestic_Outside_the_Scope).
+'  Restored 2026-10-06 (were blanked 2026-09-29).
+Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Sale_of_Goods_and_Services"
+Private Const TAX_APPLICABILITY_ZERO As String = "GBR_Outside_of_Scope"
+Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
+Private Const TAX_CODE_ZERO As String = "GBR_Zero_Rated"
+
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 
 '  ============================================================================
@@ -436,11 +447,16 @@ Private Sub WriteOutputRow( _
     Dim invoiceDate As String
     Dim orderDate As String
     Dim grossAmount As Double
+    Dim netAmount As Double
     Dim qtyValue As Double
+    Dim vatAmount As Double
+    Dim vatRatio As Double
     Dim courseNameValue As String
     Dim descriptionValue As String
     Dim emailValue As String
     Dim orgNameValue As String
+    Dim taxApplicability As String
+    Dim taxCode As String
     Dim coursePacked As String
     Dim courseParts As Variant
     Dim revenueCategory As String
@@ -470,18 +486,41 @@ Private Sub WriteOutputRow( _
     orderDate = invoiceDate
 
     ' Quantity (FH) = source "Quantity" (col H), capped at 1 per 2026-09-30 instruction:
-    ' Unit Cost (FL) carries the full row Gross, so FH x FL must equal the row total.
+    ' Unit Cost (FL) carries the full row Net, so FH x FL must equal the row total.
     ' Blank, text or <= 0 defaults to 1.
     If qtyColumn > 0 Then qtyValue = SafeCellDbl(sourceTable(sourceRow, qtyColumn)) Else qtyValue = 1#
     If qtyValue <= 0# Then qtyValue = 1#
     If qtyValue > 1# Then qtyValue = 1#
 
-    ' Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) = source Gross Price
-    ' (col K) per 2026-09-30 instruction. Line tax (FA/FB) is blank, so Workday adds no
-    ' VAT on top. See transform_specs targets cm/fl/fo.
-    If grossColumn > 0 Then grossAmount = SafeCellDbl(sourceTable(sourceRow, grossColumn)) Else grossAmount = 0#
-    ' Line Tax Applicability (FA) / Line Tax Code (FB) are left blank on every row, so no
-    ' Net/VAT tax triple is derived here (see transform_specs tax_rules).
+    ' Unit Cost (FL) = source Net (col I) (restored 2026-10-06 with the line tax): Workday
+    ' adds VAT from the line Tax Code (FB). Amount Due (CM) and Extended Amount (FO) are
+    ' left blank per 2026-10-06 instruction. See transform_specs targets cm/fl/fo.
+    If netColumn > 0 Then netAmount = SafeCellDbl(sourceTable(sourceRow, netColumn)) Else netAmount = 0#
+    If vatColumn > 0 Then vatAmount = SafeCellDbl(sourceTable(sourceRow, vatColumn)) Else vatAmount = 0#
+    If grossColumn > 0 Then
+        grossAmount = SafeCellDbl(sourceTable(sourceRow, grossColumn))
+    Else
+        grossAmount = netAmount + vatAmount
+    End If
+
+    ' Line Tax Applicability (FA) / Line Tax Code (FB): per-row tax triple from the source
+    ' Net/VAT ratio (restored 2026-10-06; see transform_specs tax_rules).
+    If netAmount > 0# Then
+        vatRatio = vatAmount / netAmount
+    Else
+        vatRatio = 0#
+    End If
+
+    If (netAmount > 0# And vatAmount = 0#) Or (netAmount = 0# And grossAmount = 0#) Then
+        taxApplicability = TAX_APPLICABILITY_ZERO
+        taxCode = TAX_CODE_ZERO
+    ElseIf Abs(vatRatio - 0.2) < 0.01 Then
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    Else
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    End If
 
     courseNameValue = SafeCellStr(sourceTable(sourceRow, courseNameColumn))
     If descriptionColumn > 0 Then descriptionValue = SafeCellStr(sourceTable(sourceRow, descriptionColumn)) Else descriptionValue = vbNullString
@@ -590,8 +629,8 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = grossAmount
+    ' Amount Due (CM) is left blank per 2026-10-06 instruction.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     If LenB(poNumberValue) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = poNumberValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INCLUDE_CUSTOMER_WORKTAGS)).Value = "Y"
@@ -603,14 +642,14 @@ Private Sub WriteOutputRow( _
 
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescription
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = taxApplicability
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = taxCode
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     ' Unit of Measure (FI) is left blank per 2026-09-22 instruction.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = grossAmount
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = grossAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
+    ' Extended Amount (FO) is left blank per 2026-10-06 instruction.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = vbNullString
 
     If LenB(orderDate) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"

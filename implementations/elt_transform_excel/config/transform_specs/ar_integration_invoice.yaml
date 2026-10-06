@@ -84,15 +84,15 @@ notes: >
   Mapping MASTER lowest-hierarchy lookup.
   An unresolved Course Name (no match in Code lists) writes the Code lists tab-sourced
   worktags as BLANK (AR archetype rule: silent_blank, not row rejection) and
-  increments a flag counter shown in the run results. Invoice Number (BO), Line
-  Tax Applicability (FA) and Line Tax Code (FB) are left blank on every row
-  (DECIDED 2026-09-29, same as ar_manual_invoice / ar_discipline_invoice /
-  ar_gbe_invoice); previously FA/FB were derived per row from the source
-  Net/VAT ratio. 2026-09-30 amendment: Amount Due (CM), Unit Cost (FL) and line
-  Extended Amount (FO) all come from the source Gross Price column (col K)
-  (reverting the 2026-09-22 switch to Net), and Quantity (FH) from the source
-  Quantity column (col H), capped at 1. With line tax blank, Workday adds no VAT
-  and the customer is charged the Gross amount.
+  increments a flag counter shown in the run results. Invoice Number (BO) is
+  left blank on every row (DECIDED 2026-09-29). Line Tax Applicability (FA) and
+  Line Tax Code (FB) are derived per row from the source Net/VAT ratio (see
+  tax_rules) -- restored 2026-10-06 after being left blank from 2026-09-29.
+  2026-10-06 amendment: Unit Cost (FL) comes from the source Net column (col I)
+  again (reverting the 2026-09-30 switch to Gross), and Quantity (FH) from the
+  source Quantity column (col H), capped at 1. Workday adds VAT from the line Tax
+  Code (FB). Amount Due (CM) and line Extended Amount (FO) are left blank on
+  every row.
   Shared invoice-line grouping is keyed by the derived invoice identifier that
   the build profile computes (not written to any output column). That makes the
   shared helper contract explicit in YAML even though the identifier itself is
@@ -234,18 +234,48 @@ course_based_hierarchy:
   business_objects_not_in_codes_tab:
     - Sales Item (EJ) - left blank (no source column)
     - Project (BN / GF) - left blank (Code lists has no Project column; silent blank rule)
-    - Line Tax (FA / FB) - left blank on every row (see tax_rules)
+    - Line Tax (FA / FB) - per-row VAT rate triple (separate rule)
 
 tax_rules:
-  mode: none
   note: >
-    DECIDED 2026-09-29: Line Tax Applicability (FA) and Line Tax Code (FB) are left
-    blank on every row, same as ar_manual_invoice / ar_discipline_invoice /
-    ar_gbe_invoice. No tax triple is derived. The Net / Vat / Gross columns are still
-    read for amounts (Gross, as of 2026-09-30) and the zero-value skip rule (Net + Vat + Gross all 0).
-    Previously per-row: Net > 0 and VAT = 0 (or Net = 0 and Gross = 0) ->
-    GBR_Domestic_Outside_the_Scope / GBR_000_No_VAT; otherwise (VAT ~= 20% of Net,
-    or any other ratio) -> GBR_Domestic_Sale_of_Goods_and_Services / GBR_200_VAT.
+    Restored 2026-10-06 (FA/FB were left blank 2026-09-29 to 2026-10-06). The
+    Net / Vat / Gross columns are also read for amounts (Net) and the zero-value
+    skip rule (Net + Vat + Gross all 0).
+  row_level_determination:
+    input_columns: ["Net £", "Vat £", "Gross Price £"]
+    input_column_aliases:
+      "Net £": ["Net PS", "Net"]
+      "Vat £": ["VAT £", "VAT PS", "VAT", "Vat PS", "Vat"]
+      "Gross Price £": ["Gross Price PS", "Gross Price"]
+    alias_note: >
+      The primary Integration template uses the literal pound-sign header "Net £".
+      Year tabs (21-22 Raised .. 26-27 season) carry the headers "Net" / "Vat" /
+      "Gross Price" (no suffix).  The internal "Net PS" name is a legacy semantic
+      alias from the AP archetype fork and must NEVER be used as a required header.
+      VBA resolves headers with a FindOptionalColumnIndexInRow fallback chain that
+      tries (1) primary £-suffix, (2) PS alias for back-compat, (3) bare name for
+      year-tab ingestion.
+    rule: |-
+      effective_net = ResolveAmount(source, Net_col)
+      effective_vat = ResolveAmount(source, Vat_col)
+      effective_gross = ResolveAmount(source, Gross_Price_col)
+      If effective_net > 0 And effective_vat = 0 Then
+          tax_triple = ZERO_RATED_SET
+      ElseIf effective_net > 0 And Abs((effective_vat / effective_net) - 0.2) < 0.01 Then
+          tax_triple = STANDARD_RATED_20PC_SET
+      ElseIf effective_net = 0 And effective_gross = 0 Then
+          tax_triple = ZERO_RATED_SET
+      Else
+          tax_triple = STANDARD_RATED_20PC_SET (sane default; flag in run results)
+      End If
+  standard_rated_20pc:
+    applicability: GBR_Domestic_Sale_of_Goods_and_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
+  zero_rated:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Fully_Recoverable
 
 skip_rule:
   drop_when:
@@ -388,18 +418,11 @@ mapping:
   note: Document Status CL = Approved per house default.
 
 - target: cm
-  source_column: "Gross Price £"
-  source_column_aliases: ["Gross Price PS", "Gross Price"]
-  number_format: "0.00"
+  default: ""
+  optional: true
   note: >
-    Amount Due CM = source "Gross Price £" (col K), per requester instruction
-    (2026-09-30). Reverts the 2026-09-22 amendment that had switched CM from Gross
-    to Net. One row = one invoice, so CM equals the line's FO (and FH x FL, with
-    FH capped at 1). Line tax (FA/FB) is blank, so Workday adds no VAT on top and
-    the customer is charged the Gross amount; VAT is not recorded separately.
-    Year-tab variants carry header "Gross Price" (no £); resolved via
-    FindOptionalColumnIndexInRow fallback chain. Cell NumberFormat = "0.00"
-    (display only, stored value stays unrounded).
+    Amount Due -- left blank on every row per requester instruction (2026-10-06).
+    Previously source "Net £" (col I) (Gross 2026-09-30 to 2026-10-06).
 
 - target: co
   default: Standard
@@ -470,20 +493,20 @@ mapping:
     year-tab files).
 
 - target: fa
-  default: ""
-  optional: true
+  derivation: per_row_tax_applicability
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.applicability or zero_rated.applicability
   note: >
-    Line Tax Applicability -- left blank on every row per requester instruction
-    (2026-09-29), same as ar_manual_invoice / ar_discipline_invoice / ar_gbe_invoice.
-    Previously derived per row from the source Net/VAT ratio. See tax_rules.
+    Tax Applicability FA = per-row based on source Net/VAT ratio. 20% rows ->
+    GBR_Domestic_Sale_of_Goods_and_Services; 0% rows -> GBR_Outside_of_Scope.
+    Restored 2026-10-06 (left blank 2026-09-29 to 2026-10-06).
 
 - target: fb
-  default: ""
-  optional: true
+  derivation: per_row_tax_code
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.code or zero_rated.code
   note: >
-    Line Tax Code -- left blank on every row per requester instruction (2026-09-29),
-    same as ar_manual_invoice / ar_discipline_invoice / ar_gbe_invoice. Previously
-    derived per row from the source Net/VAT ratio. See tax_rules.
+    Tax Code FB = per-row based on source Net/VAT ratio. 20% rows -> GBR_Standard;
+    0% rows -> GBR_Zero_Rated. Restored 2026-10-06 (left blank 2026-09-29 to
+    2026-10-06).
 
 - target: fh
   source_column: Quantity
@@ -491,35 +514,31 @@ mapping:
     Quantity FH = source "Quantity" (col H) (confirmed 2026-09-30; earlier note
     said col G, which is Course Date). Capped at 1 per requester instruction
     (2026-09-30): a source Quantity above 1 is written as 1, because Unit Cost FL
-    carries the full row Gross (not divided by Quantity) and FH x FL must equal the
+    carries the full row Net (not divided by Quantity) and FH x FL must equal the
     row total. Blank, text (e.g. "Bespoke") or <= 0 defaults to 1.
 
 - target: fi
   note: Unit of Measure FI is left blank per 2026-09-22 instruction (previously defaulted to "Each").
 
 - target: fl
-  source_column: "Gross Price £"
-  source_column_aliases: ["Gross Price PS", "Gross Price"]
+  source_column: "Net £"
+  source_column_aliases: ["Net PS", "Net"]
   number_format: "0.00"
   note: >
-    Unit Cost FL = source "Gross Price £" (col K), per requester instruction
-    (2026-09-30; previously Net). The full row amount, NOT divided by Quantity;
-    Quantity (FH) is capped at 1 (see target `fh`) so FH x FL = FO = CM.
-    Year-tab variants use header "Gross Price" (no £); resolved via
+    Unit Cost FL = source "Net £" (col I), restored 2026-10-06 together with the
+    line tax (FA/FB; Gross 2026-09-30 to 2026-10-06). The full row amount, NOT
+    divided by Quantity; Quantity (FH) is capped at 1 (see target `fh`) so
+    FH x FL = the row Net. Year-tab variants use header "Net" (no £); resolved via
     FindOptionalColumnIndexInRow fallback. Cell NumberFormat = "0.00" (display
     only, stored value stays unrounded).
 
 - target: fo
-  source_column: "Gross Price £"
-  source_column_aliases: ["Gross Price PS", "Gross Price"]
-  number_format: "0.00"
+  default: ""
+  optional: true
   note: >
-    Extended Amount FO = source "Gross Price £" (col K), per requester instruction
-    (2026-09-30). Reverts the 2026-09-22 amendment that had switched FO from Gross
-    to Net. FL, FO and CM all carry the same Gross value. Year-tab variants use
-    header "Gross Price" (no £); resolved via FindOptionalColumnIndexInRow
-    fallback. Cell NumberFormat = "0.00" (display only, stored value stays
-    unrounded).
+    Extended Amount -- left blank on every row per requester instruction
+    (2026-10-06). Previously source "Net £" (col I) (Gross 2026-09-30 to
+    2026-10-06).
 
 - target: fp
   derivation: mirror_br
