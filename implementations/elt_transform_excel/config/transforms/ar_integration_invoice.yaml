@@ -34,12 +34,14 @@ transform:
     instruction, no longer read from Code lists at all and are intentionally
     always blank. Project and Sales Item have never had a source column and
     stay blank too.
-    Invoice Number (BO), Line Tax Applicability (FA) and Line Tax Code (FB) are
-    left blank on every row (as ar_manual_invoice / ar_discipline_invoice /
-    ar_gbe_invoice do); the per-row Net/VAT tax derivation no longer applies.
-    Amounts (2026-09-30): Amount Due (CM), Unit Cost (FL) and line Extended
-    Amount (FO) = source "Gross Price" (col K); line tax is blank, so no VAT is
-    added on top;
+    Invoice Number (BO) is left blank on every row. Line Tax Applicability (FA)
+    and Line Tax Code (FB) are determined per row from the source Net/VAT split
+    (restored 2026-10-06; blank 2026-09-29 to 2026-10-06): rows with zero VAT use
+    the domestic-out-of-scope zero-rated set; rows with positive VAT use the
+    domestic 20% standard-rated set. See tax_triple_per_row.
+    Amounts (2026-10-06): Amount Due (CM), Unit Cost (FL) and line Extended
+    Amount (FO) = source "Net" (col I); Workday adds VAT from the line Tax Code
+    (FB), so the invoice total comes out at Gross (Gross 2026-09-30 to 2026-10-06);
     Quantity (FH) = source "Quantity" (col H), capped at 1 (a source value above
     1 is written as 1); blank, text or <= 0 defaults to 1.
     Customer Invoice ID (G) is
@@ -202,11 +204,25 @@ transform_constants:
         - "FA Operations -> FA Operations (no prefix, unchanged)"
   unmapped_handling: silent_blank
 
-  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
-  # blank on every row -- no tax block (tax_triple_per_row) is declared here. Previously
-  # FA/FB were derived per row from the source Net/VAT split (zero VAT ->
-  # GBR_Domestic_Outside_the_Scope / GBR_000_No_VAT; positive VAT ->
-  # GBR_Domestic_Sale_of_Goods_and_Services / GBR_200_VAT).
+  # FA (Line Tax Applicability) / FB (Line Tax Code): per-row tax triple from the source
+  # Net/VAT split, restored 2026-10-06 (left blank 2026-09-29 to 2026-10-06).
+  # BO (Invoice Number) stays blank on every row.
+  tax_triple_per_row:
+    source_net_column: "Net £"
+    source_vat_column: "Vat £"
+    source_gross_column: "Gross Price £"
+    header_aliases_net: ["Net PS", "Net"]
+    header_aliases_vat: ["VAT PS", "VAT £", "VAT", "Vat PS", "Vat"]
+    header_aliases_gross: ["Gross Price PS", "Gross Price"]
+    alias_resolution_order: primary_required_header_first_then_aliases_by_year_tab_variant
+    standard_rated:
+      applicability: GBR_Domestic_Sale_of_Goods_and_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    zero_rated:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
 
   customer_invoice_eib_columns:
     # --- HEADER identifier columns (D blank; G composite ID; BO blank) ---
@@ -232,7 +248,7 @@ transform_constants:
     invoice_date: BR
     payment_status: CK
     document_status: CL
-    amount_due: CM                    # source "Gross Price" (col K), 2026-09-30
+    amount_due: CM                    # source "Net" (col I), 2026-10-06
     customer_invoice_type: CO
     header_tax_code: CP
     customer_po_number: CQ
@@ -245,12 +261,12 @@ transform_constants:
     sales_item: EJ
     revenue_category: EM
     line_item_description: EN
-    line_tax_applicability: FA        # intentionally left blank on every row
-    line_tax_code: FB                 # intentionally left blank on every row
+    line_tax_applicability: FA        # per-row tax triple (tax_triple_per_row)
+    line_tax_code: FB                 # per-row tax triple (tax_triple_per_row)
     line_quantity: FH                 # source "Quantity" (col H), capped at 1
     line_unit_of_measure: FI
-    line_unit_cost: FL                # source "Gross Price" (col K), 2026-09-30
-    line_extended_amount: FO          # source "Gross Price" (col K), 2026-09-30
+    line_unit_cost: FL                # source "Net" (col I), 2026-10-06
+    line_extended_amount: FO          # source "Net" (col I), 2026-10-06
     line_transaction_date: FP
     line_from_date: FQ
     line_to_date: FR
