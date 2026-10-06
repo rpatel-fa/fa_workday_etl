@@ -12,11 +12,20 @@ Private Const OUTPUT_ADD_ONLY As String = "Y"
 ' The fixed prefix of the "d" (Customer Invoice Reference ID) row's output_format in
 ' config/transform_specs/ar_discipline_invoice.yaml.
 Private Const REFERENCE_ID_PREFIX As String = "cfa_discipline_"
-' The target_format of the cm / fl / fo rows in config/transform_specs/ar_discipline_invoice.yaml.
+' The target_format of the fl row in config/transform_specs/ar_discipline_invoice.yaml.
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
 ' The "j" (Company) row in config/transform_specs/ar_discipline_invoice.yaml's mapping --
 ' the fallback used only if the source sheet's first-data-row Company cell (col M) is blank.
 Private Const COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
+
+'  --- Profile-local Tax Triple overrides (hybrid scope; shadows modFinanceCommon.bas shared defaults) ---
+'  These values come from ar_discipline_invoice.yaml transform_constants.tax_triple_per_row and
+'  mirror ar_integration_invoice (modArIntegrationCustInvoice.bas); keep them profile-local so a
+'  change to the shared modFinanceCommon defaults does not alter this transform. Set 2026-10-06.
+Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Sale_of_Goods_and_Services"
+Private Const TAX_APPLICABILITY_ZERO As String = "GBR_Outside_of_Scope"
+Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
+Private Const TAX_CODE_ZERO As String = "GBR_Zero_Rated"
 
 ' Source column A holds the invoice date (dd.mm.yy text); source column F is ALSO headered
 ' "DATE" (a Date-typed invoice-month cell, unused), so a header-text lookup would collide.
@@ -69,8 +78,9 @@ Private mGrpNextKey As Long
 ' broadcast to every output row. The Customer ID is read directly from source column B
 ' ("WORKDAY ID") -- no reference-extract lookup. EIB Customer Invoice Reference ID (D) is
 ' the generated cfa_discipline_{WORKDAY ID without hyphens}_{yyyyMMdd}_{Spreadsheet Key}
-' value; Invoice Number (BO), Line Tax
-' Applicability (FA), Line Tax Code (FB) and Memo (DB) are left blank. Line grouping (Spreadsheet
+' value; Invoice Number (BO) and Memo (DB) are left blank; Line Tax Applicability (FA) and
+' Line Tax Code (FB) are set per row from the source NET/VAT split (same rule as
+' ar_integration_invoice). Line grouping (Spreadsheet
 ' Key / Line Order) is keyed directly by source `WORKDAY ID`, which is already unique per row
 ' on this sheet. The field mapping mirrors the mapping: section in
 ' config/transform_specs/ar_discipline_invoice.yaml, the same pattern AR Invoice uses.
@@ -83,6 +93,7 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
     Dim outputWorkbook As Workbook
     Dim sourceTable As Variant
     Dim workdayIdColumn As Long, invoiceDateColumn As Long, netColumn As Long, descriptionColumn As Long, qtyColumn As Long
+    Dim vatColumn As Long, grossColumn As Long
     Dim companyColumn As Long, costCentreColumn As Long, reportingTypeColumn As Long, revenueCategoryColumn As Long
     Dim companyBroadcast As String, costCentreBroadcast As String
     Dim reportingTypeBroadcast As String, revenueCategoryBroadcast As String
@@ -135,6 +146,9 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
 
     workdayIdColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "WORKDAY ID")
     netColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "NET")
+    vatColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "VAT")
+    ' GROSS is optional, as in ar_integration_invoice: absent -> Net + VAT. See mapping.fa.
+    grossColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "GROSS")
     descriptionColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "DESCRIPTION")
     qtyColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "QTY")
     companyColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Company")
@@ -177,6 +191,7 @@ Public Sub RunArDisciplineInvoiceCustomerInvoice(ByVal runnerWorkbook As Workboo
             rowsProcessed = rowsProcessed + 1
             WriteOutputRow targetSheet, targetRow, sourceTable, rowIndex, _
                 workdayIdColumn, invoiceDateColumn, netColumn, descriptionColumn, qtyColumn, _
+                vatColumn, grossColumn, _
                 companyBroadcast, costCentreBroadcast, reportingTypeBroadcast, revenueCategoryBroadcast
             targetRow = targetRow + 1
         End If
@@ -235,6 +250,7 @@ Private Sub WriteOutputRow( _
     ByVal sourceTable As Variant, _
     ByVal sourceRow As Long, _
     ByVal workdayIdColumn As Long, ByVal invoiceDateColumn As Long, ByVal netColumn As Long, ByVal descriptionColumn As Long, ByVal qtyColumn As Long, _
+    ByVal vatColumn As Long, ByVal grossColumn As Long, _
     ByVal companyBroadcast As String, ByVal costCentreBroadcast As String, _
     ByVal reportingTypeBroadcast As String, ByVal revenueCategoryBroadcast As String _
 )
@@ -242,6 +258,11 @@ Private Sub WriteOutputRow( _
     Dim invoiceDate As String
     Dim referenceId As String
     Dim netAmount As Double
+    Dim vatAmount As Double
+    Dim grossAmount As Double
+    Dim vatRatio As Double
+    Dim taxApplicability As String
+    Dim taxCode As String
     Dim qtyValue As Double
     Dim descriptionValue As String
     Dim spreadsheetKeyValue As Long
@@ -250,6 +271,12 @@ Private Sub WriteOutputRow( _
     workdayId = Trim$(CStr(sourceTable(sourceRow, workdayIdColumn)))
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, invoiceDateColumn))
     netAmount = ResolveAmount(sourceTable(sourceRow, netColumn))
+    vatAmount = ResolveAmount(sourceTable(sourceRow, vatColumn))
+    If grossColumn > 0 Then
+        grossAmount = ResolveAmount(sourceTable(sourceRow, grossColumn))
+    Else
+        grossAmount = netAmount + vatAmount
+    End If
     qtyValue = ResolveAmount(sourceTable(sourceRow, qtyColumn))
     descriptionValue = Trim$(CStr(sourceTable(sourceRow, descriptionColumn)))
     ' Grouping keyed directly by WORKDAY ID, which is already unique per row on this sheet.
@@ -285,16 +312,33 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).Value = invoiceDate
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
+    ' Amount Due (CM) intentionally left blank on every row (2026-10-06), same as
+    ' ar_integration_invoice. See mapping.cm.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     ' CY (Include Customer Worktags) intentionally left blank -- see mapping.cy.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
-    ' Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
-    ' per requester instruction (2026-09-28), same as ar_manual_invoice. See mapping.fa / mapping.fb.
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
+    ' Line Tax Applicability (FA) / Line Tax Code (FB): per-row tax triple from the source
+    ' NET/VAT ratio, mirroring ar_integration_invoice (2026-10-06). See mapping.fa / mapping.fb.
+    If netAmount > 0# Then
+        vatRatio = vatAmount / netAmount
+    Else
+        vatRatio = 0#
+    End If
+
+    If (netAmount > 0# And vatAmount = 0#) Or (netAmount = 0# And grossAmount = 0#) Then
+        taxApplicability = TAX_APPLICABILITY_ZERO
+        taxCode = TAX_CODE_ZERO
+    ElseIf Abs(vatRatio - 0.2) < 0.01 Then
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    Else
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    End If
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = taxApplicability
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = taxCode
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
     If LenB(revenueCategoryBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategoryBroadcast
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = descriptionValue
@@ -302,8 +346,9 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_MEMO)).Value = descriptionValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).NumberFormat = AMOUNT_NUMBER_FORMAT
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
+    ' Extended Amount (FO) intentionally left blank on every row (2026-10-06), same as
+    ' ar_integration_invoice. See mapping.fo.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = vbNullString
     If LenB(costCentreBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_COST_CENTRE)).Value = costCentreBroadcast
     If LenB(reportingTypeBroadcast) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REPORTING_TYPE)).Value = reportingTypeBroadcast
     ' DB (Memo) intentionally left blank -- no source narrative column mapped. See mapping.db.

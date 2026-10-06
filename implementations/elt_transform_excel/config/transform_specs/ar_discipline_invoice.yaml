@@ -31,8 +31,9 @@ notes: >
   column. The composite customer invoice ID is written to G as
   cfa_discipline_{WORKDAY ID, hyphen removed}_{invoice date yyyyMMdd}_{Spreadsheet Key};
   Customer Invoice Reference ID (D) is left blank on every row because Workday treats it as
-  an existing-invoice lookup and rejects a new ID there. Invoice Number (BO), Line Tax
-  Applicability (FA), Line Tax Code (FB) and Memo (DB) are left blank. Spreadsheet Key plus
+  an existing-invoice lookup and rejects a new ID there. Invoice Number (BO) and Memo (DB) are
+  left blank; Line Tax Applicability (FA) and Line Tax Code (FB) are set per row from the
+  source NET/VAT split, mirroring ar_integration_invoice (see tax_rules). Spreadsheet Key plus
   line order are grouped by source `WORKDAY ID`, which is already unique per row on this
   sheet. Company (J), Cost Centre (FX), Reporting Type (FY), and Revenue Category (EM) are
   read once from the sheet's first data row (row 2, source columns M/N/O/P — populated on
@@ -43,7 +44,7 @@ fields:
     default: ""
     note: No source invoice-number column on the new source layout. Invoice Number (BO) is left blank; Customer Invoice ID (G) is generated (see `mapping.g` / `mapping.bo`).
   invoice_date:     {source_column: Date, source_column_letter: A, note: "Source column A (dd.mm.yy text) -- see mapping.br landmine note: column F is also headered 'DATE'."}
-  amount_due:       {source_column: NET, basis: net}
+  amount_due:       {default: "", note: "Amount Due (CM) left blank on every row (2026-10-06) -- see mapping.cm."}
   line_amount:      {source_column: NET, basis: net}
   memo:
     default: ""
@@ -72,6 +73,36 @@ accounting_string:
     Discipline fines extract has no accounting-string driver; Revenue Category EM
     and worktags FX..GF are blank. Discipline Standard Customer Invoice Type handles
     any required statutory defaults downstream in Workday.
+
+tax_rules:
+  note: >
+    Added 2026-10-06 -- same rule and values as ar_integration_invoice tax_rules. Source
+    columns H (NET), I (VAT) and J (GROSS) on the Rolling sheet. GROSS is optional: if the
+    header is absent the .bas uses NET + VAT. Rows with NET = 0 are already skipped
+    upstream (RowIsSkippable), so the NET = 0 / GROSS = 0 branch is kept only for parity.
+  row_level_determination:
+    input_columns: ["NET", "VAT", "GROSS"]
+    rule: |-
+      effective_net = ResolveAmount(source, NET_col)
+      effective_vat = ResolveAmount(source, VAT_col)
+      effective_gross = ResolveAmount(source, GROSS_col)   ' NET + VAT if GROSS absent
+      If effective_net > 0 And effective_vat = 0 Then
+          tax_triple = ZERO_RATED_SET
+      ElseIf effective_net > 0 And Abs((effective_vat / effective_net) - 0.2) < 0.01 Then
+          tax_triple = STANDARD_RATED_20PC_SET
+      ElseIf effective_net = 0 And effective_gross = 0 Then
+          tax_triple = ZERO_RATED_SET
+      Else
+          tax_triple = STANDARD_RATED_20PC_SET (sane default)
+      End If
+  standard_rated_20pc:
+    applicability: GBR_Domestic_Sale_of_Goods_and_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
+  zero_rated:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Fully_Recoverable
 
 mapping:
 - target: b
@@ -152,9 +183,11 @@ mapping:
 - target: cl
   default: Approved
 - target: cm
-  source_column: NET
-  target_format: "0.00"
-  note: Amount Due. Displayed with 2 decimal places (cell number format only -- the stored value is not rounded), per requester instruction (2026-09-18). Same for `fl` and `fo`.
+  default: ""
+  optional: true
+  note: >
+    Amount Due -- left blank on every row per requester instruction (2026-10-06), same as
+    ar_integration_invoice. Previously source NET (col H), formatted 0.00.
 - target: co
   default: Standard
 - target: cy
@@ -182,19 +215,21 @@ mapping:
     Populated by the same AssignInvoiceLineGroup call as target `b`; always `1` on this
     sheet since `WORKDAY ID` is unique per row (N=1 case).
 - target: fa
-  default: ""
-  optional: true
+  derivation: per_row_tax_applicability
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.applicability or zero_rated.applicability
   note: >
-    Line Tax Applicability -- left blank on every row per requester instruction
-    (2026-09-28), same as ar_manual_invoice. Was fixed GBR_Standard_Rated (the shared
-    `TAX_APPLICABILITY_STANDARD` in modFinanceCommon.bas).
+    Tax Applicability FA = per-row based on source NET/VAT ratio, mirroring
+    ar_integration_invoice (requester instruction 2026-10-06). 20% rows ->
+    GBR_Domestic_Sale_of_Goods_and_Services; 0% rows -> GBR_Outside_of_Scope. Left blank
+    2026-09-28 to 2026-10-06; before that fixed GBR_Standard_Rated.
 - target: fb
-  default: ""
-  optional: true
+  derivation: per_row_tax_code
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.code or zero_rated.code
   note: >
-    Line Tax Code -- left blank on every row per requester instruction (2026-09-28), same
-    as ar_manual_invoice. Was fixed GBR_Standard_Rated (the shared `TAX_CODE_STANDARD` in
-    modFinanceCommon.bas).
+    Tax Code FB = per-row based on source NET/VAT ratio, mirroring ar_integration_invoice
+    (requester instruction 2026-10-06). 20% rows -> GBR_Standard; 0% rows ->
+    GBR_Zero_Rated. Left blank 2026-09-28 to 2026-10-06; before that fixed
+    GBR_Standard_Rated.
 - target: fp
   mirrors: br
   note: >
@@ -227,9 +262,15 @@ mapping:
 - target: fl
   source_column: NET
   target_format: "0.00"
+  note: >
+    Unit Cost. Displayed with 2 decimal places (cell number format only -- the stored value
+    is not rounded), per requester instruction (2026-09-18).
 - target: fo
-  source_column: NET
-  target_format: "0.00"
+  default: ""
+  optional: true
+  note: >
+    Extended Amount -- left blank on every row per requester instruction (2026-10-06), same
+    as ar_integration_invoice. Previously source NET (col H), formatted 0.00.
 - target: fx
   source_column: Cost Centre
   note: >
