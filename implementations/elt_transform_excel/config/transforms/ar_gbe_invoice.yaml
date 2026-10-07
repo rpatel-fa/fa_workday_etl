@@ -24,9 +24,11 @@ transform:
     (event, camp, FA Learning, commercial partner, grant, programme, project) stay blank - GBE
     still has no per-row COST CODE column for the Mapping-MASTER hierarchy lookup. Amounts
     originally mirrored ar_multi_line / ar_bulk's GROSS-into-amounts convention; DECIDED
-    2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come from
-    NET (col F) instead of GROSS. Invoice Number (BO), Line Tax Applicability (FA) and Line
-    Tax Code (FB) are left blank on every row. Customer Invoice ID (G) is
+    2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all came from
+    NET (col F) instead of GROSS; as of 2026-10-07 CM and FO are left blank on every row (as
+    ar_integration_invoice / ar_discipline_invoice) and only FL carries NET. Invoice Number (BO) is left blank on every row. Line Tax
+    Applicability (FA) and Line Tax Code (FB) are set per row from the Net / (Gross - Net)
+    split, same rule and values as ar_integration_invoice (2026-10-07). Customer Invoice ID (G) is
     gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key};
     Customer Invoice Reference ID (D) is left blank on every row (D looks up an EXISTING
     Workday invoice, so a new ID there fails the load - mirrors ar_integration_invoice).
@@ -67,9 +69,26 @@ transform_constants:
   fixed_company_code: FA
   fixed_currency: GBP
   fixed_invoice_type: Standard
-  # BO (Invoice Number), FA (Line Tax Applicability) and FB (Line Tax Code) are left
-  # blank on every row -- no tax block (uniform_tax / per_row_tax) is declared here.
+  # BO (Invoice Number) is left blank on every row. FA (Line Tax Applicability) and FB
+  # (Line Tax Code) are set per row -- see tax_triple_per_row below and mapping.fa/.fb in
+  # the spec.
   company_fallback: THE FA GROUP - FA
+  # FA / FB per-row tax triple (2026-10-07), mirroring ar_integration_invoice: rows with
+  # NET > 0 and VAT = 0 (or NET = GROSS = 0) use the zero-rated set; every other row uses
+  # the standard-rated set. VAT = GROSS - NET because the Womens tab header omits the "VAT"
+  # label. The .bas holds these values as profile-local Private Consts -- keep both in step.
+  tax_triple_per_row:
+    source_net_column: Net
+    source_gross_column: Gross
+    vat_derivation: Gross - Net
+    standard_rated:
+      applicability: GBR_Domestic_Sale_of_Goods_and_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    zero_rated:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
   # DECIDED 2026-09-17: AR now delivers a ready-made Workday Customer ID per row (source col A,
   # header "WORKDAY ID" on the Mens tab / "Customer ID" on the Womens tab). Customer resolution
   # is a DIRECT PASSTHROUGH of that column - no lookup, no name matching. This supersedes the
@@ -148,7 +167,7 @@ transform_constants:
     invoice_date: BR
     payment_status: CK
     document_status: CL
-    amount_due: CM
+    amount_due: CM                    # intentionally left blank on every row (2026-10-07)
     customer_invoice_type: CO
     header_tax_code: CP
     customer_po_number: CQ
@@ -163,12 +182,12 @@ transform_constants:
     sales_item: EJ
     revenue_category: EM
     line_item_description: EN
-    line_tax_applicability: FA        # intentionally left blank on every row
-    line_tax_code: FB                 # intentionally left blank on every row
+    line_tax_applicability: FA        # per row, see tax_triple_per_row
+    line_tax_code: FB                 # per row, see tax_triple_per_row
     line_quantity: FH
     line_unit_of_measure: FI
     line_unit_cost: FL
-    line_extended_amount: FO
+    line_extended_amount: FO          # intentionally left blank on every row (2026-10-07)
     line_transaction_date: FP
     line_from_date: FQ
     line_to_date: FR

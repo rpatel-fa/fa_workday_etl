@@ -25,6 +25,15 @@ Private Const VARIANT_KEY_WOMENS As String = "ar_gbe_invoice_womens"
 Private Const VARIANT_TOKEN_MENS As String = "mens"
 Private Const VARIANT_TOKEN_WOMENS As String = "womens"
 
+'  --- Profile-local Tax Triple overrides (hybrid scope; shadows modFinanceCommon.bas shared defaults) ---
+'  These values come from ar_gbe_invoice.yaml transform_constants.tax_triple_per_row and
+'  mirror ar_integration_invoice (modArIntegrationCustInvoice.bas); keep them profile-local so a
+'  change to the shared modFinanceCommon defaults does not alter this transform. Set 2026-10-07.
+Private Const TAX_APPLICABILITY_STANDARD As String = "GBR_Domestic_Sale_of_Goods_and_Services"
+Private Const TAX_APPLICABILITY_ZERO As String = "GBR_Outside_of_Scope"
+Private Const TAX_CODE_STANDARD As String = "GBR_Standard"
+Private Const TAX_CODE_ZERO As String = "GBR_Zero_Rated"
+
 '  -- source layout: header=1, data=2; worksheet is named per Runner variant --
 '  Values are read from Runner config at runtime (Source Worksheet Name / Resolution /
 '  Header Row / Data Start Row). ar_gbe_invoice ships TWO variant selections that share this
@@ -283,8 +292,9 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     reportingTypeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Reporting Type")
     revenueCategoryColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Revenue Category")
     '  Optional columns: GBE carries no COST CODE / SALES ITEM / QUANTITY (kept optional -> 0 ->
-    '  inert). The VAT column is intentionally NOT read: Line Tax Applicability (FA) / Line Tax
-    '  Code (FB) are left blank (DECIDED 2026-09-28), so no VAT rate is derived.
+    '  inert). The VAT column is intentionally NOT read: its header is ABSENT on the Womens tab, so
+    '  the VAT amount for Line Tax Applicability (FA) / Line Tax Code (FB) is derived as
+    '  Gross - Net (present on both tabs) in WriteOutputRow instead.
     salesItemColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "SALES ITEM CODE")
     qtyColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "QUANTITY")
     costCodeColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "COST CODE")
@@ -421,6 +431,10 @@ Private Sub WriteOutputRow( _
     Dim invoiceDate As String
     Dim grossAmount As Double
     Dim netAmount As Double
+    Dim vatAmount As Double
+    Dim vatRatio As Double
+    Dim taxApplicability As String
+    Dim taxCode As String
     Dim qtyValue As Double
     Dim costCodeValue As String
     Dim revenueCategory As String
@@ -448,6 +462,28 @@ Private Sub WriteOutputRow( _
 
     If qtyColumn > 0 Then qtyValue = ResolveAmount(sourceTable(sourceRow, qtyColumn)) Else qtyValue = 1#
     If netColumn > 0 Then netAmount = ResolveAmount(sourceTable(sourceRow, netColumn)) Else netAmount = grossAmount
+
+    '  Line Tax Applicability (FA) / Line Tax Code (FB): per-row tax triple from the Net/VAT
+    '  ratio, same rule and values as ar_integration_invoice (restored 2026-10-07; see
+    '  transform_specs tax_rules). VAT = Gross - Net because the Womens tab header omits the
+    '  VAT label, so a VAT column read cannot be relied on.
+    vatAmount = grossAmount - netAmount
+    If netAmount > 0# Then
+        vatRatio = vatAmount / netAmount
+    Else
+        vatRatio = 0#
+    End If
+
+    If (netAmount > 0# And vatAmount = 0#) Or (netAmount = 0# And grossAmount = 0#) Then
+        taxApplicability = TAX_APPLICABILITY_ZERO
+        taxCode = TAX_CODE_ZERO
+    ElseIf Abs(vatRatio - 0.2) < 0.01 Then
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    Else
+        taxApplicability = TAX_APPLICABILITY_STANDARD
+        taxCode = TAX_CODE_STANDARD
+    End If
 
     spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, referenceValue, mGrpNextKey, lineOrderValue)
     lineDescValue = BuildLineDescription(playerValue, CStr(sourceTable(sourceRow, typeColumn)))
@@ -504,8 +540,9 @@ Private Sub WriteOutputRow( _
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
-    '  DECIDED 2026-09-17: Amount Due (CM) also maps to source col F (NET), matching FL/FO.
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = netAmount
+    '  Amount Due (CM) left blank on every row (2026-10-07), as ar_integration_invoice /
+    '  ar_discipline_invoice. Was source col F (NET). See mapping.cm.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = referenceValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
@@ -516,16 +553,16 @@ Private Sub WriteOutputRow( _
     If LenB(revenueCategory) > 0 Then targetSheet.Cells(targetRow, ColumnIndex(TGT_REVENUE_CATEGORY)).Value = revenueCategory
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ITEM_DESCRIPTION)).Value = lineDescValue
-    '  Line Tax Applicability (FA) / Line Tax Code (FB) intentionally left blank on every row
-    '  per requester instruction (2026-09-28), same as ar_manual_invoice / ar_discipline_invoice.
-    '  See mapping.fa / mapping.fb.
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = vbNullString
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = vbNullString
+    '  Line Tax Applicability (FA) / Line Tax Code (FB) per row, mirroring ar_integration_invoice
+    '  (restored 2026-10-07). See mapping.fa / mapping.fb.
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_APPLICABILITY)).Value = taxApplicability
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TAX_CODE)).Value = taxCode
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_QUANTITY)).Value = qtyValue
-    '  DECIDED 2026-09-17: Unit Cost (FL) and Extended Amount (FO) map to source col F (NET),
-    '  not GROSS - matches Amount Due (CM) above, also NET as of 2026-09-17.
+    '  Unit Cost (FL) = source col F (NET), not GROSS (DECIDED 2026-09-17): Workday adds VAT
+    '  from the line Tax Code (FB). Extended Amount (FO) left blank on every row (2026-10-07),
+    '  as ar_integration_invoice / ar_discipline_invoice. See mapping.fl / mapping.fo.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_UNIT_COST)).Value = netAmount
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = netAmount
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_EXTENDED_AMOUNT)).Value = vbNullString
 
     If LenB(invoiceDate) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TRANSACTION_DATE)).NumberFormat = "@"

@@ -20,8 +20,8 @@
 #   G Invoice Line Description | H Invoice line part 2|Invoice Line Description 2 |
 #   I Invoice Memo | J (blank) | K Company | L Cost Centre | M Reporting Type | N Revenue Category
 #   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col E (the data is still
-#   present). VAT is not read: as of 2026-09-28 Line Tax Applicability (FA) and Line Tax
-#   Code (FB) are left blank, so no VAT rate is derived.
+#   present). VAT is therefore not read: the VAT amount driving Line Tax Applicability (FA)
+#   and Line Tax Code (FB) is derived as Gross - Net, present on both tabs (2026-10-07).
 #   NOTE: col A's header differs by tab ("WORKDAY ID" Mens / "Customer ID" Womens) but both
 #   carry a ready-made Workday Customer ID per row (e.g. "C-000102").
 #   NOTE: K/L/M/N (Company / Cost Centre / Reporting Type / Revenue Category) are BATCH
@@ -61,9 +61,10 @@ meta:
         Type (FY) and Revenue Category (EM) are now supplied by AR as BATCH CONSTANTS in
         source columns K/L/M/N: only row 2 carries a value; it is read once and applied to
         every output row (as of 2026-09-17).
-    (3) NO TAX (as of 2026-09-28). Line Tax Applicability (FA) and Line Tax Code (FB) are
-        left blank on every row, as is Invoice Number (BO). Previously FA/FB were driven by a
-        VAT rate derived from (Gross - Net) / Net.
+    (3) PER-ROW TAX (restored 2026-10-07). Line Tax Applicability (FA) and Line Tax Code (FB)
+        are set per row with the same rule and values as ar_integration_invoice, using
+        VAT = Gross - Net so the Womens tab (missing the VAT header) is handled identically.
+        FA/FB were blank 2026-09-28 to 2026-10-07. Invoice Number (BO) stays blank.
 
 shared_helpers:
   source_date_normalization: excel_serial_and_dmy_text
@@ -97,9 +98,11 @@ notes: >
   into the header Memo (DB). A repeated `Reference` therefore collapses to one Workday header
   with 1..N lines; a unique `Reference` remains the single-line case. v46.1 layout. Amounts
   mirrored ar_bulk_invoice / ar_multi_line_invoice's GROSS-into-amounts convention originally;
-  DECIDED 2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all now come
-  from NET (col F) instead of GROSS. Invoice Number (BO), Line Tax Applicability (FA) and
-  Line Tax Code (FB) are left blank on every row (DECIDED 2026-09-28). Line Item Description
+  DECIDED 2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all came from
+  NET (col F) instead of GROSS; as of 2026-10-07 CM and FO are left blank on every row (as
+  ar_integration_invoice / ar_discipline_invoice) and only FL carries NET. Invoice Number (BO) is left blank on every row (DECIDED
+  2026-09-28); Line Tax Applicability (FA) and Line Tax Code (FB) are set per row from the
+  Net / (Gross - Net) split, mirroring ar_integration_invoice (see tax_rules). Line Item Description
   (EN) + line Memo (FV) = Player + " - " + Type, where Player is the text before the "-FOOT"
   split and Type comes from col H.
 
@@ -141,13 +144,37 @@ fields:
     note: >
       Target DV is the grouped line order emitted from the shared invoice-line helper.
 
-tax:
-  mode: none
+tax_rules:
   note: >
-    DECIDED 2026-09-28: Line Tax Applicability (FA) and Line Tax Code (FB) are left blank on
-    every row, same as ar_manual_invoice / ar_discipline_invoice. No VAT rate is derived.
-    Previously per_row_derived from (Gross - Net) / Net: 20% -> GBR_Standard_Rated (FA/FB),
-    else GBR_Outside_of_Scope (FA) / GBR_Zero_Rated (FB).
+    Restored 2026-10-07 -- same rule and values as ar_integration_invoice tax_rules (FA/FB
+    were left blank 2026-09-28 to 2026-10-07; before that per-row derived with
+    GBR_Standard_Rated for 20% rows). Source columns D (Gross) and F (Net); the VAT amount
+    is Gross - Net because the Womens tab header omits the "VAT" label in col E. Rows with
+    Gross = 0 are already skipped upstream (RowIsSkippable), so the NET = 0 / GROSS = 0
+    branch is kept only for parity.
+  row_level_determination:
+    input_columns: ["Gross", "Net"]
+    rule: |-
+      effective_net = ResolveAmount(source, Net_col)
+      effective_gross = ResolveAmount(source, Gross_col)
+      effective_vat = effective_gross - effective_net
+      If effective_net > 0 And effective_vat = 0 Then
+          tax_triple = ZERO_RATED_SET
+      ElseIf effective_net > 0 And Abs((effective_vat / effective_net) - 0.2) < 0.01 Then
+          tax_triple = STANDARD_RATED_20PC_SET
+      ElseIf effective_net = 0 And effective_gross = 0 Then
+          tax_triple = ZERO_RATED_SET
+      Else
+          tax_triple = STANDARD_RATED_20PC_SET (sane default)
+      End If
+  standard_rated_20pc:
+    applicability: GBR_Domestic_Sale_of_Goods_and_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
+  zero_rated:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Fully_Recoverable
 
 accounting_string:
   driver: none
@@ -258,11 +285,11 @@ mapping:
 - target: cl
   default: Approved
 - target: cm
-  source_column: Net
-  source_column_letter: F
+  default: ""
+  optional: true
   note: >
-    DECIDED 2026-09-17: Amount Due CM = NET (col F), not GROSS - matches FL/FO (mapping
-    targets fl/fo above).
+    Amount Due -- left blank on every row per requester instruction (2026-10-07), same as
+    ar_integration_invoice / ar_discipline_invoice. Previously source NET (col F).
 - target: co
   default: Standard
 - target: db
@@ -290,31 +317,33 @@ mapping:
     Description" (col G) BEFORE the "-FOOT" split token (see fields.invoice_number); Type is
     col H verbatim (e.g. "Boubacar Kamara - Extension").
 - target: fa
-  default: ""
-  optional: true
+  derivation: per_row_tax_applicability
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.applicability or zero_rated.applicability
   note: >
-    Line Tax Applicability -- left blank on every row per requester instruction
-    (2026-09-28), same as ar_manual_invoice / ar_discipline_invoice. Previously derived from
-    the (Gross - Net) / Net VAT rate. See tax.
+    Tax Applicability FA = per-row based on the Net / (Gross - Net) ratio, mirroring
+    ar_integration_invoice (requester instruction 2026-10-07). 20% rows ->
+    GBR_Domestic_Sale_of_Goods_and_Services; 0% rows -> GBR_Outside_of_Scope. Left blank
+    2026-09-28 to 2026-10-07; before that 20% rows were GBR_Standard_Rated.
 - target: fb
-  default: ""
-  optional: true
+  derivation: per_row_tax_code
+  rule: tax_rules.row_level_determination -> standard_rated_20pc.code or zero_rated.code
   note: >
-    Line Tax Code -- left blank on every row per requester instruction (2026-09-28), same as
-    ar_manual_invoice / ar_discipline_invoice. Previously derived from the (Gross - Net) / Net
-    VAT rate. See tax.
+    Tax Code FB = per-row based on the Net / (Gross - Net) ratio, mirroring
+    ar_integration_invoice (requester instruction 2026-10-07). 20% rows -> GBR_Standard;
+    0% rows -> GBR_Zero_Rated. Left blank 2026-09-28 to 2026-10-07; before that 20% rows
+    were GBR_Standard_Rated.
 - target: fl
   source_column: Net
   source_column_letter: F
   note: >
-    DECIDED 2026-09-17: Unit Cost FL = NET (col F), not GROSS - matches CM/FO (mapping
-    target cm above).
+    DECIDED 2026-09-17: Unit Cost FL = NET (col F), not GROSS. Workday adds VAT from the
+    line Tax Code (FB).
 - target: fo
-  source_column: Net
-  source_column_letter: F
+  default: ""
+  optional: true
   note: >
-    DECIDED 2026-09-17: Extended Amount FO = NET (col F), not GROSS - matches CM/FL (mapping
-    target cm above).
+    Extended Amount -- left blank on every row per requester instruction (2026-10-07), same
+    as ar_integration_invoice / ar_discipline_invoice. Previously source NET (col F).
 - target: fp
   source_column: Date
   source_format: Excel date serial or dd/mm/yyyy
@@ -325,9 +354,9 @@ mapping:
 
 unused_source_columns:
   # Columns present in the source that are NOT written to the EIB output.
-  - VAT:   # NOT read. Header absent on Womens tab. FA/FB are blank as of 2026-09-28, so no VAT rate is derived.
+  - VAT:   # NOT read. Header absent on Womens tab; FA/FB use VAT = Gross - Net instead (see tax_rules).
   # NOTE: Net (col F) is NO LONGER unused as of 2026-09-17 - it is written directly to
-  # CM/FL/FO (see mapping targets cm/fl/fo above).
+  # FL (see mapping target fl above); CM/FO are blank as of 2026-10-07.
 
 open_questions:
   - id: gbe_customer_id_from_ar
