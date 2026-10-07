@@ -1578,8 +1578,8 @@ def _validate_vba_source_hygiene(
             # congruence guards that are tightly coupled to the canonical Mapping-MASTER pipeline:
             #   (6b)  AR Private Const WBO_* declaration congruence
             #   (6c)  derived_worktags.reporting_type <-> ResolveReportingTypeFromFinalCode() call
-            #   (6e)  Customer-Invoice per_row_tax AR Private Const congruence (when the profile
-            #         uses its own tax_triple_per_row naming instead of the legacy per_row_tax)
+            # Tax is NOT exempted here: a profile's tax Private Consts are validated against its
+            # own YAML tax declaration (per_row_tax or tax_triple_per_row) -- see 6t below.
             worktag_res = constants_dict.get("worktag_resolution") if isinstance(constants_dict, dict) else None
             is_noncanonical_course_lookup = (
                 isinstance(worktag_res, dict) and
@@ -1591,6 +1591,70 @@ def _validate_vba_source_hygiene(
             #   modAr* = legacy scope (AR out of this rollout). Keep original Private Const check.
             is_ap_module = module_path.name.startswith("modAp")
             is_ar_module = module_path.name.startswith("modAr")
+
+            # --- 6t. Customer Invoice tax_triple_per_row <-> .bas Private Const congruence ---
+            # Runs for EVERY Customer Invoice profile, before the worktag-pipeline early exit,
+            # so passing depends only on the profile's own tax declaration.
+            #   YAML tax_triple_per_row.standard_rated.applicability -> TAX_APPLICABILITY_STANDARD
+            #   YAML tax_triple_per_row.standard_rated.code          -> TAX_CODE_STANDARD
+            #   YAML tax_triple_per_row.zero_rated.applicability     -> TAX_APPLICABILITY_ZERO
+            #   YAML tax_triple_per_row.zero_rated.code              -> TAX_CODE_ZERO
+            # Declared -> all four consts must exist with the exact YAML values. Undeclared (and
+            # no per_row_tax) -> the .bas must declare none of them. Profiles with an active
+            # worktag pipeline get the undeclared case from the 6e guard below instead.
+            if str(binding.eib_population_type or "") == "Customer Invoice":
+                triple_yml = constants_dict.get("tax_triple_per_row") if isinstance(constants_dict, dict) else None
+                triple_const_map = {
+                    "TAX_APPLICABILITY_STANDARD": ("standard_rated", "applicability"),
+                    "TAX_CODE_STANDARD": ("standard_rated", "code"),
+                    "TAX_APPLICABILITY_ZERO": ("zero_rated", "applicability"),
+                    "TAX_CODE_ZERO": ("zero_rated", "code"),
+                }
+                triple_consts_found: dict[str, str] = {}
+                for const_name in triple_const_map:
+                    m = re.search(
+                        rb'^\s*Private\s+Const\s+' + const_name.encode("ascii") +
+                        rb'\s+As\s+String\s*=\s*"([^"]+)"\s*$',
+                        raw, re.MULTILINE,
+                    )
+                    if m:
+                        triple_consts_found[const_name] = m.group(1).decode("ascii", errors="replace")
+                if isinstance(triple_yml, dict):
+                    for const_name, (set_key, field_key) in triple_const_map.items():
+                        tax_set = triple_yml.get(set_key)
+                        expected_val = str(tax_set.get(field_key) or "") if isinstance(tax_set, dict) else ""
+                        bas_val = triple_consts_found.get(const_name)
+                        if not expected_val:
+                            errors.append(
+                                f"{module_path.name}: profile '{binding.profile_key}' declares "
+                                f"tax_triple_per_row but tax_triple_per_row.{set_key}.{field_key} "
+                                "is missing or blank in the YAML."
+                            )
+                        elif bas_val is None:
+                            errors.append(
+                                f"{module_path.name}: profile '{binding.profile_key}' declares "
+                                f"tax_triple_per_row.{set_key}.{field_key} = {expected_val!r} but "
+                                f"the .bas does NOT contain Private Const {const_name}. Add it, "
+                                "or correct the YAML."
+                            )
+                        elif bas_val != expected_val:
+                            errors.append(
+                                f"{module_path.name}: tax_triple_per_row VALUE MISMATCH on "
+                                f"Private Const {const_name}: YAML {set_key}.{field_key} = "
+                                f"{expected_val!r} but .bas value = {bas_val!r}. The YAML is the "
+                                "single source of truth -- fix the .bas."
+                            )
+                elif (
+                    triple_consts_found
+                    and constants_dict.get("per_row_tax") is None
+                    and constants_dict.get("worktag_business_objects") is None
+                ):
+                    errors.append(
+                        f"{module_path.name}: profile '{binding.profile_key}' declares no tax "
+                        "block (tax_triple_per_row / per_row_tax) in the YAML, yet the .bas "
+                        f"declares tax Private Consts: {sorted(triple_consts_found)}. Declare "
+                        "tax_triple_per_row in the YAML first, or remove the consts."
+                    )
 
             # --- Stage 1 shared_helpers block validation (AP + AR required) ---
             # Shell-variant spec dedupe: spec-existence + shared_helpers declaration are
@@ -2084,6 +2148,10 @@ def _validate_vba_source_hygiene(
                 cust_keys = {"code_zero_rated", "code_standard", "driver_invoice_type_value_fines"}
                 if any(k in per_row_tax for k in cust_keys):
                     yml_declares_any_tax = True
+            # tax_triple_per_row is a full Customer Invoice tax declaration; its .bas values are
+            # validated in 6t above.
+            if has_customer_arch and isinstance(constants_dict.get("tax_triple_per_row"), dict):
+                yml_declares_any_tax = True
 
             supplier_const_regex_map: dict[str, re.Pattern[bytes]] = {
                 "OUTPUT_TAX_APPLICABILITY": re.compile(rb'^\s*Private\s+Const\s+OUTPUT_TAX_APPLICABILITY\s+As\s+String\s*=\s*"([^"]+)"\s*$', re.MULTILINE),
@@ -2138,15 +2206,9 @@ def _validate_vba_source_hygiene(
                         "Const TAX_* / OUTPUT_TAX_* strings from the .bas that the "
                         "profile doesn't declare."
                     )
-                # NON-CANONICAL COURSE-LOOKUP EXEMPTION: profiles with their own
-                # tax_triple_per_row driver (AR Integration) deliberately avoid the
-                # legacy Customer-Invoice per_row_tax shape.  Skip the negative guard
-                # because the presence of profile-local Private Const TAX_* strings is
-                # intentional and correctly declared via the other tax schema key.
-                if (
-                    has_customer_arch and customer_consts_found
-                    and not is_noncanonical_course_lookup
-                ):
+                # Profiles declaring tax_triple_per_row never reach here (yml_declares_any_tax
+                # is True for them); their consts are validated in 6t.
+                if has_customer_arch and customer_consts_found:
                     errors.append(
                         f"{module_path.name}: profile '{binding.profile_key}' has NO "
                         "Customer-Invoice per_row_tax.code_zero_rated / code_standard "
