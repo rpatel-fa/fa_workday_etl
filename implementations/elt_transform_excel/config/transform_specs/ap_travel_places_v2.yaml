@@ -1,0 +1,336 @@
+# Transform spec - ap_travel_places_v2
+#
+# Human decision record + authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors. Lives in
+# config/transform_specs/ (NOT config/transforms/, which is the build-globbed runnable set).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and source
+# layout (worksheet, header row, required headers) - live in the build profile
+# config/transforms/ap_travel_places_v2.yaml (the build-consumed source of truth). Not restated here.
+#
+# V2 of ap_travel_places (ADDED 2026-10-07). ap_travel_places is UNCHANGED and still reads the
+# "Travel Places upload vMR" tab; this profile reads the new "Revised TP upload" tab.
+#
+# Source workbook: "FA Invoice listing 280926 to 041026 incl Event pivots.xlsx" (weekly; file name pattern
+#   "FA Invoice listing DDMMYY to DDMMYY incl Event pivots.xlsx").
+# Data sheet = "Revised TP upload" (Finance-prepared supplier-invoice upload; the other tabs, including
+#   the "Travel Places upload vMR" tab, are ignored by this profile).
+# Header row 1, data rows 2..49 (48 rows in the 28.09-04.10 week; 16 columns A-P).
+#
+# Deltas vs ap_travel_places (everything else is identical):
+#   1. Worksheet          : "Revised TP upload"  (v1 = "Travel Places upload vMR")
+#   2. Coding string      : col I "Cost code"    (v1 = col R "String Reformatted"; no such column here)
+#   3. Tax amount header  : "VAT(Tax)"           (v1 = "Tax")
+#   4. Layout             : 16 columns A-P, no "Workday Supplier ID" column, so every column after B
+#                           shifts left by one. Columns are found by header name.
+#   5. SupplierID (col B) : now holds the Workday Supplier ID (S-007201 / S-007202) and is the source
+#                           for BOTH Supplier (EIB U) and Company (EIB R).
+#   6. Company (EIB R)    : fixed map S-007201 -> THE FA GROUP - FA, S-007202 -> THE FA GROUP - WNSL.
+#                           No runner company-mapping lookup, no fallback; any other value rejects.
+#   7. Output             : ONE EIB FILE PER COMPANY from a single run. Rows are routed by Company (R)
+#                           into "..._v2_FA_output.xlsx" / "..._v2_WNSL_output.xlsx" (derived from the
+#                           configured Output File Path). A company with no rows gets no file; any
+#                           previous run's per-company files are deleted at the start of the run.
+#                           Spreadsheet Key (B) / Row ID (EK) / Line Order (EM) restart at 1 in each file.
+#
+#   A  Template     (col A: GP template tag = "DINV" on all rows; not mapped)
+#   B  SupplierID   (col B: Workday Supplier ID, "S-007201" x47 / "S-007202" x1 this week -> EIB U DIRECT + Company map)
+#   C  InvoiceNumber(col C: IV045177, IA708934, IM200423, ... -> EIB K + BG)
+#   D  SL Date      (col D: per-row invoice timestamp = InvoiceDate)
+#   E  Date sent    (col E: uniform 05/10/2026 = ReceivedDate; not written)
+#   F  Currency     (col F: GBP on all rows)
+#   G  Tray         (col G: agency tray label e.g. "Hilton"; not mapped)
+#   H  Createdby    (col H: e.g. "FA\NVargas"; not mapped)
+#   I  Cost code    (col I: finance-cleaned coding string e.g. "1203-208103-CW232701-0000" -- THE WORKTAG KEY)
+#   J  Itemcode     (col J: GP line-type code "VAL"; not mapped)
+#   K  Account      (col K: BLANK on every row -- intentionally unused)
+#   L  Net          (col L: line net)
+#   M  VAT(Tax)     (col M: line tax; 0 on PZ rows)
+#   N  Gross        (col N: line gross)
+#   O  Description  (col O: event/booking description e.g. "FA WU23 Overseas Players 2026 NE")
+#   P  Taxcode      (col P: "PZ" x42 / "P20" x5 / blank x1 this week -- blank rejects, see open_questions)
+#
+# Derived-field rules (Upload -> EIB mapping):
+#
+#   Rule 1 - Company (EIB R): col B "SupplierID" looked up in the fixed Travel Places map
+#            (transform_constants.company_resolution.map): S-007201 -> THE FA GROUP - FA,
+#            S-007202 -> THE FA GROUP - WNSL. Trim + case-insensitive. Any other value -> reject
+#            (Supplier/Company unresolved). ap_travel_places_v2 ONLY; ref_company.json untouched.
+#   Rule 2 - Supplier (EIB U): col B "SupplierID" DIRECT passthrough (Trim only; no Supplier
+#            Spreadsheet lookup). Gated by Rule 1, so only S-007201 / S-007202 are written.
+#   Rule 3 - Invoice Number (EIB K): col C "InvoiceNumber" RAW DIRECT.
+#   Rule 4 - Invoice Date (EIB AF): col D "SL Date" per-row, coerced to YYYY-MM-DD at write.
+#   Rule 5 - Receipt Date (EIB AG): LEAVE BLANK (Empty). Do NOT read col E "Date sent".
+#   Rule 6 - Suppliers Invoice Number (EIB BG): col C "InvoiceNumber" DIRECT (= Rule 3).
+#   Rule 7 - Cost Code / accounting string (EIB worktags EW/GT/GV..HH): col I "Cost code",
+#            separators normalized by the shared resolver. Split on "-": Seg1=Cost Centre,
+#            Seg2=Spend Cat, Seg3=Project/CommPartner/Grant, Seg4=Program. Lowest-hierarchy
+#            Mapping MASTER lookup (Core vs Prism = Core) per BO.
+#   Rule 8 - Item Description (EIB EP): col O "Description" DIRECT, UCase(Trim()).
+#   Rule 9 - Memo (EIB GQ): InvoiceNumber (C) + ' ' + raw Cost code (I).
+#   Rule 10 - Line Amount (EIB GE unit cost, GF extended): col L Net; if blank/zero -> fall back to
+#             (Gross N - VAT(Tax) M). BOTH GE and GF = net only. CALC_TAX_DUE (FL) lets Workday
+#             re-derive VAT from the tax triple.
+#   Rule 11 - Tax classification: per-row via col P "Taxcode" (same triples as ap_travel_places):
+#             PZ/P0 -> GBR_Outside_of_Scope / GBR_Zero_Rated / Fully_Recoverable;
+#             P20   -> GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard / Fully_Recoverable;
+#             anything else -> reject.
+#   Rule 12 - Currency (EIB T): col F DIRECT (GBP), fallback GBP.
+#   Rule 13 - PO Number (EIB BH): LEFT EMPTY.
+#   Rule 14 - Reporting Type (EIB GR): LEFT(Seg2, 1) of the Rule-7 Cost code via
+#             ResolveReportingTypeCode.
+#
+# Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md);
+# house defaults inherited unchanged: I=Y, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
+
+meta:
+  key: ap_travel_places_v2
+  label: AP Travel Places V2
+  requester: Finance (AP)
+  date_confirmed: 2026-10-07
+  exemplar_to_fork: ap_travel_places
+  note: >
+    Copy of ap_travel_places for the "Revised TP upload" tab. Kept as its own profile so
+    ap_travel_places (vMR tab, col C Workday Supplier ID, col R String Reformatted, SupplierID
+    split for Company) stays untouched.
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_passthrough
+  company_resolution: per_row_supplier_id_literal_map
+  accounting_string_derivation: direct_column_separator_normalized
+  worktag_hierarchy_lookup: standard_9pack_lowest_specificity
+  row_net_resolution: effective_net_gross_tax_fallback
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  supplier:
+    source_code: per_row_direct_passthrough
+    source_column: SupplierID                 # Upload col B, e.g. "S-007201"
+    source_column_letter: B
+    resolved_via: >
+      Workday Supplier ID read DIRECT from col B "SupplierID" (no Supplier Spreadsheet lookup).
+      Only written when Rule 1 resolves a Company, so in practice only S-007201 / S-007202 post.
+    reject_if_unresolved: true
+  company:
+    source_code: per_row_supplier_id_literal_map
+    source_column: SupplierID                 # Rule 1 -- same col B
+    map:
+      S-007201: THE FA GROUP - FA
+      S-007202: THE FA GROUP - WNSL
+    resolved_via: fixed map in transform_constants.company_resolution (NOT the runner mapping tab)
+    fallback: none                            # unmapped -> reject
+    note: Rule 1 -- ap_travel_places_v2 ONLY.
+
+fields:
+  invoice_number:                             # EIB K
+    source_column: InvoiceNumber              # Rule 3 = col C DIRECT
+  invoice_date:                               # EIB AF
+    source_column: SL Date                    # Rule 4 = col D
+    shared_helper_ref: source_date_normalization.excel_serial_and_dmy_text
+  receipt_date:                               # EIB AG
+    function: leave_blank
+  suppliers_invoice_number:                   # EIB BG
+    source_column: InvoiceNumber              # Rule 6 = col C DIRECT
+  item_description:                           # EIB EP
+    source_column: Description                # Rule 8 = col O
+    post_process: UCase(Trim(value))
+  memo:                                       # EIB GQ
+    rule: InvoiceNumber + ' ' + CostCodeString   # Rule 9
+    concat_with_space: [InvoiceNumber, CostCodeString]
+  line_amount:                                # EIB GE unit cost, GF extended
+    source_column_net: Net                    # col L
+    source_column_tax: VAT(Tax)               # col M
+    source_column_gross: Gross                # col N
+    basis: net
+    fallback_net_from_gross_minus_tax: true
+  currency:
+    source_column: Currency                   # Rule 12 = col F (GBP)
+    fallback: GBP
+  purchase_order_reference:                   # EIB BH
+    source_column: null                       # Rule 13 -- LEFT EMPTY
+    on_blank: leave_empty
+  spend_category:                             # EIB EW = Seg2 of the col I "Cost code" via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: segment 2 (Seg2), lowest-hierarchy match via Mapping MASTER
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Spend Category
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  cost_centre:                                # EIB GT = Seg1 of the col I "Cost code" via Mapping MASTER
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: segment 1 (Seg1), lowest-hierarchy match
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Cost Center
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: reject_and_report
+  event:                                      # EIB GV
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: Seg1/Seg3 matched against Events - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Events - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  camp:                                       # EIB GX
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: matched against Camps - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Camps - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  fa_learning:                                # EIB GZ
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: matched against FA Learning - Custom Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: FA Learning - Custom Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  commercial_partner:                         # EIB HB
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: Seg3 matched against Commercial Partners - Custom Worktag
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Commercial Partners - Custom Worktag
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  grant:                                      # EIB HD
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: Seg3 matched against Grant
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Grant
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  program:                                    # EIB HF
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: Seg4 matched against Program - Delivered Org
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Program - Delivered Org
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+  project:                                    # EIB HH
+    derivation: per_row_lookup
+    key_source_column: Cost code
+    key_rule: Seg3 matched against Projects (Opex)
+    use_shared_lookup: standard_9pack_lowest_specificity
+    worktag_business_object_key: Projects (Opex)
+    specificity_standard: classic_lowest_specificity
+    on_unresolved: skip_ok
+
+tax:
+  driver_column: Taxcode                      # col P, per-row STRING
+  sets:
+    - driver_value_match: { when_value_eq: PZ }
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
+    - driver_value_match: { when_value_eq: P0 }
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
+    - driver_value_match: { when_value_eq: P20 }
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+  on_unknown_when_value: reject_and_report
+  note: Same triples as ap_travel_places. Any other value (e.g. "PS20", seen in an earlier cut of the 28.09-04.10 file) rejects as Unknown Taxcode.
+
+skip_rule:
+  # reject_when -> row goes to the REJECT FILE (a genuine data error the operator must fix).
+  reject_when:
+    - InvoiceNumber (col C) blank
+    - SupplierID (col B) blank
+    - SupplierID (col B) not S-007201 / S-007202     # Company unresolved (Rule 1)
+    - Cost code (col I) blank                         # no coding -> no worktags
+    - SL Date (col D) blank                           # EIB req'd field
+    - Taxcode (col P) blank or not PZ / P0 / P20      # can't classify tax triple
+    - cost_centre unresolved
+    - spend_category unresolved
+  # silent_skip_when -> row is SILENTLY skipped: not written, NOT in the reject file; surfaced
+  # only as an informational count so the run stays auditable.
+  silent_skip_when:
+    - fully-empty / trailer row (RowIsEmptyOrTrailer)
+    - zero-value line: Net = 0 AND (Gross - Tax) = 0
+  # NOTES:
+  #  * A NEGATIVE Net (credit note) is NOT zero-value -- it MUST survive and post.
+  #  * config flag: transforms/ap_travel_places_v2.yaml transform_constants.zero_value_line_handling.
+
+unused_source_columns:
+  - Template   (col A: GP template tag "DINV")
+  - Date sent  (col E: Receipt Date AG is left blank)
+  - Tray       (col G: agency tray label, e.g. "Hilton")
+  - Createdby  (col H: Windows logon, e.g. "FA\NVargas")
+  - Itemcode   (col J: GP line-type code "VAL"; header-bleed guard only)
+  - Account    (col K: BLANK on every row -- coding lives in Cost code col I)
+
+confirmed_decisions:
+  - >-
+    [CONFIRMED 2026-10-07 by user] New profile ap_travel_places_v2 for the "Revised TP upload" tab;
+    ap_travel_places stays as is. Coding string = "Cost code"; tax amount header = "VAT(Tax)".
+  - >-
+    [CONFIRMED 2026-10-07 by user] col B "SupplierID" is the source for both Supplier (EIB U) and
+    Company (EIB R). Company map: S-007201 -> THE FA GROUP - FA, S-007202 -> THE FA GROUP - WNSL.
+    Applies to ap_travel_places_v2 only. Safest option chosen: any other SupplierID rejects.
+  - >-
+    [CONFIRMED 2026-10-07 by user] The 9 invoices on the vMR tab that are absent from the
+    "Revised TP upload" tab in the 28.09-04.10 week (CM135763, CM135869, CM135923, CM136023,
+    CM136053, CM136123, CM136124, IV045193, IV045259 -- 7 credit notes) are excluded intentionally.
+    No reconciliation against the vMR tab is needed.
+  - >-
+    [CONFIRMED 2026-10-07 by user] Option A: one run writes a separate EIB per company --
+    Submit_Supplier_Invoice_ap_travel_places_v2_FA_output.xlsx and
+    Submit_Supplier_Invoice_ap_travel_places_v2_WNSL_output.xlsx. No file is created for a company
+    with no rows. Chosen over the GBE-style "run twice" pattern because GBE splits by TAB (no row
+    filter needed), whereas Travel Places mixes FA and WNSL rows on one tab.
+
+open_questions:
+  - >-
+    IM200429 (row 40 of the 28.09-04.10 "Revised TP upload" tab) has a BLANK Taxcode, so it rejects
+    as a missing required field. Finance to fill in the Taxcode (Tax = 0, so likely PZ).
+  - >-
+    An earlier cut of the same week's file carried Taxcode "PS20" on the 5 VAT rows; the current
+    file has "P20". If "PS20" reappears it rejects as Unknown Taxcode until Finance confirms its
+    Workday triple.
+
+mapping:
+  # Standard Supplier Invoice EIB v46.2 columns (sheet = Submit Supplier Invoice):
+  #   EIB data starts row 6; clear-range ends col HH.
+  # Every row below is written to the output file of its Company (R): _FA_output / _WNSL_output.
+  "B":  { source: invoice_line_grouping (modInvoiceGrouping.AssignInvoiceLineGroup), rule: "Spreadsheet Key increments per NEW Invoice Number K; shared across a group's rows; restarts at 1 in each company file" }
+  "I":  { source: "OUTPUT_SUBMIT constant", value: "Y" }
+  "K":  { source: InvoiceNumber, rule: "Rule 3 (col C DIRECT)" }
+  "R":  { source: company_resolved_reference_id, rule: "Rule 1 -- col B SupplierID fixed map: S-007201 -> THE FA GROUP - FA, S-007202 -> THE FA GROUP - WNSL; other -> reject" }
+  "T":  { source: Currency, rule: "Rule 12 (col F DIRECT; fallback = GBP)" }
+  "U":  { source: SupplierID, rule: "Rule 2 (col B DIRECT passthrough, Trim only; no Supplier Spreadsheet lookup)" }
+  "AF": { source: "SL Date", rule: "Rule 4 (col D, per-row; coerced to YYYY-MM-DD at write)" }
+  "AG": { source: receipt_date (fields.receipt_date), rule: "Rule 5 -- LEAVE BLANK / EMPTY" }
+  "BG": { source: InvoiceNumber, rule: "Rule 6 (col C DIRECT; same as K)" }
+  # EIB BH (PO Number) intentionally NOT written -- Rule 13.
+  "EK": { source: invoice_line_grouping (line order), rule: "Row ID = 1..N within the Invoice Number group (mirror of EM)" }
+  "EM": { source: invoice_line_grouping (line order), rule: "Line Order = 1..N within the Invoice Number group (mirror of EK)" }
+  "EP": { source: Description, rule: "Rule 8 (col O; UCase(Trim(...)))" }
+  "FE": { source: per_row_tax.*.applicability, rule: "Rule 11 via Taxcode switch (PZ/P0 -> GBR_Outside_of_Scope; P20 -> GBR_Domestic_Purchase_Of_Goods_And_Services)" }
+  "FF": { source: per_row_tax.*.code, rule: "Rule 11 via Taxcode switch (PZ/P0 -> GBR_Zero_Rated; P20 -> GBR_Standard)" }
+  "FH": { source: "HOUSE DEFAULT tax_point_date_type", value: "INVOICE/ADJUSTMENT_DATE" }
+  "FK": { source: per_row_tax.*.recoverability, rule: "Rule 11 via Taxcode switch (PZ/P0/P20 -> Fully_Recoverable)" }
+  "FL": { source: "HOUSE DEFAULT tax_option", value: "CALC_TAX_DUE" }
+  "GE": { source: "Net (fallback: Gross - VAT(Tax))", rule: "Rule 10 -- line Unit Cost; net only. Same as GF. NumberFormat 0.00 (display only)" }
+  "GF": { source: "Net (fallback: Gross - VAT(Tax))", rule: "Rule 10 -- line Extended Amount; net only. Same as GE. NumberFormat 0.00 (display only)" }
+  "GQ": { source: Memo, rule: "Rule 9 concat: InvoiceNumber + ' ' + Cost code (raw)" }
+  "EW": { source: Spend Category, rule: "Rule 7 Seg2 of the col I Cost code via Mapping MASTER (reject if no-hit)" }
+  "GR": { source: Reporting Type, rule: "Rule 14 = LEFT(Seg2, 1) via ResolveReportingTypeCode" }
+  "GT": { source: Cost Center, rule: "Rule 7 Seg1 of the col I Cost code via Mapping MASTER (reject no-hit)" }
+  "GV": { source: Event, rule: "Rule 7 of the col I Cost code -- Events - Custom Org (optional, skip if no-hit)" }
+  "GX": { source: Camp, rule: "Rule 7 of the col I Cost code -- Camps - Custom Org (optional, skip)" }
+  "GZ": { source: FA Learning, rule: "Rule 7 of the col I Cost code -- FA Learning - Custom Org (optional, skip)" }
+  "HB": { source: Commercial Partner, rule: "Rule 7 Seg3 of the col I Cost code -- Commercial Partners (optional, skip)" }
+  "HD": { source: Grant, rule: "Rule 7 Seg3 of the col I Cost code -- Grant (optional, skip)" }
+  "HF": { source: Program, rule: "Rule 7 Seg4 of the col I Cost code -- Program - Delivered Org (optional, skip)" }
+  "HH": { source: Project (Opex), rule: "Rule 7 Seg3 of the col I Cost code -- Projects (Opex) (optional, skip)" }

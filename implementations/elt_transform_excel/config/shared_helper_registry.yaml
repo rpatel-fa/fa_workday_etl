@@ -80,6 +80,7 @@ shared_helpers:
         - ap_cfa_distributions
         - ap_referees
         - ap_referees_v2
+        - ap_travel_places_v2
 
     fixed_reference_id:
       description: >
@@ -183,6 +184,21 @@ shared_helpers:
       vba_module: local transform
       examples:
         - ap_amex_trains_v2
+
+    per_row_supplier_id_literal_map:
+      description: >
+        Company resolved from the per-row Workday Supplier ID (the same column
+        that feeds Supplier EIB U) via a FIXED, profile-local map declared in
+        transform_constants.company_resolution.map (e.g. S-007201 -> THE FA
+        GROUP - FA, S-007202 -> THE FA GROUP - WNSL). NOT the runner
+        entity=company mapping sheet, NO fallback: an unmapped Supplier ID
+        rejects the row. Used where the source carries only a Workday
+        Supplier ID and each supplier record belongs to exactly one company.
+      vba_module: local transform (Private Const SUPPLIER_ID_* / COMPANY_* + CompanyIndexFromSupplierId)
+      requires_columns:
+        - source Workday Supplier ID column
+      examples:
+        - ap_travel_places_v2
 
   # --------------------------------------------------------------------------
   # CUSTOMER NAME RESOLUTION (name -> Workday Customer ID)
@@ -290,6 +306,7 @@ shared_helpers:
         - ap_stationery
         - ap_taxi
         - ap_travel_places
+        - ap_travel_places_v2
         - ap_cfa_claims
         - ap_cfa_distributions
         - ap_commercial_invoice
@@ -337,6 +354,7 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
+        - ap_travel_places_v2
 
     amex_padded_22char_pipeline:
       description: >
@@ -429,6 +447,7 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
+        - ap_travel_places_v2
         - ap_cfa_distributions
         - ap_prize_funds
         - ap_referees
@@ -528,6 +547,7 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
+        - ap_travel_places_v2
 
     direct_amount:
       description: >
@@ -569,6 +589,7 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
+        - ap_travel_places_v2
         - ap_cfa_claims
         - ap_cfa_distributions
         - ap_prize_funds
@@ -683,6 +704,7 @@ shared_helpers:
         - ap_taxi
         - ap_stationery
         - ap_travel_places
+        - ap_travel_places_v2
         - ap_cfa_claims
         - ap_cfa_distributions
         - ap_prize_funds

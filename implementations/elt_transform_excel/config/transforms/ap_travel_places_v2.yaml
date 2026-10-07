@@ -1,0 +1,145 @@
+version: 1
+
+transform:
+  key: ap_travel_places_v2
+  label: AP Travel Places V2
+  source_type: AP Travel Places Upload V2
+  eib_population_type: Supplier Invoice
+  description: >
+    Travel Places (travel-agent) weekly supplier-invoice workbook transformed into the Workday
+    Supplier Invoice EIB. V2 of ap_travel_places (ap_travel_places is unchanged) for the
+    Finance-prepared "Revised TP upload" tab of "FA Invoice listing DDMMYY to DDMMYY incl Event
+    pivots.xlsx" (first seen in the 280926-041026 week). Same EIB mapping as ap_travel_places with
+    these deltas (ADDED 2026-10-07):
+      (1) worksheet name "Revised TP upload" (not "Travel Places upload vMR");
+      (2) coding string = col I "Cost code" (there is no "String Reformatted" column) -- all 9
+          worktags + Reporting Type key off it;
+      (3) tax amount header = "VAT(Tax)" (not "Tax");
+      (4) 16 columns A-P (no "Workday Supplier ID" column), so every column after B shifts left by one;
+      (5) col B "SupplierID" now holds the Workday Supplier ID (S-007201 / S-007202) and is the
+          source for BOTH Supplier (EIB U, direct passthrough) and Company (EIB R);
+      (6) Company (EIB R) = fixed Travel Places map on SupplierID:
+          S-007201 -> THE FA GROUP - FA, S-007202 -> THE FA GROUP - WNSL. Any other SupplierID
+          rejects the row (no runner company-mapping lookup, no fallback);
+      (7) ONE EIB FILE PER COMPANY from a single run (user decision 2026-10-07, option A):
+          rows are routed by Company into "<output>_FA_output.xlsx" and
+          "<output>_WNSL_output.xlsx", derived from shell_defaults.output_file_path. A company
+          with no rows gets no file; any previous run's per-company files are deleted first.
+    Tax is per-row from col P "Taxcode" with the ap_travel_places triples unchanged
+    (PZ/P0 -> Outside of Scope / Zero Rated / Fully_Recoverable; P20 -> Domestic Purchase /
+    Standard / Fully_Recoverable). Any other Taxcode (e.g. "PS20") is rejected.
+    See config/transform_specs/ap_travel_places_v2.yaml for the full decision record and the
+    per-column mapping.
+
+runtime:
+  step_list_macro: RunApTravelPlacesV2SupplierInvoice
+
+source_layout:
+  worksheet_name: "Revised TP upload"
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  # col K "Account" is present in the header row but BLANK on every data row and unused
+  # (the coding string lives in col I "Cost code"), so it is intentionally omitted here.
+  required_headers:
+    - Template
+    - SupplierID       # col B = Workday Supplier ID -- DIRECT to EIB U + Company map (EIB R)
+    - InvoiceNumber
+    - SL Date          # col D = InvoiceDate equivalent
+    - Date sent        # col E = ReceivedDate equivalent (not written; AG left blank)
+    - Currency
+    - Tray
+    - Createdby
+    - Cost code        # col I = the accounting/coding string (worktag key)
+    - Itemcode
+    - Net
+    - VAT(Tax)         # col M = line tax amount
+    - Gross
+    - Description      # col O = Item Description (EIB EP)
+    - Taxcode
+
+transform_constants:
+  # Supplier (EIB U) = source col B "SupplierID" DIRECT passthrough (no Supplier Spreadsheet lookup).
+  supplier_resolution:
+    mode: direct_workday_id_passthrough
+    source_column: SupplierID
+    source_column_letter: B
+    target_column: U
+    reject_if_blank: true
+  # Company (EIB R) = fixed map on the same SupplierID (ap_travel_places_v2 ONLY). Not the runner
+  # company-mapping sheet. Unknown / blank SupplierID -> row rejected (no fallback).
+  # Mirrored in modApTravelPlacesV2SupInv.bas SUPPLIER_ID_* / COMPANY_* constants.
+  company_resolution:
+    mode: per_row_supplier_id_literal_map
+    source_column: SupplierID
+    map:
+      S-007201: THE FA GROUP - FA
+      S-007202: THE FA GROUP - WNSL
+    on_unmapped: reject
+  # One EIB file per company (mirrored in modApTravelPlacesV2SupInv.bas COMPANY_TAG_* /
+  # BuildCompanyOutputPath). File name = output_file_path with "_output" -> "_<tag>_output".
+  split_output_by_company:
+    enabled: true
+    file_tags:
+      THE FA GROUP - FA: FA
+      THE FA GROUP - WNSL: WNSL
+    create_file_when_no_rows: false
+    delete_previous_company_files: true
+  per_row_tax:
+    driver_column: Taxcode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable   # inherited from ap_travel_places (2026-10-05)
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+  # No fallback: Company comes only from company_resolution.map above.
+  company_fallback: ""
+  # Zero-value line policy (same as ap_travel_places): Net = 0 AND (Gross - Tax) = 0 is silently
+  # skipped and counted; a NEGATIVE Net (credit note) still posts.
+  zero_value_line_handling: skip_silently
+  mapping_sheet: MAPPING MASTER
+  # All 9 worktags resolved from the col I "Cost code" accounting string via Mapping MASTER
+  # lowest-hierarchy match.
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: LEFT(accounting_element_2, 1) mapped via ResolveReportingTypeCode
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/travel_places/source/FA Invoice listing 280926 to 041026 incl Event pivots.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  # Base name only: the run writes ..._ap_travel_places_v2_FA_output.xlsx and/or ..._v2_WNSL_output.xlsx.
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/travel_places/target/Submit_Supplier_Invoice_ap_travel_places_v2_output.xlsx
+  # source_layout defaults -- override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: "Revised TP upload"
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

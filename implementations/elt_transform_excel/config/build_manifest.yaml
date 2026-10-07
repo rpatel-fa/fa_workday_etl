@@ -39,6 +39,7 @@ active_profiles:
   - ap_referees_v2
   - ap_taxi
   - ap_travel_places
+  - ap_travel_places_v2
   - ap_wnl_grants_invoice
 
   # AR - Customer Invoices
