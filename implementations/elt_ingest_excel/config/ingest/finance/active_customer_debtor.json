@@ -136,5 +136,17 @@
         "targetTableName": "crm_license"
       }
     ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "All CRM Licences and their Accounts (with Id).xlsx",
+    "sheets": [
+      {
+        "sheetName": "Licence Advanced Find View",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_license_all"
+      }
+    ]
   }
 ]
