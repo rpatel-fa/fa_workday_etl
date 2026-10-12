@@ -99,6 +99,8 @@ To add a further transform, follow `docs/ADDING_A_TRANSFORM.md` — the end-to-e
 - Read `docs/ARCHITECTURE.md` for implementation boundaries.
 - Use `docs/RUNBOOK.md` and `docs/ops/CLI.md` for operating and verifying the project.
 - Use `docs/ADDING_A_TRANSFORM.md` to add a new source → EIB transform from a cold start.
+- Use `docs/MASTER_CUSTOMER_SUPPLIER.md` for the AR/AP customer & supplier create-helper (input templates →
+  3+ Master Customers / Master Suppliers EIBs): rules, where each piece lives, status, next steps.
 - Use `docs/AGENT_COLD_START_PROMPT_CONTRACT.md` as a cold agent before acting — defines the 3 valid
   prompt forms ("update transform for xyz", "create new transform for source abc → supplier/customer EIB"),
   the ambiguity-rules (when to fire follow-up questions) and the 8 required user prompts + 4-step
