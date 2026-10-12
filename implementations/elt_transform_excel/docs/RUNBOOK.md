@@ -205,6 +205,24 @@ survive a rebuild (`build_runner.py` regenerates only `dist/Runner.xlsm`).
   each transform macro opens its inputs and writes the output directly.
 - If backlog state becomes unclear, resume from `docs/TODO.md` and the active anchor doc under `docs/todo/`.
 
+## Running AR Customer Master (`ar_customer_master`)
+
+Status 2026-10-12: code-complete, **pending the manual Excel import + verify** (the macro, `modEntityBlockWriter`
+and `modHelpers.LookupRuntimeValue` have not been run in Excel yet).
+
+1. Build the input template: `uv run --with openpyxl --with pyyaml --no-project python scripts/create_ingest_template.py ar_customer --overwrite`
+   (writes `dist/ingest_templates/ar_customer.xlsx`; 36 columns after the 2026-10-12 simplification, was 43).
+2. AR fill sheet `Customer`, one row per customer, and save it as the Source Data path in the Runner config.
+3. Build/import the Runner as above (steps 1-5 of Current Workflow), pick **AR Customer Master**, click **Run Transform**.
+4. Output: `Master_Customers_ar_customer_master_output.xlsx` (clone of the 3+ Master Customers EIB, sheet
+   `Submit Customer`, data from row 6) plus a `.rejects.csv` beside it for rejected customers.
+5. Rule (operator, 2026-10-12): one address, one email, one phone number, one bank account, one customer group
+   per customer. The EIB has one row per customer EXCEPT the address lines: each non-blank Address Line 1/2/3 goes
+   on its own EIB row (columns B, BL, BU, BW, BX only on rows 2+). Nothing else repeats. A missing value or a
+   missing Workday reference ID rejects the whole customer (no fallbacks).
+6. After the Excel run, compare the output with `Master Customers.xlsx` sample rows 6 and 9 (see
+   `config/transform_specs/ar_customer_master.yaml`).
+
 ## Related Docs
 
 - `PRD.md`

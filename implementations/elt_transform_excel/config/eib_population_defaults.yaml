@@ -145,8 +145,8 @@ eib_populations:
   # --------------------------------------------------------------------------
   # MASTER-DATA EIBs (added 2026-10-12). One entity = a BLOCK of rows sharing the
   # Spreadsheet Key (col B); written by the shared modEntityBlockWriter helper
-  # (registry concern entity_row_block). No transform uses these types yet: the
-  # ar_customer_master / ap_supplier_master transforms are added as separate changes.
+  # (registry concern entity_row_block). ar_customer_master uses "Customer" (2026-10-12);
+  # ap_supplier_master (type "Supplier") is still to be added as a separate change.
   # Template tab names are the v46.2 master templates' (A1 reads "Submit Customer - v46.2" /
   # "Submit Supplier - v46.2"; the TAB name has no version suffix). Header rows 2-5, data row 6.
   # clear_published_rows_end_col = the last column of each Master sheet's dimension

@@ -1,13 +1,15 @@
 {
   "description": "Allowed phone device types for the AR customer template. Used by Phone 1/2/3 Device Type so Finance AR choose only the supported Workday values for customer phone rows.",
   "key_column": "phone_device",
-  "provenance": "Snapshot created 2026-07-21 for elt_transform_excel/ar_customer from the agreed AR customer template design: the allowed values are Landline and Mobile. This is a COPY, not a live link.",
+  "provenance": "Snapshot created 2026-07-21 for elt_transform_excel/ar_customer from the agreed AR customer template design: the allowed values are Landline and Mobile. This is a COPY, not a live link. reference_id added 2026-10-12 from the Customer EIB 'Tenant Default Named Ranges'!E/F (Phone_Device / Phone_Device Ref ID: Fax, Landline, Mobile, Pager; each Ref ID equals its display value) of `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm`; cross-checked to the Master Customers sample (Phone Device Type = Mobile). Only the template's two values (Landline, Mobile) are listed.",
   "rows": [
     {
-      "phone_device": "Landline"
+      "phone_device": "Landline",
+      "reference_id": "Landline"
     },
     {
-      "phone_device": "Mobile"
+      "phone_device": "Mobile",
+      "reference_id": "Mobile"
     }
   ]
 }

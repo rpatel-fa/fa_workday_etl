@@ -1,0 +1,413 @@
+# Transform spec - ar_customer_master
+#
+# Human decision record + the authoritative target-column mapping (see docs/ADDING_A_TRANSFORM.md).
+# The mapping: section is the source of truth the .bas module mirrors (modArCustomerMaster).
+# Operational facts (paths, source layout, required headers, column-letter map) live in the build
+# profile config/transforms/ar_customer_master.yaml.
+#
+# Status: code-complete, pending manual Excel import + verify (not run in Excel yet).
+
+meta:
+  key: ar_customer_master
+  label: AR Customer Master
+  requester: Finance (AR)
+  source_template: config/ingest_specs/ar_customer.yaml
+  target_eib: Master Customers.xlsx, sheet "Submit Customer", data from row 6
+
+shared_helpers:
+  entity_row_block: item_index_block
+
+decisions:
+  - id: single_value_per_area_address_lines_spill
+    date: 2026-10-12
+    by: Operator
+    quote: >-
+      "only address - i thought we said we only support 1 address 1 email 1 phone number 1 bank
+      account details and you have stated that for addresses - it means spilling to multiple lines
+      since an address is multipe address lines"
+    rule: >
+      One address, one email, one phone, one bank account, one customer group (the automatic
+      band). The EIB output is ONE row per customer EXCEPT the address lines: each non-blank
+      Address Line 1/2/3 goes on its own EIB row, as in the 3+ Master Suppliers sample rows 6-7.
+      Row k carries B (same Spreadsheet Key), BL (address Row ID = 1, repeated), BU (= k), BW
+      (ADDRESS_LINE_k) and BX (the line text). Numbering is contiguous (blank lines skipped).
+      Every other field is written on row 1 only. Written through modEntityBlockWriter.
+    supersedes: the earlier strict 1:1 (one EIB row per customer) wording and the earlier
+      multi-row (Use For SHIPPING / REMIT, extra phones / emails / groups) behaviour.
+    consequence: >
+      The 3+ sample's SHIPPING and REMIT Use For rows are NOT reproduced. Use For is BILLING on
+      the address, phone and email. If no address line is typed the customer is rejected
+      ("Missing required field: Address Line 1"): the writer writes nothing for an empty block,
+      so the transform must not drop the customer silently.
+  - id: tax_id_group
+    date: 2026-10-12
+    by: Operator
+    rule: >
+      Tax ID group populated when a Tax ID is typed. Tax ID Type* takes the tenant Tax_ID_Type
+      reference ID from config/ingest_lookups/ref_country_tax_id_type.json (key '<ISO2>|<type>',
+      tenant CountryTaxTable). A blank reference_id rejects the customer (no fallback). When no
+      Tax ID is typed the group stays empty and the customer is NOT rejected. AT is named by the
+      TSV name "Tax ID Text" (the brief called it "Tax ID"). AV and AW are fixed Y constants;
+      AQ (Replace All) and AS (Delete) are blank by design.
+  - id: not_written
+    date: 2026-10-12
+    by: Operator
+    rule: >
+      Tax Code and Accepted Currencies input columns are not written. Email Use For and the
+      Address / Phone / Email Public / Primary input columns are not loaded (constants are used).
+      Reference ID is written as typed.
+  - id: phone_device_reference_id
+    date: 2026-10-12
+    by: Reviewer condition
+    rule: >
+      Phone Device Type (DM) takes ref_phone_device.reference_id, added from the tenant named range
+      Phone_Device / Phone_Device Ref ID (Fax, Landline, Mobile, Pager; Ref ID = display value) and
+      cross-checked to the sample value Mobile. Blank -> reject, no label fallback.
+  - id: no_fallbacks
+    date: 2026-10-12
+    by: Operator
+    rule: >
+      A missing required value or a missing Workday reference ID rejects the WHOLE customer: one
+      AppendRejectRow, nothing written for it.
+  - id: v1_hand_off
+    date: 2026-10-12
+    by: Operator
+    rule: >
+      v1 to get this out; another developer refines later with AR/AP. Keep simple, document clearly
+      (docs/RUNBOOK.md, docs/TODO.md).
+
+assumptions:
+  - Spreadsheet Key is 1..N over the processed customers of the run; every Row ID is 1 except BU = k.
+  - Address ID is <Customer ID>_MAIN_1; phone ID <Customer ID>_PH1_1; email ID <Customer ID>_EM1_1.
+  - The phone code is stored as +44 in ref_country and written without the '+'.
+
+# Columns the transform does NOT write through ColumnIndex("XX") literals are kept OUT of the
+# mapping: block (the spec<->code gate in build_runner.py compares mapping: targets with the .bas
+# ColumnIndex literals). B, BU, BW and BX are written by modEntityBlockWriter (letters passed as
+# strings; pinned in config/transforms/ar_customer_master.yaml customer_master_eib_columns).
+# AQ and AS are never written.
+writer_columns:
+- column: B
+  eib_field: "Spreadsheet Key*"
+  source: "writer (EntityBlockFlush)"
+  rule: "1..N across the run (rowsProcessed); same key on every block row of the customer"
+  written_on: every block row
+- column: BU
+  eib_field: "Address Line Data Row ID*"
+  source: "writer item"
+  rule: "k = 1.. contiguous over the NON-BLANK Address Line 1/2/3"
+  written_on: every address row
+- column: BW
+  eib_field: "Address line Type"
+  source: "writer item"
+  rule: "ADDRESS_LINE_k"
+  written_on: every address row
+- column: BX
+  eib_field: "Address Line Data"
+  source: "writer item"
+  rule: "the line text (Address Line 1/2/3), blank lines skipped"
+  written_on: every address row
+
+blank_by_design:
+- column: AQ
+  eib_field: "Replace All (tax ID group)"
+  source: "none"
+  rule: "blank by design (not written)"
+  written_on: never
+- column: AS
+  eib_field: "Delete (tax ID group)"
+  source: "none"
+  rule: "blank by design (not written)"
+  written_on: never
+
+mapping:
+- target: C
+  eib_field: "Add Only"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: H
+  eib_field: "Customer ID"
+  source: "Customer ID"
+  rule: "as typed (text)"
+  written_on: row 1
+- target: I
+  eib_field: "Customer Reference ID"
+  source: "Reference ID"
+  rule: "as typed; blank allowed"
+  written_on: row 1
+- target: J
+  eib_field: "Customer Name"
+  source: "Customer Name"
+  rule: "as typed"
+  written_on: row 1
+- target: L
+  eib_field: "Submit"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: Q
+  eib_field: "Customer Category"
+  source: "Customer Category"
+  rule: "ref_customer_category.reference_id; blank -> reject"
+  written_on: row 1
+- target: S
+  eib_field: "Customer Group+"
+  source: "Customer Name (first char)"
+  rule: "automatic band from ref_customer_group (assignment auto_band, is_fallback row otherwise); the only group"
+  written_on: row 1
+- target: V
+  eib_field: "Payment Terms"
+  source: "Payment Terms"
+  rule: "ref_payment_term.reference_id; blank -> reject"
+  written_on: row 1
+- target: W
+  eib_field: "Default Payment Type"
+  source: "Default Payment Type"
+  rule: "ref_payment_type.reference_id; blank -> reject"
+  written_on: row 1
+- target: AR
+  eib_field: "Tax ID Data+ Row ID**"
+  source: "Tax ID"
+  rule: "1 only when a Tax ID is typed; group left empty (no reject) when no Tax ID is typed"
+  written_on: row 1
+- target: AT
+  eib_field: "Tax ID Text (brief calls it 'Tax ID')"
+  source: "Tax ID"
+  rule: "as typed (text)"
+  written_on: row 1
+- target: AU
+  eib_field: "Tax ID Type*"
+  source: "Tax ID Type + Tax ID Country Code"
+  rule: "ref_country_tax_id_type.reference_id keyed '<ISO2>|<type>'; blank/missing -> reject (only when a Tax ID is typed)"
+  written_on: row 1
+- target: AV
+  eib_field: "Transaction Tax ID"
+  source: "constant"
+  rule: "Y (taken from the 3+ sample convention; not user input)"
+  written_on: row 1 when Tax ID typed
+- target: AW
+  eib_field: "Primary Tax ID"
+  source: "constant"
+  rule: "Y (as AV)"
+  written_on: row 1 when Tax ID typed
+- target: BI
+  eib_field: "Business Entity Name*"
+  source: "Customer Name"
+  rule: "= Customer Name"
+  written_on: row 1
+- target: BL
+  eib_field: "Address Data+ Row ID*"
+  source: "constant"
+  rule: "1; written by the transform on row 1 and repeated by the writer (EntityBlockAddAncestor) on every address-line row k>1"
+  written_on: every address row
+- target: BS
+  eib_field: "Country"
+  source: "Address Country Code"
+  rule: "as typed ISO2"
+  written_on: row 1
+- target: BY
+  eib_field: "Municipality"
+  source: "City"
+  rule: "as typed (required)"
+  written_on: row 1
+- target: CA
+  eib_field: "ISO 3166 1 Alpha 2 Code"
+  source: "Address Country Code"
+  rule: "as typed ISO2"
+  written_on: row 1
+- target: CF
+  eib_field: "Country Region"
+  source: "Region"
+  rule: "ref_country_region.reference_id keyed '<ISO2>|<region>'; only when Region typed; blank id -> reject"
+  written_on: row 1
+- target: CG
+  eib_field: "Country Region Descriptor"
+  source: "Region"
+  rule: "as typed"
+  written_on: row 1
+- target: CL
+  eib_field: "Postal Code"
+  source: "Postcode"
+  rule: "as typed (text)"
+  written_on: row 1
+- target: CM
+  eib_field: "Address Usage Row ID*"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: CN
+  eib_field: "Address Public"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: CO
+  eib_field: "Address Type Row ID**"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: CP
+  eib_field: "Address Primary"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: CQ
+  eib_field: "Address Type*"
+  source: "constant"
+  rule: "BUSINESS"
+  written_on: row 1
+- target: CR
+  eib_field: "Address Use For+"
+  source: "constant"
+  rule: "BILLING only (SHIPPING / REMIT rows of the 3+ sample are dropped by the one-address rule)"
+  written_on: row 1
+- target: CX
+  eib_field: "Address ID"
+  source: "Customer ID"
+  rule: "<Customer ID>_MAIN_1"
+  written_on: row 1
+- target: CY
+  eib_field: "Phone Data+ Row ID*"
+  source: "constant"
+  rule: "1, only when Phone typed"
+  written_on: row 1
+- target: DI
+  eib_field: "Phone Country ISO Code"
+  source: "Phone Country Code"
+  rule: "ref_country.iso3; blank -> reject"
+  written_on: row 1
+- target: DJ
+  eib_field: "International Phone Code"
+  source: "Phone Country Code"
+  rule: "ref_country.phone_code with '+' removed"
+  written_on: row 1
+- target: DK
+  eib_field: "Phone Number"
+  source: "Phone"
+  rule: "as typed (text)"
+  written_on: row 1
+- target: DM
+  eib_field: "Phone Device Type"
+  source: "Phone Device Type"
+  rule: "ref_phone_device.reference_id (Landline/Mobile, tenant Phone_Device Ref ID); blank -> reject, no label fallback"
+  written_on: row 1
+- target: DN
+  eib_field: "Phone Usage Row ID*"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: DO
+  eib_field: "Phone Public"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: DP
+  eib_field: "Phone Type Row ID**"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: DQ
+  eib_field: "Phone Primary"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: DR
+  eib_field: "Phone Type*"
+  source: "constant"
+  rule: "BUSINESS"
+  written_on: row 1
+- target: DS
+  eib_field: "Phone Use For+"
+  source: "constant"
+  rule: "BILLING only"
+  written_on: row 1
+- target: DW
+  eib_field: "Phone ID"
+  source: "Customer ID"
+  rule: "<Customer ID>_PH1_1"
+  written_on: row 1
+- target: DX
+  eib_field: "Email Data+ Row ID*"
+  source: "constant"
+  rule: "1, only when Email typed"
+  written_on: row 1
+- target: EA
+  eib_field: "Email Address"
+  source: "Email Address"
+  rule: "as typed; a ';' (more than one address) -> reject"
+  written_on: row 1
+- target: EC
+  eib_field: "Email Usage Row ID*"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: ED
+  eib_field: "Email Public"
+  source: "constant"
+  rule: "Y (the Email Public input column is not loaded)"
+  written_on: row 1
+- target: EE
+  eib_field: "Email Type Row ID**"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: EF
+  eib_field: "Email Primary"
+  source: "constant"
+  rule: "Y"
+  written_on: row 1
+- target: EG
+  eib_field: "Email Type*"
+  source: "constant"
+  rule: "BUSINESS"
+  written_on: row 1
+- target: EH
+  eib_field: "Email Use For+"
+  source: "constant"
+  rule: "BILLING only (the Email Use For input column is not loaded)"
+  written_on: row 1
+- target: EL
+  eib_field: "Email ID"
+  source: "Customer ID"
+  rule: "<Customer ID>_EM1_1"
+  written_on: row 1
+- target: LF
+  eib_field: "Currency"
+  source: "Default Currency"
+  rule: "ref_currency_default.currency_id; blank -> reject. Accepted Currencies and Tax Code are not written"
+  written_on: row 1
+- target: LI
+  eib_field: "Invoice Delivery Type+"
+  source: "Invoice Delivery Method"
+  rule: "ref_document_delivery_method.reference_id; blank -> reject"
+  written_on: row 1
+- target: LJ
+  eib_field: "Invoice Notification Email Recipients+"
+  source: "Invoice Notification Email Recipients"
+  rule: "ref_document_email_recipient_invoice.reference_id"
+  written_on: row 1
+- target: LK
+  eib_field: "Statement Delivery Type+"
+  source: "Statement Delivery Method"
+  rule: "ref_document_delivery_method.reference_id"
+  written_on: row 1
+- target: LL
+  eib_field: "Statement Notification Email Recipients+"
+  source: "Statement Notification Email Recipients"
+  rule: "ref_document_email_recipient_statement.reference_id"
+  written_on: row 1
+- target: MB
+  eib_field: "Tax Status Data+ Row ID**"
+  source: "constant"
+  rule: "1"
+  written_on: row 1
+- target: MD
+  eib_field: "Tax Status Country*"
+  source: "Tax Status Country Code"
+  rule: "as typed ISO2 (must exist in ref_country)"
+  written_on: row 1
+- target: ME
+  eib_field: "Transaction Tax Status"
+  source: "Transaction Tax Status"
+  rule: "ref_transaction_tax_status.reference_id; blank -> reject"
+  written_on: row 1

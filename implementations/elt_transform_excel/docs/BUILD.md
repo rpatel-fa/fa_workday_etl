@@ -61,7 +61,7 @@ These two CLI commands are the only repo-side build steps the operator runs befo
 Prep also writes the hidden `lookups` sheet (runtime reference lookups for the Customer / Supplier
 master EIBs) from `config/ingest_lookups/*.json` via `RUNTIME_LOOKUP_SOURCES` in `build_runner.py`;
 `--verify` checks it against config. Status (2026-10-12): `modHelpers.LookupRuntimeValue` and
-`modEntityBlockWriter` are **code-complete, pending the manual Excel import** -- they have not been run in Excel.
+`modEntityBlockWriter` (used by `ar_customer_master`) are **code-complete, pending the manual Excel import** -- they have not been run in Excel.
 `create_runner_shell.py` regenerates the shell workbook; `build_runner.py` then enforces the
 config/shared-helper/VBA parity contract before preparing the distributable workbook. Any drift
 between canonical YAML and checked-in VBA must fail here, before macro bootstrap/import.

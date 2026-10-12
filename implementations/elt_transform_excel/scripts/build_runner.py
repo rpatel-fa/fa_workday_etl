@@ -76,6 +76,10 @@ RUNTIME_LOOKUP_SOURCES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ref_document_email_recipient_invoice", ("reference_id",)),
     ("ref_document_email_recipient_statement", ("reference_id",)),
     ("ref_transaction_tax_status", ("reference_id",)),
+    ("ref_phone_device", ("reference_id",)),
+    # "<ISO2>|<tax ID type>" -> Workday Tax_ID_Type reference id (key_column = country_tax_key)
+    ("ref_country_tax_id_type", ("reference_id",)),
+    ("ref_currency_default", ("currency_id",)),
     ("ref_supplier_category", ("reference_id",)),
     ("ref_supplier_status", ("reference_id",)),
     ("ref_supplier_transaction_tax_status", ("reference_id",)),

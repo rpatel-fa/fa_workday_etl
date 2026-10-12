@@ -1,0 +1,146 @@
+version: 1
+
+transform:
+  key: ar_customer_master
+  label: AR Customer Master
+  source_type: AR Customer
+  eib_population_type: Customer
+  start_row: 6
+  description: >
+    The populated AR Customer input template (config/ingest_specs/ar_customer.yaml, sheet
+    "Customer") is cloned into the 3+ Master Customers EIB (sheet "Submit Customer", data from
+    row 6, template /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Master Customers.xlsx).
+    One input row = one customer = one block of EIB rows sharing the Spreadsheet Key (column B).
+    1:1 rule (operator, 2026-10-12): a single value per area -- Use For BILLING only, one
+    customer group (the automatic alphabetical band), one email, one phone, every Row ID = 1.
+    ONE exception (operator, 2026-10-12): each non-blank Address Line 1..3 is written on its own
+    EIB row, as in the 3+ sample (Master Suppliers rows 6-7); written through the shared
+    modEntityBlockWriter. No fallbacks: a missing required value or a missing Workday reference
+    ID rejects the whole customer. See config/transform_specs/ar_customer_master.yaml for the
+    decision record + mapping.
+
+runtime:
+  step_list_macro: RunArCustomerMaster
+
+source_layout:
+  worksheet_resolution: named
+  worksheet_name: Customer
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  # Every input-template column the macro reads (FindColumnIndexInRow raises on a missing one).
+  required_headers:
+    - Customer ID
+    - Customer Name
+    - Reference ID
+    - Customer Category
+    - Payment Terms
+    - Default Payment Type
+    - Default Currency
+    - Transaction Tax Status
+    - Tax Status Country Code
+    - Tax ID
+    - Tax ID Type
+    - Tax ID Country Code
+    - Address Country Code
+    - Address Line 1
+    - Address Line 2
+    - Address Line 3
+    - City
+    - Region
+    - Postcode
+    - Phone Country Code
+    - Phone
+    - Phone Device Type
+    - Email Address
+    - Invoice Delivery Method
+    - Invoice Notification Email Recipients
+    - Statement Delivery Method
+    - Statement Notification Email Recipients
+
+transform_constants:
+  # Master-data archetype: NO worktag / tax pipeline. The flat map below pins every EIB column
+  # letter the transform writes (Step 6d checks each ColumnIndex("XX") literal in the .bas against
+  # it). Letters verified against the Master Customers.xlsx 'Submit Customer' header (rows 2-5).
+  # B, BU, BW, BX are written by modEntityBlockWriter (letters passed as strings, not ColumnIndex
+  # literals); they are pinned here so the contract is complete.
+  fixed_usage_type: BUSINESS
+  fixed_use_for: BILLING
+  fixed_yes_flag: "Y"
+  fixed_row_id: "1"
+  max_address_lines: 3
+  customer_master_eib_columns:
+    spreadsheet_key: B                  # Spreadsheet Key* (written by EntityBlockFlush on every block row)
+    add_only: C                         # Add Only -- fixed "Y"
+    customer_id: H                      # Customer ID
+    customer_reference_id: I            # Customer Reference ID (input "Reference ID")
+    customer_name: J                    # Customer Name
+    submit: L                           # Submit -- fixed "Y"
+    customer_category: Q                # Customer Category -- reference_id
+    customer_group: S                   # Customer Group+ -- automatic band reference_id
+    payment_terms: V                    # Payment Terms -- reference_id
+    default_payment_type: W             # Default Payment Type -- reference_id
+    tax_id_row_id: AR                   # Tax ID Data+ Row ID** -- "1" when a Tax ID is typed
+    tax_id_text: AT                     # Tax ID Text
+    tax_id_type: AU                     # Tax ID Type* -- Tax_ID_Type reference_id
+    tax_id_transaction: AV              # Transaction Tax ID -- fixed "Y"
+    tax_id_primary: AW                  # Primary Tax ID -- fixed "Y"
+    business_entity_name: BI            # Business Entity Name* = Customer Name
+    address_row_id: BL                  # Address Data+ Row ID* -- "1" on every block row of an address line
+    address_country: BS                 # Address Country (ISO2)
+    address_line_row_id: BU             # Address Line Data+ Row ID* = k (writer item)
+    address_line_type: BW               # Address line Type = ADDRESS_LINE_k (writer item)
+    address_line_data: BX               # Address Line Data (writer item)
+    address_city: BY                    # Municipality = City
+    address_iso2: CA                    # ISO 3166 1 Alpha 2 Code
+    address_region: CF                  # Country Region -- region reference_id
+    address_region_descriptor: CG       # Country Region Descriptor = Region
+    address_postcode: CL                # Postal Code
+    address_usage_row_id: CM            # Usage Data+ Row ID* (address)
+    address_public: CN                  # Public -- fixed "Y"
+    address_type_row_id: CO             # Type Data+ Row ID** (address)
+    address_primary: CP                 # Primary -- fixed "Y"
+    address_type: CQ                    # Type* -- fixed BUSINESS
+    address_use_for: CR                 # Use For+ -- fixed BILLING
+    address_id: CX                      # Address ID = <Customer ID>_MAIN_1
+    phone_row_id: CY                    # Phone Data+ Row ID*
+    phone_iso3: DI                      # Country ISO Code (ISO3)
+    phone_intl_code: DJ                 # International Phone Code (no '+')
+    phone_number: DK                    # Phone Number
+    phone_device_type: DM               # Phone Device Type -- reference_id
+    phone_usage_row_id: DN              # Usage Data+ Row ID* (phone)
+    phone_public: DO                    # Public -- fixed "Y"
+    phone_type_row_id: DP               # Type Data+ Row ID** (phone)
+    phone_primary: DQ                   # Primary -- fixed "Y"
+    phone_type: DR                      # Type* -- fixed BUSINESS
+    phone_use_for: DS                   # Use For+ -- fixed BILLING
+    phone_id: DW                        # ID = <Customer ID>_PH1_1
+    email_row_id: DX                    # Email Address Data+ Row ID*
+    email_address: EA                   # Email Address
+    email_usage_row_id: EC              # Usage Data+ Row ID* (email)
+    email_public: ED                    # Public -- fixed "Y"
+    email_type_row_id: EE               # Type Data+ Row ID** (email)
+    email_primary: EF                   # Primary -- fixed "Y"
+    email_type: EG                      # Type* -- fixed BUSINESS
+    email_use_for: EH                   # Use For+ -- fixed BILLING
+    email_id: EL                        # ID = <Customer ID>_EM1_1
+    currency: LF                        # Currency -- ref_currency_default.currency_id
+    invoice_delivery_type: LI           # Invoice Delivery Type+ -- reference_id
+    invoice_notification_recipients: LJ # Invoice Notification Email Recipients+ -- reference_id
+    statement_delivery_type: LK         # Statement Delivery Type+ -- reference_id
+    statement_notification_recipients: LL # Statement Notification Email Recipients+ -- reference_id
+    tax_status_row_id: MB               # Tax Status Data+ Row ID**
+    tax_status_country: MD              # Country* (ISO2)
+    transaction_tax_status: ME          # Transaction Tax Status -- reference_id
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/customer/source/ar_customer.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Master Customers.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/customer/target/Master_Customers_ar_customer_master_output.xlsx
+  source_worksheet_resolution: named
+  source_worksheet_name: Customer
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet are inherited from
+  # config/reference_paths.yaml but NOT loaded at runtime: every Workday reference ID comes from
+  # the Runner's hidden 'lookups' sheet (modHelpers.LookupRuntimeValue).
