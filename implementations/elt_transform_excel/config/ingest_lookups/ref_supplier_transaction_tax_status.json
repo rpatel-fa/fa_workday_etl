@@ -1,0 +1,55 @@
+{
+  "description": "The 12 valid Workday supplier Transaction Tax Status values - the list the Supplier EIB validates Supplier Tax!J against. Supplier-specific: the customer list (ref_transaction_tax_status) holds 'Customer of ...' values that are not valid for a supplier.",
+  "key_column": "transaction_tax_status",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Transaction_Tax_Status / Transaction_Tax_Status_ID named ranges ('Tenant Default Named Ranges'!BF/BG, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. Display values keep the tenant's own punctuation (some use an en dash).",
+  "rows": [
+    {
+      "transaction_tax_status": "Supplier of Goods - VAT/GST Registered in this Country",
+      "reference_id": "Supplier_of_Goods_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "Supplier of Services - VAT/GST Registered in this Country",
+      "reference_id": "Supplier_of_Services_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "Supplier of Goods – Buyer to Reverse Charge VAT/GST",
+      "reference_id": "Supplier_of_Goods_Buyer_to_Reverse_Charge"
+    },
+    {
+      "transaction_tax_status": "Supplier of VAT/GST Exempt Services",
+      "reference_id": "Supplier_of_Exempt_Services"
+    },
+    {
+      "transaction_tax_status": "Supplier of VAT/GST Exempt Goods",
+      "reference_id": "Supplier_of_Exempt_Goods"
+    },
+    {
+      "transaction_tax_status": "Supplier of Services – Buyer to Reverse Charge VAT/GST",
+      "reference_id": "Supplier_of_Services_Buyer_to_Reverse_Charge"
+    },
+    {
+      "transaction_tax_status": "Supplier of Services - Not VAT/GST Registered in this Country",
+      "reference_id": "Supplier_of_Services_Not_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "Supplier Domestic - Not VAT/GST Registered in this Country",
+      "reference_id": "Supplier_Domestic_Not_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "Supplier of Goods - Not VAT/GST Registered in this Country",
+      "reference_id": "Supplier_of_Goods_Not_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "NI Supplier of Goods - Not VAT Registered in this Country",
+      "reference_id": "NI_Supplier_of_Goods_Not_VAT_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "EU Supplier of Services - Not VAT Registered in this Country",
+      "reference_id": "EU_Supplier_of_Services_Not_Registered_in_this_Country"
+    },
+    {
+      "transaction_tax_status": "EU Supplier of Goods - Not VAT Registered in this Country",
+      "reference_id": "EU_Supplier_of_Goods_Not_Registered_in_this_Country"
+    }
+  ]
+}

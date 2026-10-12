@@ -119,9 +119,10 @@ Render the template a finance team populate by hand, from its ingest spec. One s
 
 ```bash
 uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py ar_customer --overwrite
+uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py ap_supplier --overwrite
 ```
 
-`implementations/elt_transform_excel/config/ingest_specs/ar_customer.yaml` -> `implementations/elt_transform_excel/dist/ingest_templates/ar_customer.xlsx`. The argument is the
+`implementations/elt_transform_excel/config/ingest_specs/ar_customer.yaml` -> `implementations/elt_transform_excel/dist/ingest_templates/ar_customer.xlsx`. Likewise `ap_supplier.yaml` -> `ap_supplier.xlsx`. The argument is the
 spec key (any file under `implementations/elt_transform_excel/config/ingest_specs/`); a path to a spec YAML also works. Add `--sample-row`
 to also fill row 2 from each column's `example`. Columns with a `default` are pre-filled either way.
 

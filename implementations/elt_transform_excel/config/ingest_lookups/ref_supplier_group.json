@@ -1,0 +1,55 @@
+{
+  "description": "The 6 valid Workday supplier groups. Two jobs: assignment='selectable' lists what AP may pick as the one extra group; assignment='auto_band' rows carry the first_char_from/first_char_to boundaries a transform bands the supplier name with (is_fallback='Y' when the first character is outside every band). The band boundaries live here, in config, so they are not hard-coded in a CASE the way workday_supplier_groups.sql does it. Same shape as ref_customer_group.",
+  "key_column": "supplier_group",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Default_Supplier_Group named range ('Customer Specific Named Ranges'!C/D, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. Band rows first, then the 3 selectable rows together (an Excel range must be contiguous). The migration used 'Barclays Girls Football Schools Partnerships' as the extra group on all 319 suppliers; 'Panel Members' and 'Referees' are valid and unused by it.",
+  "rows": [
+    {
+      "supplier_group": "Suppliers A - L",
+      "reference_id": "Suppliers_A_L",
+      "assignment": "auto_band",
+      "first_char_from": "A",
+      "first_char_to": "L",
+      "is_fallback": "N"
+    },
+    {
+      "supplier_group": "Suppliers M - Z",
+      "reference_id": "Suppliers_M_Z",
+      "assignment": "auto_band",
+      "first_char_from": "M",
+      "first_char_to": "Z",
+      "is_fallback": "N"
+    },
+    {
+      "supplier_group": "Suppliers 0 - 9",
+      "reference_id": "Suppliers_0_9",
+      "assignment": "auto_band",
+      "first_char_from": "0",
+      "first_char_to": "9",
+      "is_fallback": "Y"
+    },
+    {
+      "supplier_group": "Barclays Girls Football Schools Partnerships",
+      "reference_id": "Barclays_Girls_Football_Schools_Partnerships",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    },
+    {
+      "supplier_group": "Panel Members",
+      "reference_id": "Panel Members",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    },
+    {
+      "supplier_group": "Referees",
+      "reference_id": "Referees",
+      "assignment": "selectable",
+      "first_char_from": "",
+      "first_char_to": "",
+      "is_fallback": "N"
+    }
+  ]
+}
