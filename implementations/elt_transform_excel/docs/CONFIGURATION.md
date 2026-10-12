@@ -205,11 +205,12 @@ aggregation, ranking and mapping machinery that exists only because legacy data 
 finance team are asked to populate fields that are discarded while the fields Workday actually needs
 get guessed at.
 
-Current specs (only `ar_customer` is currently in scope as an input template; invoice/credit note specs are legacy placeholders):
+Current specs (`ar_customer` and `ap_supplier` are in scope as input templates; invoice/credit note specs are legacy placeholders):
 
 | Spec | Template | EIB population type |
 |---|---|---|
 | `config/ingest_specs/ar_customer.yaml` | Customer | Customer |
+| `config/ingest_specs/ap_supplier.yaml` | Supplier | Supplier |
 | `config/ingest_specs/ar_customer_invoice.yaml` | Customer Invoice (out of scope) | Customer Invoice |
 | `config/ingest_specs/ar_customer_credit_note.yaml` | Customer Credit Note (out of scope) | Customer Invoice Adjustment |
 
@@ -232,8 +233,9 @@ Top-level keys:
 | `decisions` | Yes | Resolved decisions: `{id, decided, by, date, rationale, consequence}`. A question that moves out of `open_questions` lands here — it is not deleted. |
 | `lookups` | No | Shared reference datasets to materialise as tabs — a list of **bare names**, resolved to `config/ingest_lookups/<name>.json`. The renderer uses the lookup name as the logical identifier and workbook formula source; the visible worksheet title may be deterministically shortened to satisfy Excel's 31-character sheet-name limit. See "Ingest Lookups" below. |
 | `transform_supplied` | EIB-mapped specs | Populated EIB columns that are **not** template columns: `{tab, column, field, rule}`. Only three rules qualify — generated from an ID, a restatement of a typed value, or implied by which column a value was typed into. Everything else is a template column. |
-| `excluded` | Yes | EIB columns that exist but are **never populated** — `{tab, count, columns}`. The transform leaves them empty and the template never mentions them. |
+| `excluded` | Yes | EIB columns that exist but are **never populated** — `{tab, count, columns}`, plus optional `letters` (e.g. `"D-K, M-T"`; `ap_supplier` carries it) so `count` can be checked against the letters and the tab's header width. The transform leaves them empty and the template never mentions them. |
 | `excluded_tabs` | Multi-tab EIBs | Whole EIB tabs never populated (the reference transform is `WHERE 1=2`), with the reason. |
+| `mapping_phase_findings` | No | Notes for the **later** step that maps the template onto a 3+ Master load file (`Master Customers.xlsx` / `Master Suppliers.xlsx`): Master-only constants (Add Only, Submit, Type BUSINESS, Use For, ...) and where the Master needs Workday reference IDs rather than display values. A list of `{master_column, field, value, note}`. Recorded, not acted on — the renderer ignores it and it changes no `feeds`. |
 | `open_questions` | Yes | Unresolved finance decisions. Same role as in a transform spec: must be empty before the transform is authored. |
 
 **Every populated EIB column must be reachable from exactly one of three places — a column's `feeds`, a
@@ -315,6 +317,7 @@ backwards ships either a template missing its defaults, or fake customer data th
 | `example` | No | A sample value. |
 | `feeds` | See below | Where the value is **written**. A list of `{tab, column, field}` — the EIB worksheet, its column letter, and the header text at `meta.eib_header_row`. Add `note:` for a reshape (e.g. one row per value). This is the link to the transform spec that does not yet exist. |
 | `drives` | See below | Where the value **selects a derived value** without being written. Same shape as `feeds` plus `rule:` stating the derivation. |
+| `feeds_master` | See below | For a value the EIB workbook has **no header-row-3 column** for, but the 3+ Master load file does: `{sheet, column, field, status}` naming the Master sheet column. `status: unverified-until-mapping` until the mapping step checks it. Example: `ap_supplier`'s `Supplier Status` → `Submit Supplier - v46.2!MI` (`Status*`). |
 
 | `default` | No | A value **pre-filled on the first data row, which the user may change** (e.g. `GBP`). Not "the value on every row" — that is what the superseded `expected_value` meant, and it contradicted `picklist`. |
 | `cross_reference` | No | Another ingest spec column this one must match (e.g. an invoice's Customer ID against the customer template's). |
@@ -322,6 +325,10 @@ backwards ships either a template missing its defaults, or fake customer data th
 
 **Every column must carry at least one of `feeds` or `drives` — a column with neither is the real
 error**, because it means nobody knows what the field is for and it should not be in the template.
+`feeds_master` is the third, weaker way to satisfy this rule: it is allowed only when the EIB workbook
+has no column for the value at all, and it stays **unverified until the mapping step** checks it
+against the Master file. The `feeds`/`drives` verification below skips it and should list it as
+skipped rather than passed.
 
 **`drives` is how a coded column reaches the columns it expands into.** A column may carry both: in
 `ar_customer`, `Phone Country Code` **feeds** `Customer Phone!E` (the code itself) and **drives**
@@ -430,8 +437,18 @@ documentation lives with the data instead of being restated by every spec that u
 | `provenance` | Where the values came from and when — the thing a human re-checks. Always a **snapshot**, never a link. |
 | `rows` | A non-empty list of flat objects. Header order follows the first object's keys. |
 
-Current lookups: `ref_country` (106), `ref_country_region` (2522), `ref_customer_category` (12),
-`ref_customer_group` (7), `ref_payment_term` (9), `ref_payment_type` (13).
+Current lookups used by ingest specs (24): shared — `ref_country` (106), `ref_country_region` (2522),
+`ref_payment_term` (9), `ref_payment_type` (13), `ref_phone_device` (2), `ref_yes_no` (2); customer —
+`ref_customer_category` (12), `ref_customer_group` (7), `ref_country_tax_id_type` (534), `ref_currency`
+(155), `ref_currency_default` (154), `ref_tax_code` (138), `ref_transaction_tax_status` (5),
+`ref_document_delivery_method` (2), `ref_document_email_recipient_invoice` (8),
+`ref_document_email_recipient_statement` (7); supplier — `ref_supplier_category` (6),
+`ref_supplier_group` (6), `ref_supplier_status` (3), `ref_supplier_currency` (150),
+`ref_supplier_transaction_tax_status` (12), `ref_supplier_country_tax_id_type` (541),
+`ref_po_issue_option` (9), `ref_bank_account_type` (2). The supplier lookups were built from
+`FA E2E Suppliers V1.xlsm`'s named ranges; `ref_supplier_currency` carries a `default_allowed`
+column so a `where: {default_allowed: "Yes"}` filter drops `All Currencies` from Default/Bank
+Currency.
 
 Two lookups in the same directory use the identical self-describing shape but are consumed by the
 **Runner build** rather than by ingest specs: `ref_company` (source→target company names) and

@@ -1,0 +1,15 @@
+{
+  "description": "The 2 valid Workday settlement bank account types - the list the Supplier EIB validates Supplier Settlement Account!F against.",
+  "key_column": "bank_account_type",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Account_Type named range ('Tenant Default Named Ranges'!M/N, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. The migration wrote 'Checking' on all 319 settlement accounts.",
+  "rows": [
+    {
+      "bank_account_type": "Checking",
+      "reference_id": "DDA"
+    },
+    {
+      "bank_account_type": "Savings",
+      "reference_id": "SA"
+    }
+  ]
+}

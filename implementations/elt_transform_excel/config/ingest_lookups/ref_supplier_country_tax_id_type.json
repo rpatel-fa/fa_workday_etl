@@ -1,0 +1,3794 @@
+{
+  "description": "Workday supplier Tax ID Type values by ISO country code, so Tax ID Type cascades from Tax ID Country Code. Supplier-specific: built from the Supplier EIB's own Tax_ID_Types range, which differs from the customer-sourced ref_country_tax_id_type. source='tenant' rows come from the workbook; source='fallback' rows give 'TIN' for ref_country codes the workbook has no tax ID type for (same fallback rule as the customer lookup).",
+  "key_column": "tax_id_type",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Tax_ID_Types / Ref ID / Tax Country ranges ('Tenant Default Named Ranges'!AC/AD/AE, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. Counts: 799 raw rows; 2 repeat a (tax_id_type, country) display pair with a different Ref ID (Eritrea TIN: ERI-TIN/ESH-TIN; Rwanda TIN: RWA-TIN/SAM-TIN), first kept, leaving 797 distinct pairs; joined by country name to ref_country.json (106 rows) - 537 kept, 260 dropped (129 tenant countries not in ref_country, including Eritrea and Rwanda; ref_country is not extended - see ap_supplier open_questions); 4 TIN fallback rows for ref_country codes with no tenant type (AX, BL, MF, PM); 541 rows in total. Country-name alias map applied before the join (tenant name -> ref_country name): 'Czech Republic' -> 'Czechia'; 'Côte D'Ivoire' -> 'Côte d'Ivoire'; 'Macedonia, the Former Yugoslav Republic of' -> 'North Macedonia'. Sorted by country_code (tenant order within a country) so each country's rows are one contiguous Excel range.",
+  "rows": [
+    {
+      "country_code": "AE",
+      "country_name": "United Arab Emirates",
+      "tax_id_type": "Company Number",
+      "reference_id": "ARE-CN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AE",
+      "country_name": "United Arab Emirates",
+      "tax_id_type": "TIN",
+      "reference_id": "ARE-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AE",
+      "country_name": "United Arab Emirates",
+      "tax_id_type": "VAT Registration Number",
+      "reference_id": "ARE-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AL",
+      "country_name": "Albania",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ALB-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AL",
+      "country_name": "Albania",
+      "tax_id_type": "TIN",
+      "reference_id": "ALB-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "CDI - Identification Code",
+      "reference_id": "ARG-CDI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "ID Card (CI) Number",
+      "reference_id": "ARG-CI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "CUIT - Single Tax Identification Code",
+      "reference_id": "ARG-CUI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "Worker Identification Number (CUIL)",
+      "reference_id": "ARG-CUIL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "CUIL - Unified Labor Identification Code",
+      "reference_id": "ARG-CUL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "DNI Number",
+      "reference_id": "ARG-DNI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "Ingresos Brutos",
+      "reference_id": "ARG-IB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ARG-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AT",
+      "country_name": "Austria",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "AUT-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AT",
+      "country_name": "Austria",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "AUT-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AT",
+      "country_name": "Austria",
+      "tax_id_type": "UID",
+      "reference_id": "AUT-UID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "tax_id_type": "ABN",
+      "reference_id": "AUS-ABN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "tax_id_type": "Australian Company Number",
+      "reference_id": "AUS-ACN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "tax_id_type": "GST",
+      "reference_id": "AUS-GST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "tax_id_type": "TAX",
+      "reference_id": "AUS-TAX",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "tax_id_type": "Tax File Number",
+      "reference_id": "AUS-TFN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "AX",
+      "country_name": "Åland Islands",
+      "tax_id_type": "TIN",
+      "reference_id": "",
+      "source": "fallback"
+    },
+    {
+      "country_code": "BA",
+      "country_name": "Bosnia and Herzegovina",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "BIH-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BA",
+      "country_name": "Bosnia and Herzegovina",
+      "tax_id_type": "TIN",
+      "reference_id": "BIH-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "BEL-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "BEL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "tax_id_type": "Numéro National (NN)",
+      "reference_id": "BEL-NN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "tax_id_type": "No TVA",
+      "reference_id": "BEL-NOTVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "tax_id_type": "TIN Business number - Numéro d’entreprise - Belgische ondernemingsnummer",
+      "reference_id": "BEL-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "БУЛСТАТ",
+      "reference_id": "BGR-BUL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "DDS",
+      "reference_id": "BGR-DDS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "BGR-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "BGR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "Tax Identification Number",
+      "reference_id": "BGR-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "tax_id_type": "Unified Civil Number (UCN)",
+      "reference_id": "BGR-UCN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BL",
+      "country_name": "Saint Barthelemy",
+      "tax_id_type": "TIN",
+      "reference_id": "",
+      "source": "fallback"
+    },
+    {
+      "country_code": "BM",
+      "country_name": "Bermuda",
+      "tax_id_type": "Social Insurance Number",
+      "reference_id": "BMU-SIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BM",
+      "country_name": "Bermuda",
+      "tax_id_type": "TIN",
+      "reference_id": "BMU-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "CCM",
+      "reference_id": "BRA-CCM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "CNPJ",
+      "reference_id": "BRA-CNPJ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "CPF",
+      "reference_id": "BRA-CPF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "CTPS Number",
+      "reference_id": "BRA-CTPS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "IE",
+      "reference_id": "BRA-IE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "INSS",
+      "reference_id": "BRA-INSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "BRA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "National Civil Identification (NCI)",
+      "reference_id": "BRA-NCI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "Programas de Integracao Social",
+      "reference_id": "BRA-PIS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "Registro Geral",
+      "reference_id": "BRA-RG",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "Foreign National Registration (RNE) Number",
+      "reference_id": "BRA-RNE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "tax_id_type": "Voter Registration Number",
+      "reference_id": "BRA-VRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "PST - British Columbia",
+      "reference_id": "CAN-BCPST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "Business Number",
+      "reference_id": "CAN-BN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "DUNS",
+      "reference_id": "CAN-DNS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "NEQ - Québec Enterprise Number",
+      "reference_id": "CA-NEQ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "CAN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "RST - Manitoba",
+      "reference_id": "CAN-MBRST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "Non-Resident Tax Account",
+      "reference_id": "CAN-NR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "QST",
+      "reference_id": "CAN-QST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "Social Insurance Number",
+      "reference_id": "CAN-SIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "PST - Saskatchewan",
+      "reference_id": "CAN-SKPST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "tax_id_type": "VAT",
+      "reference_id": "CAN-VATID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "CNSS - National Social Security Fund",
+      "reference_id": "COD-CNSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "Identification Nationale - National Identification",
+      "reference_id": "COD-IN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "Numéro INPP - Professional Training Institute Number",
+      "reference_id": "COD-INPP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "Numéro INSS - Social Security Institute Number",
+      "reference_id": "COD-INSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "Numéro d’impôt - Tax Number",
+      "reference_id": "COD-NI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "RCCM - Trade and Personal Property Credit Register",
+      "reference_id": "COD-RCCM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Congo, Democratic Republic of the",
+      "tax_id_type": "TIN",
+      "reference_id": "COD-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CG",
+      "country_name": "Congo",
+      "tax_id_type": "CNSS - National Social Security Fund",
+      "reference_id": "COG-CNSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CG",
+      "country_name": "Congo",
+      "tax_id_type": "NIU - Single Identification Number",
+      "reference_id": "COG-NIU",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CG",
+      "country_name": "Congo",
+      "tax_id_type": "TIN",
+      "reference_id": "COG-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "tax_id_type": "Enterprise ID",
+      "reference_id": "CHE-EID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "CHE-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "tax_id_type": "MWST Nr",
+      "reference_id": "CHE-MWSTNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "tax_id_type": "OASI Number",
+      "reference_id": "CHE-OASI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "tax_id_type": "UID-number",
+      "reference_id": "CHE-UID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CI",
+      "country_name": "Côte d'Ivoire",
+      "tax_id_type": "CNPS - National Social Security Fund",
+      "reference_id": "CIV-CNPS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CI",
+      "country_name": "Côte d'Ivoire",
+      "tax_id_type": "NCC - Numéro de Compte Contribuable",
+      "reference_id": "CIV-NCC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CI",
+      "country_name": "Côte d'Ivoire",
+      "tax_id_type": "RCCM - Trade and Personal Property Credit Register",
+      "reference_id": "CIV-RCCM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CI",
+      "country_name": "Côte d'Ivoire",
+      "tax_id_type": "TIN",
+      "reference_id": "CIV-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CL",
+      "country_name": "Chile",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "CHL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CL",
+      "country_name": "Chile",
+      "tax_id_type": "RUT",
+      "reference_id": "CHL-RUT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CM",
+      "country_name": "Cameroon",
+      "tax_id_type": "NIU - Single Identification Number",
+      "reference_id": "CMR-NIU",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CM",
+      "country_name": "Cameroon",
+      "tax_id_type": "RCCM - Trade and Personal Property Credit Register",
+      "reference_id": "CMR-RCCM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CM",
+      "country_name": "Cameroon",
+      "tax_id_type": "TIN",
+      "reference_id": "CMR-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CN",
+      "country_name": "China",
+      "tax_id_type": "ECC - Unified Social Credit Code",
+      "reference_id": "CHN-ECC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CN",
+      "country_name": "China",
+      "tax_id_type": "ICC - ID Card Number",
+      "reference_id": "CHN-ICC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CN",
+      "country_name": "China",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "CHN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CN",
+      "country_name": "China",
+      "tax_id_type": "TIN",
+      "reference_id": "CHN-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CR",
+      "country_name": "Costa Rica",
+      "tax_id_type": "ID Card Number",
+      "reference_id": "CRI-CI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CR",
+      "country_name": "Costa Rica",
+      "tax_id_type": "Residence Card (DIMEX)",
+      "reference_id": "CRI-DIM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CR",
+      "country_name": "Costa Rica",
+      "tax_id_type": "Social Security Number (NSS)",
+      "reference_id": "CRI-NSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CV",
+      "country_name": "Cabo Verde",
+      "tax_id_type": "NIF",
+      "reference_id": "CPV-NIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CW",
+      "country_name": "Curaçao",
+      "tax_id_type": "CRIB Number - Central Registration of Taxable Persons Number",
+      "reference_id": "CUW-CRIB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CW",
+      "country_name": "Curaçao",
+      "tax_id_type": "KvK Nr - Registry of Commerce Number",
+      "reference_id": "CUW-KVK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CW",
+      "country_name": "Curaçao",
+      "tax_id_type": "National ID Number",
+      "reference_id": "CUW-NID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CW",
+      "country_name": "Curaçao",
+      "tax_id_type": "TIN",
+      "reference_id": "CUW-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CY",
+      "country_name": "Cyprus",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "CYP-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CY",
+      "country_name": "Cyprus",
+      "tax_id_type": "FPA",
+      "reference_id": "CYP-FPA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CY",
+      "country_name": "Cyprus",
+      "tax_id_type": "TIN - Tax Identification Code",
+      "reference_id": "CYP-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CZ",
+      "country_name": "Czechia",
+      "tax_id_type": "DIC",
+      "reference_id": "CZE-DIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CZ",
+      "country_name": "Czechia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "CZE-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CZ",
+      "country_name": "Czechia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "CZE-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "CZ",
+      "country_name": "Czechia",
+      "tax_id_type": "TIN",
+      "reference_id": "CZE-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DE",
+      "country_name": "Germany",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "DEU-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DE",
+      "country_name": "Germany",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "DEU-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DE",
+      "country_name": "Germany",
+      "tax_id_type": "Steuernummer",
+      "reference_id": "DEU-STEUERNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DE",
+      "country_name": "Germany",
+      "tax_id_type": "USt-IdNr",
+      "reference_id": "DEU-USTIDNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "tax_id_type": "Persons - Tax Identification Number",
+      "reference_id": "DNK-CPR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "tax_id_type": "CVR",
+      "reference_id": "DNK-CVR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "DNK-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "DNK-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "tax_id_type": "Company VAT Registration Number",
+      "reference_id": "DNK-MOMS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DO",
+      "country_name": "Dominican Republic",
+      "tax_id_type": "National ID (Cédula) Number",
+      "reference_id": "DOM-CIE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DO",
+      "country_name": "Dominican Republic",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "DOM-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DO",
+      "country_name": "Dominican Republic",
+      "tax_id_type": "RNC",
+      "reference_id": "DOM-RNC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DO",
+      "country_name": "Dominican Republic",
+      "tax_id_type": "Social Security Number (NSS)",
+      "reference_id": "DOM-TSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DZ",
+      "country_name": "Algeria",
+      "tax_id_type": "RC - Registry of Commerce Number",
+      "reference_id": "DZA- RC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DZ",
+      "country_name": "Algeria",
+      "tax_id_type": "NIF - Fiscal Identification Number",
+      "reference_id": "DZA-NIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "DZ",
+      "country_name": "Algeria",
+      "tax_id_type": "TIN",
+      "reference_id": "DZA-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "tax_id_type": "Cedula de Identidad",
+      "reference_id": "ECU-CI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ECU-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "tax_id_type": "Social Security Number (NSS)",
+      "reference_id": "ECU-NSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "tax_id_type": "Pasaporte e Identificacion Tributaria",
+      "reference_id": "ECU-PIT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "tax_id_type": "RUC",
+      "reference_id": "ECU-RUC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EE",
+      "country_name": "Estonia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "EST-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EE",
+      "country_name": "Estonia",
+      "tax_id_type": "KMKR",
+      "reference_id": "EST-KMKR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EE",
+      "country_name": "Estonia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "EST-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "EE",
+      "country_name": "Estonia",
+      "tax_id_type": "Registrikood",
+      "reference_id": "EST-Registrikood",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "Register Of Companies Location - Commercial Chamber Registry",
+      "reference_id": "ESP-CCR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "CIF",
+      "reference_id": "ESP-CIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "DNI - Documento nacional de identidad",
+      "reference_id": "ESP-DNI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "ESP-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "IVA",
+      "reference_id": "ESP-IVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ESP-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "NIE - Número de Identidad Extranjero",
+      "reference_id": "ESP-NIE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "NIF",
+      "reference_id": "ESP-NIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "Person Type Code",
+      "reference_id": "ESP-PTC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "tax_id_type": "Residence Type Code",
+      "reference_id": "ESP-RTC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "tax_id_type": "VAT Number (ALV)",
+      "reference_id": "FIN-ALV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "tax_id_type": "Business ID",
+      "reference_id": "FIN-BIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "FIN-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "FIN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "tax_id_type": "Personal Identity Code",
+      "reference_id": "FIN-PIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FM",
+      "country_name": "Micronesia, Federated States of",
+      "tax_id_type": "TIN",
+      "reference_id": "FSM-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "APE or SIC",
+      "reference_id": "FRA-APE-SIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "FRA-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "FRA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "No TVA",
+      "reference_id": "FRA-NOTVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "RCS Trade and Company Register Number",
+      "reference_id": "FRA-RCS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "SIREN",
+      "reference_id": "FRA-SIREN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "tax_id_type": "SIRET",
+      "reference_id": "FRA-SIRET",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "Company Number",
+      "reference_id": "UK-COMPANYNUMBER",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "COTAX Reference",
+      "reference_id": "UK-COTAX",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "DUNS",
+      "reference_id": "UK-DNS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "Employer Accounts Office Reference Number",
+      "reference_id": "UK-EAORN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "ECON",
+      "reference_id": "UK-ECON",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "E-File VAT Registration Number",
+      "reference_id": "UK-E-FILING VRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "UK-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "HMRC Office Number",
+      "reference_id": "UK-HMRCONO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "UK-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "NINO - National Insurance Number",
+      "reference_id": "UK-NINO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "Employer PAYE Reference",
+      "reference_id": "UK-PAYEREF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "UTR - Unique Taxpayer Reference",
+      "reference_id": "UK-UTR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "tax_id_type": "VAT Reg No",
+      "reference_id": "GBR-VATREGNO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GE",
+      "country_name": "Georgia",
+      "tax_id_type": "TIN",
+      "reference_id": "GEO-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GG",
+      "country_name": "Guernsey",
+      "tax_id_type": "TIN",
+      "reference_id": "GGY-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GI",
+      "country_name": "Gibraltar",
+      "tax_id_type": "TIN",
+      "reference_id": "GIB-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GR",
+      "country_name": "Greece",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "GRC-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GR",
+      "country_name": "Greece",
+      "tax_id_type": "FPA",
+      "reference_id": "GRC-FPA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "GR",
+      "country_name": "Greece",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "GRC-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HK",
+      "country_name": "Hong Kong",
+      "tax_id_type": "BR - Business Registration number",
+      "reference_id": "HKG-BR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HK",
+      "country_name": "Hong Kong",
+      "tax_id_type": "HKID - Hong Kong Identity Card",
+      "reference_id": "HKG-HKID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HK",
+      "country_name": "Hong Kong",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "HKG-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HK",
+      "country_name": "Hong Kong",
+      "tax_id_type": "TIN",
+      "reference_id": "HKG-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HR",
+      "country_name": "Croatia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "HRV-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HR",
+      "country_name": "Croatia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "HRV-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HR",
+      "country_name": "Croatia",
+      "tax_id_type": "OIB- Personal Identification Number",
+      "reference_id": "HRV-OIB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HR",
+      "country_name": "Croatia",
+      "tax_id_type": "PDV-ID",
+      "reference_id": "HRV-PDVID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HU",
+      "country_name": "Hungary",
+      "tax_id_type": "ANUM",
+      "reference_id": "HUN-ANUM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HU",
+      "country_name": "Hungary",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "HUN-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "HU",
+      "country_name": "Hungary",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "HUN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "eFIN - Electronic Filing Identification Number",
+      "reference_id": "IDN-eFIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "KPP - Tax Service Office",
+      "reference_id": "IDN-KPP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "IDN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "NPWP - Tax Identification Number",
+      "reference_id": "IDN-NPWP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "PKP - VAT Registered Entrepreneur/ Enterprise",
+      "reference_id": "IDN-PKP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "tax_id_type": "TDP -  Company Register at the Department of Trade",
+      "reference_id": "IDN-TDP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "CHY - Charitable tax exemption",
+      "reference_id": "IRE-CHY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "CID",
+      "reference_id": "IRE-CID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "IRE-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "IRE-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "PPS -  Personal Public Service Number",
+      "reference_id": "IRE-PPS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "TRN - Tax Reference Numbers",
+      "reference_id": "IRE-TRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "tax_id_type": "VAT No",
+      "reference_id": "IRE-VATNO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IL",
+      "country_name": "Israel",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ISR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IL",
+      "country_name": "Israel",
+      "tax_id_type": "Taxpayer Identification Number (TIN)",
+      "reference_id": "ISR-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IL",
+      "country_name": "Israel",
+      "tax_id_type": "VAT Number",
+      "reference_id": "ISR-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IM",
+      "country_name": "Isle of Man",
+      "tax_id_type": "NINO - National Insurance Number",
+      "reference_id": "IMN-NINO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IM",
+      "country_name": "Isle of Man",
+      "tax_id_type": "TIN",
+      "reference_id": "IMN-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IM",
+      "country_name": "Isle of Man",
+      "tax_id_type": "TRN - Tax Reference Number",
+      "reference_id": "IMN-TRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "CGST TIN - Central GST Tax Identification Number",
+      "reference_id": "IND-CGSTTIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "CIN Company identification Number",
+      "reference_id": "IND-CIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "CST TIN",
+      "reference_id": "IND-CSTTIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Jammu and Kashmir",
+      "reference_id": "IND-GSTIN-1",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Bihar",
+      "reference_id": "IND-GSTIN-10",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Sikkim",
+      "reference_id": "IND-GSTIN-11",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Arunachal Pradesh",
+      "reference_id": "IND-GSTIN-12",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Nagaland",
+      "reference_id": "IND-GSTIN-13",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Manipur",
+      "reference_id": "IND-GSTIN-14",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Mizoram",
+      "reference_id": "IND-GSTIN-15",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Tripura",
+      "reference_id": "IND-GSTIN-16",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Meghalaya",
+      "reference_id": "IND-GSTIN-17",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Assam",
+      "reference_id": "IND-GSTIN-18",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - West Bengal",
+      "reference_id": "IND-GSTIN-19",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Himachal Pradesh",
+      "reference_id": "IND-GSTIN-2",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Jharkhand",
+      "reference_id": "IND-GSTIN-20",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Odisha",
+      "reference_id": "IND-GSTIN-21",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Chhattisgarh",
+      "reference_id": "IND-GSTIN-22",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Madhya Pradesh",
+      "reference_id": "IND-GSTIN-23",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Gujarat",
+      "reference_id": "IND-GSTIN-24",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Daman and Diu",
+      "reference_id": "IND-GSTIN-25",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Dadra and Nagar Haveli",
+      "reference_id": "IND-GSTIN-26",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Maharashtra",
+      "reference_id": "IND-GSTIN-27",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Karnataka",
+      "reference_id": "IND-GSTIN-29",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Punjab",
+      "reference_id": "IND-GSTIN-3",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Goa",
+      "reference_id": "IND-GSTIN-30",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Lakshadweep",
+      "reference_id": "IND-GSTIN-31",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Kerala",
+      "reference_id": "IND-GSTIN-32",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Tamilnadu",
+      "reference_id": "IND-GSTIN-33",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Pondichery",
+      "reference_id": "IND-GSTIN-34",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Andaman and Nicobar",
+      "reference_id": "IND-GSTIN-35",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Telangana",
+      "reference_id": "IND-GSTIN-36",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Andhra Pradesh",
+      "reference_id": "IND-GSTIN-37",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Chandigarh",
+      "reference_id": "IND-GSTIN-4",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Uttarakhand",
+      "reference_id": "IND-GSTIN-5",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Haryana",
+      "reference_id": "IND-GSTIN-6",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Delhi",
+      "reference_id": "IND-GSTIN-7",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Rajasthan",
+      "reference_id": "IND-GSTIN-8",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "GS TIN - Uttar Pradesh",
+      "reference_id": "IND-GSTIN-9",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "IND-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "PAN Permanent Account Number",
+      "reference_id": "IND-PAN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "Service Tax Registration Number",
+      "reference_id": "IND-STRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "tax_id_type": "TAN Tax Deduction and Collection Account",
+      "reference_id": "IND-TAN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IS",
+      "country_name": "Iceland",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ISL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IS",
+      "country_name": "Iceland",
+      "tax_id_type": "TIN",
+      "reference_id": "ISL-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "ATECO Code - Classification of Economic Activity",
+      "reference_id": "ITA-ATECO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "DST - Digital Service Tax Identification Number",
+      "reference_id": "ITA-DST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "e-filing VAT Registration Number - VAT Group",
+      "reference_id": "ITA-E-FILING VRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "ITA-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Codice Fiscal (Company)",
+      "reference_id": "ITA-FIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Codice Fiscal (Individual)",
+      "reference_id": "ITA-FII",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ITA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Partita IVA",
+      "reference_id": "ITA-PIVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "REA - Company Registration Number to Chamber of Commerce",
+      "reference_id": "ITA-REA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Tax System",
+      "reference_id": "ITA-RF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "SDI Code - Number of registration to Service of Interchange for eInvoice",
+      "reference_id": "ITA-SDI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "tax_id_type": "Shared Capital",
+      "reference_id": "ITA-Share",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JE",
+      "country_name": "Jersey",
+      "tax_id_type": "SSN - Individual Social Security Numbers",
+      "reference_id": "JEY-SSN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JE",
+      "country_name": "Jersey",
+      "tax_id_type": "TIN",
+      "reference_id": "JEY-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JM",
+      "country_name": "Jamaica",
+      "tax_id_type": "National Insurance Number",
+      "reference_id": "JAM-NIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JM",
+      "country_name": "Jamaica",
+      "tax_id_type": "TIN",
+      "reference_id": "JAM-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JM",
+      "country_name": "Jamaica",
+      "tax_id_type": "TRN - Tax Registration Number",
+      "reference_id": "JAM-TRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JP",
+      "country_name": "Japan",
+      "tax_id_type": "CN - Corporate Number",
+      "reference_id": "JPN-CN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JP",
+      "country_name": "Japan",
+      "tax_id_type": "IN - Individual Number \"My Number\"",
+      "reference_id": "JPN-IN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "JP",
+      "country_name": "Japan",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "JPN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KR",
+      "country_name": "Korea, Republic of",
+      "tax_id_type": "BRN - Business Registration Number",
+      "reference_id": "KOR-BRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KR",
+      "country_name": "Korea, Republic of",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "KOR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KR",
+      "country_name": "Korea, Republic of",
+      "tax_id_type": "RRN - Resident Registration Number",
+      "reference_id": "KOR-RRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KR",
+      "country_name": "Korea, Republic of",
+      "tax_id_type": "TIN",
+      "reference_id": "KOR-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KY",
+      "country_name": "Cayman Islands",
+      "tax_id_type": "TIN",
+      "reference_id": "CYM-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KZ",
+      "country_name": "Kazakhstan",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "KAZ-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "KZ",
+      "country_name": "Kazakhstan",
+      "tax_id_type": "TIN",
+      "reference_id": "KAZ-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LA",
+      "country_name": "Laos",
+      "tax_id_type": "TIN",
+      "reference_id": "LAO-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LS",
+      "country_name": "Lesotho",
+      "tax_id_type": "TIN",
+      "reference_id": "LSO-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "LTU-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "LTU-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "tax_id_type": "Įmonės kodas",
+      "reference_id": "LTU-MK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "tax_id_type": "PVM kodas",
+      "reference_id": "LTU-PVM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "LUX-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "LUX-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "National Identification Number",
+      "reference_id": "LUX-NIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "RCS Trade and Company Register Number",
+      "reference_id": "LUX-RCS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "TIN",
+      "reference_id": "LUX-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "tax_id_type": "No. TVA",
+      "reference_id": "LUX-TVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LV",
+      "country_name": "Latvia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "LVA-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LV",
+      "country_name": "Latvia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "LVA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LV",
+      "country_name": "Latvia",
+      "tax_id_type": "PVN",
+      "reference_id": "LVA-PVN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "LV",
+      "country_name": "Latvia",
+      "tax_id_type": "Reģistrācijas numurs",
+      "reference_id": "LVA-RN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "CNSS - Caisse Nationale de Sécurité Sociale",
+      "reference_id": "MAR-CNSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "ICE - Identifiant Commun de l'Entreprise",
+      "reference_id": "MAR-ICE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "IF - Identifiant Fiscal",
+      "reference_id": "MAR-IF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MAR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "N° Patente",
+      "reference_id": "MAR-PAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "RC - Registre du Commerce",
+      "reference_id": "MAR-RC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "tax_id_type": "TIN",
+      "reference_id": "MAR-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MCO-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "tax_id_type": "NIS - Statistical ID Number",
+      "reference_id": "MCO-NIS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "tax_id_type": "No TVA - VAT Number",
+      "reference_id": "MCO-NoTVA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "tax_id_type": "RCI - Trade & Industry Register",
+      "reference_id": "MCO-RCI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "tax_id_type": "TIN",
+      "reference_id": "MCO-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MF",
+      "country_name": "Saint Martin",
+      "tax_id_type": "TIN",
+      "reference_id": "",
+      "source": "fallback"
+    },
+    {
+      "country_code": "MK",
+      "country_name": "North Macedonia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MKD-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MK",
+      "country_name": "North Macedonia",
+      "tax_id_type": "TIN",
+      "reference_id": "MKD-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MO",
+      "country_name": "Macao",
+      "tax_id_type": "Business Tax Registration Number",
+      "reference_id": "MAC-BRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MO",
+      "country_name": "Macao",
+      "tax_id_type": "M/1 Number (TIN - Taxpayer Identification Number)",
+      "reference_id": "MAC-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "MLT-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "tax_id_type": "Personal Identity Card Number",
+      "reference_id": "MLT-ICN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MLT-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "tax_id_type": "TIN - Tax Identification Numbers",
+      "reference_id": "MLT-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "tax_id_type": "VAT Identification Number",
+      "reference_id": "MLT-VATNO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "tax_id_type": "CURP - Clave Única de Registro de Población",
+      "reference_id": "MEX-CURP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MEX-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "tax_id_type": "Social Security (IMSS) Number",
+      "reference_id": "MEX-NSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "tax_id_type": "Residence Card (RC)",
+      "reference_id": "MEX-RC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "tax_id_type": "RFC",
+      "reference_id": "MEX-RFC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "Business Registration Number",
+      "reference_id": "MYS-BRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "Corporate Tax Number",
+      "reference_id": "MYS-CTN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "GST No.",
+      "reference_id": "MYS-GSTNO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "ITN - Income Tax Number",
+      "reference_id": "MYS-ITN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "MYS-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "tax_id_type": "SST Registration Number",
+      "reference_id": "MYS-SST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NG",
+      "country_name": "Nigeria",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "NGA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NG",
+      "country_name": "Nigeria",
+      "tax_id_type": "TIN",
+      "reference_id": "NGA-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "tax_id_type": "BTW-nr",
+      "reference_id": "NLD-BTWNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "NLD-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "tax_id_type": "KvK - Chamber of Commerce Registration Number",
+      "reference_id": "NLD-KvK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "NLD-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "tax_id_type": "RSIN - Legal Entities and Partnerships Information Number",
+      "reference_id": "NLD-RSIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "D Number for Foreign",
+      "reference_id": "NOR-FDN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "Legal Entity Organisation Number",
+      "reference_id": "NOR-LEG",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "NOR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "NIN - National Identity Number",
+      "reference_id": "NOR-NIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "Orgnr",
+      "reference_id": "NOR-ORGNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "tax_id_type": "VAT registered legal entity",
+      "reference_id": "NOR-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NZ",
+      "country_name": "New Zealand",
+      "tax_id_type": "IRD Number",
+      "reference_id": "NZL-IRD",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NZ",
+      "country_name": "New Zealand",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "NZL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "NZ",
+      "country_name": "New Zealand",
+      "tax_id_type": "New Zealand Business Number",
+      "reference_id": "NZL-NZBN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PH",
+      "country_name": "Philippines",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "PHL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PH",
+      "country_name": "Philippines",
+      "tax_id_type": "TIN",
+      "reference_id": "PHL-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "POL-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "POL-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "NIP",
+      "reference_id": "POL-NIP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "PESEL - Tax Identification Number for Individuals",
+      "reference_id": "POL-PESEL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "TIN - Tax Identification Number for Entity",
+      "reference_id": "POL-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "tax_id_type": "VAT Number",
+      "reference_id": "POL-VATNIP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PM",
+      "country_name": "Saint Pierre and Miquelon",
+      "tax_id_type": "TIN",
+      "reference_id": "",
+      "source": "fallback"
+    },
+    {
+      "country_code": "PR",
+      "country_name": "Puerto Rico",
+      "tax_id_type": "EIN",
+      "reference_id": "PRI-EIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PR",
+      "country_name": "Puerto Rico",
+      "tax_id_type": "VAT",
+      "reference_id": "PRI-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PS",
+      "country_name": "Palestine",
+      "tax_id_type": "TIN",
+      "reference_id": "PSE-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PT",
+      "country_name": "Portugal",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "PRT-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PT",
+      "country_name": "Portugal",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "PRT-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PT",
+      "country_name": "Portugal",
+      "tax_id_type": "NIF",
+      "reference_id": "PRT-NIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PT",
+      "country_name": "Portugal",
+      "tax_id_type": "NIPC",
+      "reference_id": "PRT-NIPC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PY",
+      "country_name": "Paraguay",
+      "tax_id_type": "ID Card (CI) Number",
+      "reference_id": "PRY-CI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "PY",
+      "country_name": "Paraguay",
+      "tax_id_type": "RUC",
+      "reference_id": "PRY-RUC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "QA",
+      "country_name": "Qatar",
+      "tax_id_type": "Company Number",
+      "reference_id": "QAT-CN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "QA",
+      "country_name": "Qatar",
+      "tax_id_type": "Customs Registration (CR) Number",
+      "reference_id": "QAT-CRN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "QA",
+      "country_name": "Qatar",
+      "tax_id_type": "TIN",
+      "reference_id": "QAT-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "QA",
+      "country_name": "Qatar",
+      "tax_id_type": "VAT Registration Number",
+      "reference_id": "QAT-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RE",
+      "country_name": "Reunion",
+      "tax_id_type": "TIN",
+      "reference_id": "REU-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "tax_id_type": "CIF",
+      "reference_id": "ROM-CIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "tax_id_type": "CNP - Personal Identification Number resident persons",
+      "reference_id": "ROM-CNP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "ROM-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ROM-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "tax_id_type": "TIN",
+      "reference_id": "ROM-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RS",
+      "country_name": "Serbia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SRB-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RS",
+      "country_name": "Serbia",
+      "tax_id_type": "PIB",
+      "reference_id": "SRB-PIB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RU",
+      "country_name": "Russian Federation",
+      "tax_id_type": "INN",
+      "reference_id": "RUS-INN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RU",
+      "country_name": "Russian Federation",
+      "tax_id_type": "KIO",
+      "reference_id": "RUS-KIO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RU",
+      "country_name": "Russian Federation",
+      "tax_id_type": "KPP",
+      "reference_id": "RUS-KPP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "RU",
+      "country_name": "Russian Federation",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "RUS-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SA",
+      "country_name": "Saudi Arabia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SAU-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SA",
+      "country_name": "Saudi Arabia",
+      "tax_id_type": "TIN",
+      "reference_id": "SAU-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "Co-ordination number",
+      "reference_id": "SWE-COO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "SWE-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SWE-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "Momsnr",
+      "reference_id": "SWE-MOMSNR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "Personal identification number",
+      "reference_id": "SWE-PER",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "tax_id_type": "TIN",
+      "reference_id": "SWE-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "FIN for Foreign Individuals",
+      "reference_id": "SGP-FIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "GST",
+      "reference_id": "SGP-GST",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SGP-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "NRIC Number for Singapore Citizens",
+      "reference_id": "SGP-NRIC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "TIN",
+      "reference_id": "SGP-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "UEN - Unique Entity Number",
+      "reference_id": "SGP-UEN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "UEN – Others",
+      "reference_id": "SGP-UENOTH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "UEN – Business (ROB)",
+      "reference_id": "SGP-UENROB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "tax_id_type": "UEN – Local Company (ROC)",
+      "reference_id": "SGP-UENROC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SI",
+      "country_name": "Slovenia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "SVN-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SI",
+      "country_name": "Slovenia",
+      "tax_id_type": "ID za DDV",
+      "reference_id": "SVN-IDDDV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SI",
+      "country_name": "Slovenia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SVN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SI",
+      "country_name": "Slovenia",
+      "tax_id_type": "TIN",
+      "reference_id": "SVN-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "tax_id_type": "EORI Code - Economic Operator Registration and Identification code",
+      "reference_id": "SVK-EORI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "tax_id_type": "IC DPH",
+      "reference_id": "SVK-ICDPH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "SVK-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "tax_id_type": "TIN",
+      "reference_id": "SVK-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SN",
+      "country_name": "Senegal",
+      "tax_id_type": "CSS - Social Security",
+      "reference_id": "SEN-CSS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SN",
+      "country_name": "Senegal",
+      "tax_id_type": "NINEA - National ID Number of Companies & Associations",
+      "reference_id": "SEN-NINEA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SN",
+      "country_name": "Senegal",
+      "tax_id_type": "RCCM - Trade and Personal Property Credit Register",
+      "reference_id": "SEN-RCCM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SN",
+      "country_name": "Senegal",
+      "tax_id_type": "TIN",
+      "reference_id": "SEN-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ST",
+      "country_name": "Sao Tome and Principe",
+      "tax_id_type": "NIF",
+      "reference_id": "STP-NIF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ST",
+      "country_name": "Sao Tome and Principe",
+      "tax_id_type": "TIN",
+      "reference_id": "STP-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SX",
+      "country_name": "Sint Maarten",
+      "tax_id_type": "CRIB Number - Central Registration of Taxable Persons Number",
+      "reference_id": "SXM-CRIB",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SX",
+      "country_name": "Sint Maarten",
+      "tax_id_type": "KvK / COCI Number - Registry of Commerce Number",
+      "reference_id": "SXM-KVKCOCINR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "SX",
+      "country_name": "Sint Maarten",
+      "tax_id_type": "TIN",
+      "reference_id": "SXM-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TH",
+      "country_name": "Thailand",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "THA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TH",
+      "country_name": "Thailand",
+      "tax_id_type": "TIN",
+      "reference_id": "THA-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TL",
+      "country_name": "Timor-Leste",
+      "tax_id_type": "TIN",
+      "reference_id": "TLS-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TR",
+      "country_name": "Turkey",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "TUR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TR",
+      "country_name": "Turkey",
+      "tax_id_type": "Vergi Kimlik Numarası",
+      "reference_id": "TUR-VKM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "tax_id_type": "BIR - Board Inland Revenue",
+      "reference_id": "TTO-BIR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "tax_id_type": "National ID Number",
+      "reference_id": "TTO-NID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "tax_id_type": "National Insurance Number",
+      "reference_id": "TTO-NIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "tax_id_type": "TIN",
+      "reference_id": "TTO-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "tax_id_type": "VAT",
+      "reference_id": "TTO-VAT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TW",
+      "country_name": "Taiwan",
+      "tax_id_type": "BAN",
+      "reference_id": "TWN-BAN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "TW",
+      "country_name": "Taiwan",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "TWN-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UA",
+      "country_name": "Ukraine",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "UKR-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UA",
+      "country_name": "Ukraine",
+      "tax_id_type": "INPP",
+      "reference_id": "UKR-INPP",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UM",
+      "country_name": "United States Minor Outlying Islands",
+      "tax_id_type": "TIN",
+      "reference_id": "UMI-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "DUNS",
+      "reference_id": "USA-DNS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Employer ID Number",
+      "reference_id": "USA-EIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "U.S. Individual Taxpayer Identification Number (ITIN)",
+      "reference_id": "USA-ITIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "USA-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "SSN or ITIN",
+      "reference_id": "USA-SSN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Alaska",
+      "reference_id": "USA-STATE_SALES/USE TAX_AK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Alabama",
+      "reference_id": "USA-STATE_SALES/USE TAX_AL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Arkansas",
+      "reference_id": "USA-STATE_SALES/USE TAX_AR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Arizona",
+      "reference_id": "USA-STATE_SALES/USE TAX_AZ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - California",
+      "reference_id": "USA-STATE_SALES/USE TAX_CA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Colorado",
+      "reference_id": "USA-STATE_SALES/USE TAX_CO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Connecticut",
+      "reference_id": "USA-STATE_SALES/USE TAX_CT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - District of Columbia",
+      "reference_id": "USA-STATE_SALES/USE TAX_DC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Delaware",
+      "reference_id": "USA-STATE_SALES/USE TAX_DE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Florida",
+      "reference_id": "USA-STATE_SALES/USE TAX_FL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Georgia",
+      "reference_id": "USA-STATE_SALES/USE TAX_GA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Hawaii",
+      "reference_id": "USA-STATE_SALES/USE TAX_HI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Iowa",
+      "reference_id": "USA-STATE_SALES/USE TAX_IA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Idaho",
+      "reference_id": "USA-STATE_SALES/USE TAX_ID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Illinois",
+      "reference_id": "USA-STATE_SALES/USE TAX_IL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Indiana",
+      "reference_id": "USA-STATE_SALES/USE TAX_IN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Kansas",
+      "reference_id": "USA-STATE_SALES/USE TAX_KS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Kentucky",
+      "reference_id": "USA-STATE_SALES/USE TAX_KY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Louisiana",
+      "reference_id": "USA-STATE_SALES/USE TAX_LA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Massachusetts",
+      "reference_id": "USA-STATE_SALES/USE TAX_MA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Maryland",
+      "reference_id": "USA-STATE_SALES/USE TAX_MD",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Maine",
+      "reference_id": "USA-STATE_SALES/USE TAX_ME",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Michigan",
+      "reference_id": "USA-STATE_SALES/USE TAX_MI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Minnesota",
+      "reference_id": "USA-STATE_SALES/USE TAX_MN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Missouri",
+      "reference_id": "USA-STATE_SALES/USE TAX_MO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Mississippi",
+      "reference_id": "USA-STATE_SALES/USE TAX_MS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Montana",
+      "reference_id": "USA-STATE_SALES/USE TAX_MT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - North Carolina",
+      "reference_id": "USA-STATE_SALES/USE TAX_NC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - North Dakota",
+      "reference_id": "USA-STATE_SALES/USE TAX_ND",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Nebraska",
+      "reference_id": "USA-STATE_SALES/USE TAX_NE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - New Hampshire",
+      "reference_id": "USA-STATE_SALES/USE TAX_NH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - New Jersey",
+      "reference_id": "USA-STATE_SALES/USE TAX_NJ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - New Mexico",
+      "reference_id": "USA-STATE_SALES/USE TAX_NM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Nevada",
+      "reference_id": "USA-STATE_SALES/USE TAX_NV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - New York",
+      "reference_id": "USA-STATE_SALES/USE TAX_NY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Ohio",
+      "reference_id": "USA-STATE_SALES/USE TAX_OH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Oklahoma",
+      "reference_id": "USA-STATE_SALES/USE TAX_OK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Oregon",
+      "reference_id": "USA-STATE_SALES/USE TAX_OR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Pennsylvania",
+      "reference_id": "USA-STATE_SALES/USE TAX_PA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Rhode Island",
+      "reference_id": "USA-STATE_SALES/USE TAX_RI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - South Carolina",
+      "reference_id": "USA-STATE_SALES/USE TAX_SC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - South Dakota",
+      "reference_id": "USA-STATE_SALES/USE TAX_SD",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Tennessee",
+      "reference_id": "USA-STATE_SALES/USE TAX_TN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Texas",
+      "reference_id": "USA-STATE_SALES/USE TAX_TX",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Utah",
+      "reference_id": "USA-STATE_SALES/USE TAX_UT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Virginia",
+      "reference_id": "USA-STATE_SALES/USE TAX_VA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Vermont",
+      "reference_id": "USA-STATE_SALES/USE TAX_VT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Washington",
+      "reference_id": "USA-STATE_SALES/USE TAX_WA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Wisconsin",
+      "reference_id": "USA-STATE_SALES/USE TAX_WI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - West Virginia",
+      "reference_id": "USA-STATE_SALES/USE TAX_WV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales/Use Tax ID - Wyoming",
+      "reference_id": "USA-STATE_SALES/USE TAX_WY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Alaska",
+      "reference_id": "USA-STATE_TIN_AK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Alabama",
+      "reference_id": "USA-STATE_TIN_AL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Arkansas",
+      "reference_id": "USA-STATE_TIN_AR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Arizona",
+      "reference_id": "USA-STATE_TIN_AZ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - California",
+      "reference_id": "USA-STATE_TIN_CA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Colorado",
+      "reference_id": "USA-STATE_TIN_CO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Connecticut",
+      "reference_id": "USA-STATE_TIN_CT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Delaware",
+      "reference_id": "USA-STATE_TIN_DE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Florida",
+      "reference_id": "USA-STATE_TIN_FL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Georgia",
+      "reference_id": "USA-STATE_TIN_GA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Hawaii",
+      "reference_id": "USA-STATE_TIN_HI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Iowa",
+      "reference_id": "USA-STATE_TIN_IA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Idaho",
+      "reference_id": "USA-STATE_TIN_ID",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Illinois",
+      "reference_id": "USA-STATE_TIN_IL",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Indiana",
+      "reference_id": "USA-STATE_TIN_IN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Kansas",
+      "reference_id": "USA-STATE_TIN_KS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Kentucky",
+      "reference_id": "USA-STATE_TIN_KY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Louisiana",
+      "reference_id": "USA-STATE_TIN_LA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Massachusetts",
+      "reference_id": "USA-STATE_TIN_MA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Maryland",
+      "reference_id": "USA-STATE_TIN_MD",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Maine",
+      "reference_id": "USA-STATE_TIN_ME",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Michigan",
+      "reference_id": "USA-STATE_TIN_MI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Minnesota",
+      "reference_id": "USA-STATE_TIN_MN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Missouri",
+      "reference_id": "USA-STATE_TIN_MO",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Mississippi",
+      "reference_id": "USA-STATE_TIN_MS",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Montana",
+      "reference_id": "USA-STATE_TIN_MT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - North Carolina",
+      "reference_id": "USA-STATE_TIN_NC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - North Dakota",
+      "reference_id": "USA-STATE_TIN_ND",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Nebraska",
+      "reference_id": "USA-STATE_TIN_NE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - New Hampshire",
+      "reference_id": "USA-STATE_TIN_NH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - New Jersey",
+      "reference_id": "USA-STATE_TIN_NJ",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - New Mexico",
+      "reference_id": "USA-STATE_TIN_NM",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Nevada",
+      "reference_id": "USA-STATE_TIN_NV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - New York",
+      "reference_id": "USA-STATE_TIN_NY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Ohio",
+      "reference_id": "USA-STATE_TIN_OH",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Oklahoma",
+      "reference_id": "USA-STATE_TIN_OK",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Oregon",
+      "reference_id": "USA-STATE_TIN_OR",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Pennsylvania",
+      "reference_id": "USA-STATE_TIN_PA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Rhode Island",
+      "reference_id": "USA-STATE_TIN_RI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - South Carolina",
+      "reference_id": "USA-STATE_TIN_SC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - South Dakota",
+      "reference_id": "USA-STATE_TIN_SD",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Tennessee",
+      "reference_id": "USA-STATE_TIN_TN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Texas",
+      "reference_id": "USA-STATE_TIN_TX",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Utah",
+      "reference_id": "USA-STATE_TIN_UT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Virginia",
+      "reference_id": "USA-STATE_TIN_VA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Vermont",
+      "reference_id": "USA-STATE_TIN_VT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Washington",
+      "reference_id": "USA-STATE_TIN_WA",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Wisconsin",
+      "reference_id": "USA-STATE_TIN_WI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - West Virginia",
+      "reference_id": "USA-STATE_TIN_WV",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "State Income Tax ID - Wyoming",
+      "reference_id": "USA-STATE_TIN_WY",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Sales Tax/Use Tax",
+      "reference_id": "USA-ST-UT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States of America",
+      "tax_id_type": "Transmitter Control Code",
+      "reference_id": "USA-TCC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "tax_id_type": "Voter Credentials (Series and Number)",
+      "reference_id": "URY-CC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "tax_id_type": "Identity Card Number",
+      "reference_id": "URY-CI",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "tax_id_type": "IDCard - Identity Card for Physical Persons",
+      "reference_id": "URY-IDC",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "tax_id_type": "NIE - Foreigner’s Identification Number",
+      "reference_id": "URY-NIE",
+      "source": "tenant"
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "tax_id_type": "RUT - Single Register of Tax Payers Number",
+      "reference_id": "URY-RUT",
+      "source": "tenant"
+    },
+    {
+      "country_code": "VA",
+      "country_name": "Holy See (Vatican City State)",
+      "tax_id_type": "TIN",
+      "reference_id": "VAT-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "VI",
+      "country_name": "U. S. Virgin Islands",
+      "tax_id_type": "EIN",
+      "reference_id": "VIR-EIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "XK",
+      "country_name": "Kosovo",
+      "tax_id_type": "TIN",
+      "reference_id": "KSV-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "tax_id_type": "Legal form of the Company",
+      "reference_id": "ZAF-LEGALF",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "tax_id_type": "RGN",
+      "reference_id": "ZAF-RGN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "tax_id_type": "TIN - Tax Identification number",
+      "reference_id": "ZAF-TIN",
+      "source": "tenant"
+    },
+    {
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "tax_id_type": "VAT",
+      "reference_id": "ZAF-VAT",
+      "source": "tenant"
+    }
+  ]
+}

@@ -280,9 +280,11 @@ no VBA — nothing here touches the Runner build above.
 
 ```powershell
 uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py ar_customer --overwrite
+uv run --with openpyxl --with pyyaml --no-project python implementations/elt_transform_excel/scripts/create_ingest_template.py ap_supplier --overwrite
 ```
 
-`config/ingest_specs/ar_customer.yaml` → `dist/ingest_templates/ar_customer.xlsx`. The argument
+`config/ingest_specs/ar_customer.yaml` → `dist/ingest_templates/ar_customer.xlsx` (likewise
+`ap_supplier.yaml` → `ap_supplier.xlsx`). The argument
 is the spec key (any file under `config/ingest_specs/`); a path to a spec YAML also works. Add
 `--sample-row` to also fill row 2 from each column's `example`. Columns with a `default` are
 pre-filled either way.

@@ -116,6 +116,24 @@ lookups:
 - ref_document_email_recipient_statement
 
 decisions:
+- id: flat_row_no_nested_multivalue
+  decided: >
+    HARD CONSTRAINT. One flat row per customer. The template does not support the multi-line
+    entries the Workday EIB uses for nested multi-value datasets (multiple groups, multiple
+    addresses, multiple bank accounts, etc.). Multi-value is allowed only as fixed numbered slot
+    columns or a single ';'-delimited cell. Anything needing more than that is excluded and done
+    directly in Workday after the customer is created.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    Operator, 2026-10-12, in the session that built ap_supplier: "we do not support multiline
+    entries (like the workday EIBs have) for enabling multi-value nested datasets (like defining
+    multiple groups, multiple addresses etc) - this is a quick tool for getting the
+    customer/supplier defined and then creating in workday - everthing thing else they doi in
+    wokday."
+  consequence: >
+    Never add a child tab, a row-per-address/account/group structure, or repeating rows to this
+    template. The one-address, one-extra-group and slot decisions below all follow from this.
 - id: customer_group_band_auto_extras_selected
   decided: >
     The alphabetical band row (Customers A - L / M - Z / 0 - 9) is assigned automatically from
@@ -766,6 +784,18 @@ excluded:
 # Whole EIB tabs never populated (transform is WHERE 1=2). Not template columns.
 excluded_tabs:
 - {tabs: "Customer Credit, Customer Company Restrictions, Customer Settlement Account, Customer Intermediary Account, Bank Account Address, Customer Credit Card, Customer Related Worktags", reason: "transform SQL is WHERE 1=2 - always empty. Dropping Company followed from this (see decisions)."}
+
+# Recorded 2026-10-12 for the LATER mapping step to the 3+ Master Customers.xlsx load file
+# ('Submit Customer', 2 sample customers). Not template columns, and columns:/feeds above are
+# deliberately unchanged. Every populated Master field is covered by a column above or by
+# transform_supplied, except these constants. Letters are Master sheet columns.
+mapping_phase_findings:
+- {master_column: C, field: Add Only, value: "Y", note: "constant"}
+- {master_column: L, field: Submit, value: "Y", note: "constant"}
+- {master_column: BI, field: "Business Entity Name*", value: "= Customer Name", note: "restatement of a template column"}
+- {master_column: "CQ / DR / EG", field: "Type* (address / phone / email)", value: BUSINESS, note: "constant"}
+- {master_column: "CR / DS / EH", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT (email: BILLING)", note: "address and phone have no template column; Email Use For is a template column"}
+- {master_column: various, field: reference IDs, value: "e.g. NET_30, EMAIL, BILL_TO_CONTACTS, STATEMENT_CONTACTS, Customer_of_Goods", note: "Master takes Workday reference IDs. Lookups with no reference_id yet, needed at mapping: ref_document_delivery_method, ref_document_email_recipient_invoice, ref_document_email_recipient_statement, ref_transaction_tax_status."}
 
 open_questions:
 - id: default_payment_type_default

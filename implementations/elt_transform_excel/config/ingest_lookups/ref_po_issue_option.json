@@ -1,0 +1,43 @@
+{
+  "description": "The 9 valid Workday Purchase Order Issue Option values - the list the Supplier EIB validates Supplier Procurement!C against.",
+  "key_column": "po_issue_option",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Issue_Option named range ('Tenant Default Named Ranges'!S/T, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. The migration wrote 'Email' on all 283 suppliers with an email.",
+  "rows": [
+    {
+      "po_issue_option": "XML",
+      "reference_id": "XML"
+    },
+    {
+      "po_issue_option": "Supplier Portal",
+      "reference_id": "PORTAL"
+    },
+    {
+      "po_issue_option": "Print",
+      "reference_id": "PRINT"
+    },
+    {
+      "po_issue_option": "Phone",
+      "reference_id": "PHONE"
+    },
+    {
+      "po_issue_option": "Email",
+      "reference_id": "EMAIL"
+    },
+    {
+      "po_issue_option": "XML Auto",
+      "reference_id": "XML AUTO"
+    },
+    {
+      "po_issue_option": "External",
+      "reference_id": "EXTERNAL"
+    },
+    {
+      "po_issue_option": "EDI",
+      "reference_id": "EDI"
+    },
+    {
+      "po_issue_option": "EDI Auto",
+      "reference_id": "EDI Auto"
+    }
+  ]
+}

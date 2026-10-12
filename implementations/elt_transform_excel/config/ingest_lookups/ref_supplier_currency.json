@@ -1,0 +1,607 @@
+{
+  "description": "Workday supplier currency values. default_allowed='Yes' rows (every real ISO code) back Default Currency and Bank Currency; the whole list, including the special 'All Currencies' value, backs Accepted Currencies. Supplier-specific: the Supplier EIB's Currency range has 150 values, the customer ref_currency 155.",
+  "key_column": "currency_code",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Currency named range ('Tenant Default Named Ranges'!AO, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`), in tenant order. A snapshot, not a link. 'All Currencies' is first with default_allowed='No'; the other 149 rows follow contiguously with 'Yes' so a where-filtered drop-down is one Excel range.",
+  "rows": [
+    {
+      "currency_code": "All Currencies",
+      "default_allowed": "No"
+    },
+    {
+      "currency_code": "USD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AED",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AFN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ALL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AMD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ANG",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AOA",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ARS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AUD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AWG",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "AZN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BAM",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BBD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BDT",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BGN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BHD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BIF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BMD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BND",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BOB",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BRL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BSD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BTN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BWP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BYR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "BZD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CAD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CDF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CHF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CLP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CNY",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "COP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CRC",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CUP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CVE",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "CZK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "DJF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "DKK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "DOP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "DZD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "EGP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ERN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ETB",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "EUR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "FJD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GBP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GEL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GHS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GMD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GNF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GTQ",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "GYD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "HKD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "HNL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "HRK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "HUF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "IDR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ILS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "INR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "IQD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "IRR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ISK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "JMD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "JOD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "JPY",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KES",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KGS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KHR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KMF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KPW",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KRW",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KWD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KYD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "KZT",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LAK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LBP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LKR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LRD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LTL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LVL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "LYD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MAD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MDL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MGA",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MKD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MMK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MNT",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MOP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MRO",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MUR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MVR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MWK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MXN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MYR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "MZN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "NGN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "NIO",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "NOK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "NPR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "NZD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "OMR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PEN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PGK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PHP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PKR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PLN",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "PYG",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "QAR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "RON",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "RSD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "RUB",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "RWF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SAR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SBD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SCR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SDG",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SEK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SGD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SLL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SOS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SRD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "STD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SYP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "SZL",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "THB",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TJS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TMM",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TND",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TOP",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TRY",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TTD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TWD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "TZS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "UAH",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "UGX",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "UYU",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "UZS",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "VEF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "VND",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "VUV",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "WST",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "XAF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "XCD",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "XOF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "XPF",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "YER",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ZAR",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ZMK",
+      "default_allowed": "Yes"
+    },
+    {
+      "currency_code": "ZWD",
+      "default_allowed": "Yes"
+    }
+  ]
+}

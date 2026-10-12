@@ -1,0 +1,788 @@
+# Ingest spec - ap_supplier
+#
+# Defines the AP-facing template workbook that Finance (AP) populate by hand to create new
+# suppliers directly in Workday. See docs/CONFIGURATION.md ("Ingest Specs").
+#
+# Built the same way as ar_customer (read that spec's header first): the column list is the set
+# of Supplier EIB columns the reference pipeline actually populates, every one checked against
+# header row 3 of FA E2E Suppliers V1.xlsm. AP provide final Workday values; the transform
+# derives nothing from them. Every value that has a tenant list is a drop-down built from the
+# EIB workbook's own named ranges, so AP pick rather than type.
+#
+# Operator, 2026-10-12: "we need to do the same for suppliers ... like we did for customer make
+# all the required drop down selections so it is easier for AP team to create their supplier
+# lists". Mapping to the 3+ Master Suppliers.xlsx load file is a LATER step ("first get an
+# appropriate set of input spreadsheets build") - see mapping_phase_findings.
+
+meta:
+  key: ap_supplier
+  label: AP Supplier
+  requester: Finance (AP)
+  eib_population_type: Supplier
+  purpose: >
+    A simple form for creating new suppliers directly in Workday. One row per supplier, with one
+    address and one settlement (bank) account. AP supply final Workday values, mostly by picking
+    from drop-downs; the transform copies them to the EIB.
+  derived_from: >
+    The populated columns of elt_ingest_excel's workday_supplier_*.sql outputs, measured against
+    the live DuckDB on 2026-10-12 (the current 319-supplier GFS batch), cross-checked column by
+    column to header row 3 of the EIB workbook below.
+  validated_against: >
+    Not yet. ~/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx (sheet
+    'Submit Supplier - v46.2', 2 sample suppliers) is the 3+ load file this template will be
+    mapped to in a later step. It is recorded here as that target only; nothing in this spec has
+    been validated against it beyond the notes in mapping_phase_findings.
+  eib_workbook: FA E2E Suppliers V1.xlsm
+  eib_header_row: 3
+  eib_data_row: 4
+  eib_tab_map: elt_ingest_excel/config/publish/finance/publish_supplier.json
+
+  # N of M: N columns covered by columns: (feeds/drives) + transform_supplied:, M = header-row-3
+  # width of that tab. The rest are listed per tab under excluded:.
+  eib_coverage:
+    Supplier Name: 4 of 22
+    Supplier Groups: 3 of 3
+    Supplier Currencies: 4 of 4
+    Supplier Tax: 9 of 18
+    Supplier Payment: 5 of 11
+    Supplier Procurement: 4 of 20
+    Supplier Settlement Account: 14 of 24
+    Supplier Address: 13 of 30
+    Supplier Phone: 10 of 16
+    Supplier Email: 8 of 15
+
+template:
+  worksheet_name: Supplier
+  header_row: 1
+  data_start_row: 2
+  grain: one row per supplier, with exactly one address and exactly one settlement account
+
+  instructions:
+    enabled: true
+    worksheet_name: Instructions
+
+  fan_out:
+    Supplier Name: 1 row
+    Supplier Groups: 1 band row (auto) + 1 row if Additional Supplier Group is set
+    Supplier Currencies: 1 row
+    Supplier Tax: 1 row
+    Supplier Payment: 1 row
+    Supplier Procurement: 1 row
+    Supplier Settlement Account: 1 row (exactly one account per supplier - see decisions)
+    Supplier Address: 1 row (exactly one address per supplier - see decisions)
+    Supplier Phone: 1 row per populated Phone 1/2/3 slot
+    Supplier Email: 1 row per ';' value in Email Address
+
+# Shared reference datasets materialised as tabs, named only - each describes itself in
+# config/ingest_lookups/<name>.json. 8 are supplier-specific (built from FA E2E Suppliers
+# V1.xlsm's named ranges); 6 are shared with ar_customer and verified equal to the supplier
+# workbook's own lists (payment term/type) or reused as the agreed country/region/yes-no/device
+# sets. Not used here: ref_tax_code (see decisions), ref_currency, ref_currency_default and
+# ref_country_tax_id_type (customer-sourced; replaced by supplier-specific lookups).
+lookups:
+- ref_country
+- ref_country_region
+- ref_yes_no
+- ref_payment_term
+- ref_payment_type
+- ref_phone_device
+- ref_supplier_category
+- ref_supplier_group
+- ref_supplier_status
+- ref_supplier_currency
+- ref_supplier_transaction_tax_status
+- ref_supplier_country_tax_id_type
+- ref_po_issue_option
+- ref_bank_account_type
+
+decisions:
+- id: flat_row_no_nested_multivalue
+  decided: >
+    HARD CONSTRAINT. One flat row per supplier. The template does not support the multi-line
+    entries the Workday EIB uses for nested multi-value datasets (multiple groups, multiple
+    addresses, multiple bank accounts, etc.). Multi-value is allowed only as fixed numbered slot
+    columns or a single ';'-delimited cell. Anything needing more than that is excluded and done
+    directly in Workday after the supplier is created.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    Operator, 2026-10-12, in the session that built ap_supplier: "we do not support multiline
+    entries (like the workday EIBs have) for enabling multi-value nested datasets (like defining
+    multiple groups, multiple addresses etc) - this is a quick tool for getting the
+    customer/supplier defined and then creating in workday - everthing thing else they doi in
+    wokday."
+  consequence: >
+    Never add a child tab, a row-per-address/account/group structure, or repeating rows to this
+    template. The one-address, one-extra-group, one-settlement-account and slot decisions below all follow from this.
+- id: supplier_group_band_auto_extras_selected
+  decided: >
+    The alphabetical band row (Suppliers A - L / M - Z / 0 - 9) is assigned automatically from
+    Supplier Name's first character. AP pick only the ONE extra group, in Additional Supplier
+    Group, from a drop-down backed by the ref_supplier_group tab (selectable rows only).
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    Same rule as ar_customer. The band is mechanically determined by a value AP already typed.
+    Measured on the reference output: 638 group rows for 319 suppliers, every supplier has
+    exactly 2 (its band + 'Barclays Girls Football Schools Partnerships'), none has more - so one
+    extra-group column covers it and can be a drop-down.
+  consequence: >
+    Band boundaries are CONFIG (ref_supplier_group.json first_char_from/to + is_fallback), not
+    the hard-coded CASE in workday_supplier_groups.sql.
+- id: values_from_eib_named_ranges
+  decided: >
+    Every drop-down list comes from FA E2E Suppliers V1.xlsm's own named ranges ('Customer
+    Specific Named Ranges' / 'Tenant Default Named Ranges'), not from what the migration
+    produced.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    The named ranges are the tenant's list of valid values; the migration used one value for
+    most columns (Miscellaneous, Immediate, Email, Checking) and would deny AP the rest.
+  consequence: >
+    Snapshots live in config/ingest_lookups/ and are never read live from the workbook or from
+    elt_ingest_excel.
+- id: ap_provide_final_values
+  decided: >
+    The template is the exact list of populated Supplier EIB columns. AP provide final Workday
+    values; the transform derives nothing from them.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    The reference pipeline's derivations (transaction tax status from country + schedule, payment
+    types from currency/bank fields, tax ID type from number format) reconstruct values absent
+    from legacy GP data. A form can ask for them.
+  consequence: >
+    Do not reintroduce a mapping table or format-sniffing rule for any column here.
+- id: one_address_per_supplier
+  decided: One address per supplier. Address ID is always supplier_id_MAIN_1, Address Primary Yes.
+  by: Operator
+  date: 2026-10-12
+  rationale: The reference output has exactly one MAIN_1 address on each of its 319 suppliers.
+  consequence: Address Line 1/2/3 are three lines of ONE address; no address array.
+- id: one_settlement_account_per_supplier
+  decided: One settlement (bank) account per supplier.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    The reference output has exactly one account on each of its 319 suppliers. The SQL can emit
+    more (account_rnk > 1 => For Supplier Connections Only = Y), but none occur in the batch.
+  consequence: >
+    No Settlement Bank Account ID column (Settlement!C stays empty, as in the reference output).
+    A second account is added in Workday, not here (flat_row_no_nested_multivalue).
+- id: payment_types_as_default_plus_slots
+  decided: >
+    Payment types are a Default Payment Type plus two Additional Payment Type Accepted slots,
+    each a drop-down - NOT a '|'-delimited list. The transform writes Payment Types Accepted
+    (Payment!D) as Default | Additional 1 | Additional 2, blanks skipped.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    A drop-down cannot produce a delimited list. The reference output is 'BACS|Manual' with BACS
+    as default on all 319 rows; the SQL can emit up to 3 (e.g. SEPA|Wire|Manual), hence 2 extra
+    slots.
+  consequence: Default Payment Type is always the first value of Payment Types Accepted.
+- id: email_first_value_primary_and_default_po
+  decided: >
+    Email Address is a ';' list. The first value is Primary = Yes and Default PO = Yes; the
+    others are No.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    Matches the reference output (primary_flag and default_po both Yes on 283 first rows, No on
+    9 others).
+  consequence: Primary and Default PO are transform_supplied, not template columns.
+- id: no_ref_tax_code
+  decided: No Default Tax Code column and no ref_tax_code lookup tab.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    No supplier column uses it: workday_supplier_tax.sql line 58 is
+    `CAST(NULL AS VARCHAR) default_tax_code`, so Supplier Tax!O is never populated.
+  consequence: Supplier Tax!O is in excluded:. Adding it later is a new column plus the lookup.
+- id: supplier_specific_lookups
+  decided: >
+    Supplier currency and tax-ID-type lookups are supplier-specific (ref_supplier_currency,
+    ref_supplier_country_tax_id_type), not the customer ones.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    The Supplier EIB's Currency range has 150 values against the customer's 155, and its
+    Tax_ID_Types range (799 rows) differs from the customer-sourced ref_country_tax_id_type
+    (534 rows). A supplier drop-down must offer the values the Supplier EIB validates against.
+  consequence: >
+    ref_supplier_currency carries default_allowed so 'All Currencies' is offered for Accepted
+    Currencies only. ref_supplier_country_tax_id_type is joined to ref_country (106 rows) by
+    country name; tenant countries outside ref_country are dropped and recorded in its
+    provenance, and ref_country codes with no tenant type get a TIN fallback row.
+
+# Every column below is typed (or picked) by AP and copied to the EIB tab/column in `feeds`
+# without derivation. `drives` = an EIB column written from this value via a reference lookup.
+# `feeds_master` = no FA E2E header-row-3 column exists; the value targets the Master load file
+# directly and is unverified until the mapping step. `default` is pre-filled on the first data
+# row; AP may change it.
+columns:
+
+# --- Identity: Supplier Name tab (4 of 22 columns live) --------------------------------------
+- name: Supplier ID
+  required: true
+  type: text
+  description: >
+    The Workday Supplier ID. AP supply it. Unique across the workbook; must not collide with an
+    existing supplier. Repeated as the join key in column A of every other tab.
+  example: S-009400
+  feeds:
+  - {tab: Supplier Name, column: A, field: Supplier ID}
+  - {tab: ALL child tabs, column: A, field: Supplier ID, note: join key, repeated on every tab}
+
+- name: Supplier Name
+  required: true
+  type: text
+  description: Taken exactly as typed.
+  example: Acme Sports Ltd
+  feeds:
+  - {tab: Supplier Name, column: B, field: Supplier Name}
+  - {tab: ALL child tabs, column: B, field: Supplier Name, note: repeated on every tab}
+  drives:
+  - tab: Supplier Groups
+    column: C
+    field: Supplier Group
+    rule: >
+      The supplier's alphabetical band row, assigned automatically - AP do not type it. The first
+      character of Supplier Name is banded via config/ingest_lookups/ref_supplier_group.json rows
+      where assignment = auto_band, matching first_char_from..first_char_to; the is_fallback = Y
+      row applies when the first character is not A-Z. Additional Supplier Group adds one row.
+
+- name: Reference ID
+  required: false
+  type: text
+  description: Optional secondary reference carrying the originating system's key (the GP creditor code in the migration).
+  example: ACM001
+  feeds:
+  - {tab: Supplier Name, column: C, field: Reference ID}
+
+- name: Supplier Category
+  required: true
+  type: text
+  default: Miscellaneous
+  description: >
+    Workday supplier category. 6 valid values from the EIB's Supplier_Category named range.
+    The migration wrote Miscellaneous on all 319 suppliers.
+  picklist: {lookup: ref_supplier_category, column: supplier_category}
+  feeds:
+  - {tab: Supplier Name, column: D, field: Supplier Category}
+
+- name: Supplier Status
+  required: true
+  type: text
+  default: Active
+  description: >
+    The supplier's Workday status. The FA E2E workbook has no header-row-3 column for it (only
+    the 'Supplier Status Data (AL)' prep sheet); the 3+ Master load file carries it as Status*.
+  picklist: {lookup: ref_supplier_status, column: supplier_status}
+  feeds_master:
+    sheet: Submit Supplier - v46.2
+    column: MI
+    field: Status*
+    status: unverified-until-mapping
+
+# --- Supplier Groups tab (3 of 3 columns live) -----------------------------------------------
+- name: Additional Supplier Group
+  required: false
+  type: text
+  description: >
+    One extra Workday supplier group, over and above the alphabetical band row the transform
+    assigns from Supplier Name. Single-valued: every reference supplier has exactly one extra.
+    Band values are excluded from the list - the band row is automatic.
+  example: Barclays Girls Football Schools Partnerships
+  picklist: {lookup: ref_supplier_group, column: supplier_group, where: {assignment: selectable}}
+  feeds:
+  - {tab: Supplier Groups, column: C, field: Supplier Group, note: "one EXTRA row, in addition to the auto-assigned band row"}
+
+# --- Supplier Payment tab (5 of 11 columns live) ---------------------------------------------
+- name: Payment Terms
+  required: true
+  type: text
+  default: Immediate
+  description: >
+    The Workday payment term (display value). 9 values from the EIB's Payment_Term named range -
+    identical to the customer list, so ref_payment_term is shared. Immediate on 318 of 319
+    reference suppliers.
+  picklist: {lookup: ref_payment_term, column: payment_term}
+  feeds:
+  - {tab: Supplier Payment, column: C, field: Payment Terms}
+
+- name: Default Payment Type
+  required: true
+  type: text
+  default: BACS
+  description: >
+    How the supplier is paid by default. BACS on all 319 reference suppliers. Also written as
+    the first value of Payment Types Accepted.
+  picklist: {lookup: ref_payment_type, column: payment_type}
+  feeds:
+  - {tab: Supplier Payment, column: E, field: Default Payment Type}
+  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "first value of the '|'-joined list"}
+
+- name: Additional Payment Type Accepted 1
+  required: false
+  type: text
+  default: Manual
+  description: >
+    A further accepted payment type, after the default. The reference output accepts
+    'BACS|Manual' on all 319 suppliers. Leave blank if the default is the only one.
+  picklist: {lookup: ref_payment_type, column: payment_type}
+  feeds:
+  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "'|'-joined after Default Payment Type"}
+
+- name: Additional Payment Type Accepted 2
+  required: false
+  type: text
+  description: A third accepted payment type, if any.
+  picklist: {lookup: ref_payment_type, column: payment_type}
+  feeds:
+  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "'|'-joined after Additional 1"}
+
+# --- Supplier Currencies tab (4 of 4 columns live) -------------------------------------------
+- name: Accepted Currencies
+  required: true
+  type: text
+  default: All Currencies
+  picklist: {lookup: ref_supplier_currency, column: currency_code}
+  feeds:
+  - {tab: Supplier Currencies, column: C, field: Accepted Currencies+}
+
+- name: Default Currency
+  required: true
+  type: text
+  default: GBP
+  description: ISO 4217 code. 'All Currencies' is not offered - it is valid only for Accepted Currencies.
+  picklist: {lookup: ref_supplier_currency, column: currency_code, where: {default_allowed: "Yes"}}
+  feeds:
+  - {tab: Supplier Currencies, column: D, field: Default Currency}
+
+# --- Supplier Tax tab (9 of 18 columns live) -------------------------------------------------
+- name: Transaction Tax Status
+  required: true
+  type: text
+  default: Supplier of Goods - VAT/GST Registered in this Country
+  description: >
+    AP supply it. 12 supplier values from the EIB's Transaction_Tax_Status named range. The
+    reference pipeline selected it from country + tax schedule; that is not reproduced. 308 of
+    319 reference suppliers carry the default, 11 'Supplier of Services - VAT/GST Registered in
+    this Country'.
+  picklist: {lookup: ref_supplier_transaction_tax_status, column: transaction_tax_status}
+  feeds:
+  - {tab: Supplier Tax, column: J, field: Transaction Tax Status}
+
+- name: Tax Status Country Code
+  required: true
+  type: text
+  default: GB
+  description: >
+    ISO2 code for the tax status country. Drives-only - Supplier Tax has no country-code column.
+  picklist: {lookup: ref_country, column: country_code}
+  drives:
+  - {tab: Supplier Tax, column: H, field: Tax Status Country, rule: "ref_country.country_name for this code"}
+
+# The five tax-identifier columns below are a group - supply all or none.
+- name: Tax ID
+  required: false
+  type: text
+  description: Supply with the other tax-identifier columns or leave all blank.
+  feeds:
+  - {tab: Supplier Tax, column: D, field: Tax ID}
+
+- name: Tax ID Type
+  required: false
+  type: text
+  description: >
+    The allowed values cascade from Tax ID Country Code using the Supplier EIB's own
+    Tax_ID_Types range; 'TIN' where the workbook has no list for that country. The reference
+    pipeline's format-sniffing is not reproduced.
+  example: VAT Reg No
+  picklist:
+    lookup: ref_supplier_country_tax_id_type
+    column: tax_id_type
+    filtered_by: Tax ID Country Code
+    key: country_code
+  feeds:
+  - {tab: Supplier Tax, column: E, field: Tax ID Type}
+
+- name: Tax ID Country Code
+  required: false
+  type: text
+  description: ISO2 code for the tax ID country; the transform writes the name into Supplier Tax!C.
+  example: GB
+  picklist: {lookup: ref_country, column: country_code}
+  drives:
+  - {tab: Supplier Tax, column: C, field: Tax ID Country, rule: "ref_country.country_name for this code"}
+
+- name: Primary Tax ID
+  required: false
+  type: text
+  default: "Yes"
+  description: Yes when the tax-identifier group is supplied; blank otherwise.
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Tax, column: F, field: "Primary Tax ID?"}
+
+- name: Transaction Tax ID
+  required: false
+  type: text
+  default: "Yes"
+  description: Yes when the tax-identifier group is supplied; blank otherwise.
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Tax, column: G, field: "Transaction Tax ID?"}
+
+# --- Supplier Procurement tab (4 of 20 columns live) -----------------------------------------
+- name: Purchase Order Issue Option
+  required: false
+  type: text
+  default: Email
+  description: >
+    How purchase orders are sent. 9 values from the EIB's Issue_Option named range. The
+    migration wrote Email on every supplier that has an email (283 of 319).
+  picklist: {lookup: ref_po_issue_option, column: po_issue_option}
+  feeds:
+  - {tab: Supplier Procurement, column: C, field: Purchase Order Issue Option}
+
+- name: Use Supplier Reference as Default Supplier Payment Memo
+  required: false
+  type: text
+  default: "Yes"
+  description: Master Suppliers.xlsx sets it to Y on both sample suppliers.
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Procurement, column: L, field: "Use Supplier Reference as Default Supplier Payment Memo?"}
+
+# --- Supplier Settlement Account tab (14 of 24 columns live) ---------------------------------
+- name: Bank Country Code
+  required: true
+  type: text
+  default: GB
+  description: >
+    ISO2 code of the bank's country. The reference output writes the country NAME (United
+    Kingdom) into Bank Country, so the transform resolves it from ref_country.
+  picklist: {lookup: ref_country, column: country_code}
+  drives:
+  - {tab: Supplier Settlement Account, column: D, field: Bank Country, rule: "ref_country.country_name for this code"}
+
+- name: Bank Currency
+  required: true
+  type: text
+  default: GBP
+  picklist: {lookup: ref_supplier_currency, column: currency_code, where: {default_allowed: "Yes"}}
+  feeds:
+  - {tab: Supplier Settlement Account, column: E, field: Currency}
+
+- name: Bank Account Type
+  required: true
+  type: text
+  default: Checking
+  description: Checking (DDA) or Savings (SA). Checking on all 319 reference accounts.
+  picklist: {lookup: ref_bank_account_type, column: bank_account_type}
+  feeds:
+  - {tab: Supplier Settlement Account, column: F, field: Bank Account Type}
+
+- name: Bank Name
+  required: true
+  type: text
+  example: Lloyds Bank plc
+  feeds:
+  - {tab: Supplier Settlement Account, column: G, field: Bank Name}
+
+- name: Bank Account Name
+  required: true
+  type: text
+  description: The name on the account.
+  feeds:
+  - {tab: Supplier Settlement Account, column: H, field: Name on Account}
+
+- name: Bank Account Number
+  required: true
+  type: text
+  description: Keep leading zeros - type as text.
+  example: "01234567"
+  feeds:
+  - {tab: Supplier Settlement Account, column: I, field: Bank Account Number}
+
+- name: Sort Code/Routing Number
+  required: conditional
+  type: text
+  condition: UK accounts (the sort code, 6 digits, no dashes)
+  example: "123456"
+  feeds:
+  - {tab: Supplier Settlement Account, column: K, field: Routing Number/Bank Code}
+
+- name: IBAN
+  required: conditional
+  type: text
+  condition: non-UK accounts that use IBAN
+  feeds:
+  - {tab: Supplier Settlement Account, column: L, field: IBAN}
+
+- name: SWIFT/BIC
+  required: conditional
+  type: text
+  condition: international payments
+  feeds:
+  - {tab: Supplier Settlement Account, column: M, field: SWIFT Bank Identification Code}
+
+- name: Roll Number
+  required: false
+  type: text
+  description: Building society roll number, if the bank uses one.
+  feeds:
+  - {tab: Supplier Settlement Account, column: N, field: Roll Number}
+
+- name: Check Digit
+  required: false
+  type: text
+  feeds:
+  - {tab: Supplier Settlement Account, column: O, field: Check Digit}
+
+- name: Branch ID
+  required: false
+  type: text
+  feeds:
+  - {tab: Supplier Settlement Account, column: P, field: Branch ID}
+
+# --- Supplier Address tab (13 of 30 columns live) --------------------------------------------
+- name: Address Country Code
+  required: true
+  type: text
+  default: GB
+  description: ISO2 code; the transform writes the country name into Country (column K) from ref_country.
+  picklist: {lookup: ref_country, column: country_code}
+  feeds:
+  - {tab: Supplier Address, column: L, field: Country Code}
+  drives:
+  - {tab: Supplier Address, column: K, field: Country, rule: "ref_country.country_name for this code"}
+
+- name: Address Line 1
+  required: true
+  type: text
+  feeds:
+  - {tab: Supplier Address, column: Q, field: "Address Line #1"}
+
+- name: Address Line 2
+  required: false
+  type: text
+  feeds:
+  - {tab: Supplier Address, column: R, field: "Address Line #2"}
+
+- name: Address Line 3
+  required: false
+  type: text
+  description: "Address Line #4 (column T) is never populated - the template stops at 3."
+  feeds:
+  - {tab: Supplier Address, column: S, field: "Address Line #3"}
+
+- name: City
+  required: true
+  type: text
+  feeds:
+  - {tab: Supplier Address, column: O, field: City}
+
+- name: Region
+  required: false
+  type: text
+  description: The Workday region, filtered to the selected Address Country Code (ref_country_region).
+  picklist:
+    lookup: ref_country_region
+    column: region
+    filtered_by: Address Country Code
+    key: country_code
+  feeds:
+  - {tab: Supplier Address, column: M, field: Region}
+
+- name: Postcode
+  required: false
+  type: text
+  example: AL5 2LG
+  feeds:
+  - {tab: Supplier Address, column: U, field: Postal Code}
+
+- name: Address Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Address, column: V, field: Public}
+
+- name: Address Primary
+  required: true
+  type: text
+  default: "Yes"
+  description: Always Yes - one address per supplier.
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Address, column: W, field: Primary}
+
+# --- Supplier Phone tab (10 of 16 columns live) - mirrors ar_customer ------------------------
+- name: Phone Country Code
+  required: false
+  type: text
+  default: GB
+  description: ISO2 code for this supplier's phones (one for all slots).
+  picklist: {lookup: ref_country, column: country_code}
+  feeds:
+  - {tab: Supplier Phone, column: E, field: Country Code, note: repeated on every phone row}
+  drives:
+  - {tab: Supplier Phone, column: D, field: Phone Country, rule: "ref_country.country_name for this code"}
+  - {tab: Supplier Phone, column: F, field: International Phone Code, rule: "ref_country.phone_code for this code, '+' stripped (+44 -> 44)"}
+
+- name: Phone 1
+  required: false
+  type: text
+  description: Include the area code - Area Code (column G) is never populated.
+  example: 01234 567890
+  feeds:
+  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row; Primary=Yes}
+
+- name: Phone 1 Device Type
+  required: false
+  type: text
+  description: Required when Phone 1 is populated.
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 1 row}
+
+- name: Phone 2
+  required: false
+  type: text
+  feeds:
+  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row}
+
+- name: Phone 2 Device Type
+  required: false
+  type: text
+  description: Required when Phone 2 is populated.
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 2 row}
+
+- name: Phone 3
+  required: false
+  type: text
+  feeds:
+  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row}
+
+- name: Phone 3 Device Type
+  required: false
+  type: text
+  description: Required when Phone 3 is populated.
+  picklist: {lookup: ref_phone_device, column: phone_device}
+  feeds:
+  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 3 row}
+
+- name: Phone Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Phone, column: K, field: Public, note: repeated on every phone row}
+
+# --- Supplier Email tab (8 of 15 columns live) -----------------------------------------------
+- name: Email Address
+  required: false
+  type: text
+  multi_value: "';'-delimited list"
+  description: The first address is the primary and the default PO email.
+  example: "accounts@supplier.com; remit@supplier.com"
+  feeds:
+  - {tab: Supplier Email, column: C, field: Email Address, note: one row per ';' value}
+
+- name: Email Public
+  required: true
+  type: text
+  default: "Yes"
+  picklist: {lookup: ref_yes_no, column: yes_no}
+  feeds:
+  - {tab: Supplier Email, column: F, field: Public, note: repeated on every email row}
+
+- name: Email Use For
+  required: true
+  type: text
+  default: SHIPPING|BILLING|REMIT
+  description: >
+    Free text - the workbook has no tenant list for it. SHIPPING|BILLING|REMIT on all 292
+    reference email rows.
+  feeds:
+  - {tab: Supplier Email, column: J, field: Use For, note: repeated on every email row}
+
+# Populated EIB columns that are NOT template columns: generated from Supplier ID or implied by
+# slot / list position. None is a derivation of AP's judgement.
+transform_supplied:
+- {tab: Supplier Address, column: J, field: Address ID, rule: "supplier_id || '_MAIN_1' - one address per supplier"}
+- {tab: Supplier Phone, column: C, field: Phone ID, rule: "supplier_id || '_PH<slot>_1'"}
+- {tab: Supplier Phone, column: L, field: Primary, rule: "Yes for the lowest populated phone slot, No for the others"}
+- {tab: Supplier Email, column: E, field: Email ID, rule: "supplier_id || '_EM1_<n>' by position in Email Address"}
+- {tab: Supplier Email, column: G, field: Primary, rule: "Yes for the first address in Email Address, No for the others"}
+- {tab: Supplier Email, column: H, field: Default PO, rule: "Yes for the first address in Email Address, No for the others"}
+
+# EIB columns that exist (header row 3) but are NEVER populated. The template does not mention
+# them and the transform leaves them empty. count = number of letters listed.
+excluded:
+- {tab: Supplier Name, count: 18, letters: "E-V", columns: "Business Entity Name, Do Not Reimburse Contingent Worker Expense Reports, Worktag Only?, Integration System, External Entity ID, Supplier Source, Supplier Change Source, Submit, Spend Category or Hierarchy+, Supplier Security Segment, Create Supplier from Customer / Financial Institution / Tax Authority / Investor, Customer Account Number, Certificate of Insurance Date, DUNS Number, Unique Entity Identifier"}
+- {tab: Supplier Tax, count: 9, letters: "I, K-R", columns: "Tax Status, Withholding Tax Status, Tax Authority Form Type, IRS 1099 Supplier?, Tax Document Date, Default Tax Code, Default Withholding Tax Code, FATCA?, Business Entity Tax ID"}
+- {tab: Supplier Payment, count: 6, letters: "F-K", columns: "Shipping Terms, Always Separate Payments, Do not pay during Bank Account updates, Exclude Freight Amount / Other Charge / Tax Amount from Supplier Invoice Discount"}
+- {tab: Supplier Procurement, count: 16, letters: "D-K, M-T", columns: "Invoice Any Supplier, Shipping Method, Acknowledgement Expected?, Enable ASN, ASN Due in Days, Supplier Minimum Order Amount, Minimum Order Amount Currency, Text for Default Supplier Payment Memo, Use Invoice Memo as Default Supplier Payment Memo?, Use Supplier Connection Memo?, Enable Global Location Number?, Disable Change Order?, Multi-Supplier Supplier Link for PO Issue, Procurement Credit Card, Edit Portal Taxes, Change Order Issue Option"}
+- {tab: Supplier Settlement Account, count: 10, letters: "C, J, Q-X", columns: "Settlement Bank Account ID, Bank Account Nickname, Branch Name, Accepts Payment Types+, Payment Types+, For Supplier Connections Only?, Requires Prenote, Payment Type Prenote, Inactive, Bank Instructions"}
+- {tab: Supplier Address, count: 17, letters: "C-I, N, P, T, X-AD", columns: "Formatted Address, Address Format Type, Defaulted Business Site Address, Delete, Do Not Replace All, Last Modified, Descriptor, Subregion, Submunicipality, Address Line #4, Effective Date, Type, Use For, Use For Tenanted, Comments, Number of Days, Municipality Local"}
+- {tab: Supplier Phone, count: 6, letters: "G, I, M-P", columns: "Area Code, Phone Number Extension, Type, Use For, Use For Tenanted, Comments"}
+- {tab: Supplier Email, count: 7, letters: "D, I, K-O", columns: "Email Comment, Type, Use For Tenated, Delete, Do Not Replace All, Comments, Email"}
+
+# Whole EIB tabs never populated by the reference pipeline. Not template columns.
+excluded_tabs:
+- {tabs: "Supplier Alternate Name, Supplier Company Restrictions, Supplier Intermediary Account", reason: "in publish_supplier.json but 0 rows in the reference output (sup_pop.json)"}
+- {tabs: "Supplier Children, Supplier Related Worktags, Supplier Classification", reason: "not in publish_supplier.json - never published. Supplier Classification is an open question."}
+- {tabs: "Supplier Contact Name, Supplier Contact Address, Supplier Contact Phone, Supplier Contact Email", reason: "not in publish_supplier.json - contacts are not migrated"}
+- {tabs: "Supplier Prep (AL), Supplier (AL), Supplier Class Prep (AL), Supplier Group Ref (AL), Supplier Currencies (AL), Supplier Status Data (AL), Supplier Class Data (AL), Supplier Class Field (AL)", reason: "workbook preparation sheets, not EIB load tabs"}
+
+# Recorded for the LATER mapping step to Master Suppliers.xlsx ('Submit Supplier - v46.2').
+# Not template columns and not acted on now. Letters are Master sheet columns.
+mapping_phase_findings:
+- {master_column: Q, field: Approval Status, value: APPROVED, note: "constant on both samples"}
+- {master_column: C, field: Add Only, value: "Y", note: "constant"}
+- {master_column: R, field: Submit, value: "Y", note: "constant"}
+- {master_column: CZ, field: Business Entity Name, value: "= Supplier Name", note: "restatement of a template column"}
+- {master_column: DF, field: Address Format Type, value: BASIC, note: "constant"}
+- {master_column: DJ, field: Address Effective Date, value: "1900-01-01", note: "constant"}
+- {master_column: "EI / FJ / FY", field: "Type* (address / phone / email)", value: BUSINESS, note: "constant"}
+- {master_column: "EJ / FK / FZ", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT", note: "address and phone have no template column; email maps from Email Use For"}
+- {master_column: DO, field: Address Line Type, value: "ADDRESS_LINE_<n>", note: "implied by Address Line 1/2/3 position"}
+- {master_column: CC, field: Default PO Issue Email, value: "= first Email Address", note: "restatement; FA E2E carries it as Email!H Default PO"}
+- {master_column: various, field: reference IDs, value: "e.g. DDA, EMAIL, Suppliers_A_L, ACTIVE, Supplier_of_Goods_Registered_in_this_Country", note: "Master takes Workday reference IDs, not display values. The supplier lookups carry reference_id where the tenant gives one; ref_supplier_status's tenant ID 'Active' differs from Master's 'ACTIVE' (Business_Entity_Status_Value_ID); ref_country is ISO2 but Master's phone Country ISO Code (FA) is ISO3 (GBR)."}
+
+open_questions:
+- id: supplier_classification
+  question: >
+    The tenant has a 'Payment Practice Report - UK' supplier classification (Significant UK
+    Connection / Financial Services Related, Yes/No). Neither the migration nor the Master
+    sample populates it. Does AP need it for new suppliers?
+  blocking: false
+  owner: Finance (AP)
+- id: ref_country_coverage
+  question: >
+    ref_country has 106 countries; the supplier workbook lists 242. Tax ID types for 129 tenant
+    countries outside ref_country are dropped (see ref_supplier_country_tax_id_type provenance).
+    Extend ref_country (shared with ar_customer) if AP onboard suppliers from those countries.
+  blocking: false
+  owner: Finance (AP)
+- id: phone_device_fax_pager
+  question: >
+    The supplier workbook's Phone_Device range also has Fax and Pager; ref_phone_device (shared)
+    has Landline and Mobile only, and the reference output uses only those. Add Fax/Pager?
+  blocking: false
+  owner: Finance (AP)
+- id: default_payment_type_default
+  question: >
+    Default Payment Type defaults to BACS with Manual as the additional accepted type (all 319
+    reference suppliers). Confirm with AP that this is the right default for a new supplier.
+  blocking: false
+  owner: Finance (AP)
