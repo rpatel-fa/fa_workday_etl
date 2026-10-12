@@ -1,7 +1,7 @@
 {
   "description": "The 3 valid Workday supplier statuses.",
   "key_column": "supplier_status",
-  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Supplier_Status named range ('Tenant Default Named Ranges'!W/X, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. Master Suppliers.xlsx carries the reference ID 'ACTIVE' (Business_Entity_Status_Value_ID) - the tenant Ref ID here is 'Active'; reconcile at the mapping step.",
+  "provenance": "Transcribed 2026-10-12 from the Supplier EIB's Supplier_Status named range ('Tenant Default Named Ranges'!W/X, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`). A snapshot, not a link. Master Suppliers.xlsx carries the reference ID 'ACTIVE' (Business_Entity_Status_Value_ID) - the tenant Ref ID here is 'Active'; reconcile at the mapping step. Note 2026-10-12: the tenant Ref ID is 'Active' (mixed case) but the Master Suppliers sample row carries 'ACTIVE'; the master transform writes the constant ACTIVE per the sample, not this reference_id.",
   "rows": [
     {
       "supplier_status": "Active",

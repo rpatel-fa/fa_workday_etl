@@ -1,7 +1,7 @@
 {
   "description": "ISO 3166-1 alpha-2 country code -> country name, dialling code, currency, language, tax ID type. Backs every *Country Code column; the transform resolves the country name and the international phone code (phone_code with '+' stripped) from it.",
   "key_column": "country_code",
-  "provenance": "Snapshot copied 2026-07-15 from elt_ingest_excel/config/data/ref_country.json. A COPY, not a link — nothing syncs it. Re-check by hand against that file if countries change.",
+  "provenance": "Snapshot copied 2026-07-15 from elt_ingest_excel/config/data/ref_country.json. A COPY, not a link — nothing syncs it. Re-check by hand against that file if countries change. iso3 added 2026-10-12 from the Supplier EIB tenant named ranges 'ISO 3166-1 alpha 3' / 'ISO 3166-1 alpha 2' ('Tenant Default Named Ranges'!AI/AK, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Suppliers V1.xlsm`), joined on the ISO2 code (Master phone 'Country ISO Code' needs ISO3). Country codes with no ISO3 in that range (left empty): PR, XK.",
   "rows": [
     {
       "country_code": "AE",
@@ -9,7 +9,8 @@
       "currency_code": "AED",
       "phone_code": "+971",
       "tax_id_type": "Other",
-      "country_name": "United Arab Emirates"
+      "country_name": "United Arab Emirates",
+      "iso3": "ARE"
     },
     {
       "country_code": "AL",
@@ -17,7 +18,8 @@
       "currency_code": "ALL",
       "phone_code": "+355",
       "tax_id_type": "Other",
-      "country_name": "Albania"
+      "country_name": "Albania",
+      "iso3": "ALB"
     },
     {
       "country_code": "AR",
@@ -25,7 +27,8 @@
       "currency_code": "ARS",
       "phone_code": "+54",
       "tax_id_type": "Other",
-      "country_name": "Argentina"
+      "country_name": "Argentina",
+      "iso3": "ARG"
     },
     {
       "country_code": "AT",
@@ -33,7 +36,8 @@
       "currency_code": "EUR",
       "phone_code": "+43",
       "tax_id_type": "VAT",
-      "country_name": "Austria"
+      "country_name": "Austria",
+      "iso3": "AUT"
     },
     {
       "country_code": "AU",
@@ -41,7 +45,8 @@
       "currency_code": "AUD",
       "phone_code": "+61",
       "tax_id_type": "Other",
-      "country_name": "Australia"
+      "country_name": "Australia",
+      "iso3": "AUS"
     },
     {
       "country_code": "AX",
@@ -49,7 +54,8 @@
       "currency_code": "EUR",
       "phone_code": "+358",
       "tax_id_type": "Other",
-      "country_name": "Åland Islands"
+      "country_name": "Åland Islands",
+      "iso3": "ALA"
     },
     {
       "country_code": "BA",
@@ -57,7 +63,8 @@
       "currency_code": "BAM",
       "phone_code": "+387",
       "tax_id_type": "Other",
-      "country_name": "Bosnia and Herzegovina"
+      "country_name": "Bosnia and Herzegovina",
+      "iso3": "BIH"
     },
     {
       "country_code": "BE",
@@ -65,7 +72,8 @@
       "currency_code": "EUR",
       "phone_code": "+32",
       "tax_id_type": "VAT",
-      "country_name": "Belgium"
+      "country_name": "Belgium",
+      "iso3": "BEL"
     },
     {
       "country_code": "BG",
@@ -73,7 +81,8 @@
       "currency_code": "BGN",
       "phone_code": "+359",
       "tax_id_type": "Other",
-      "country_name": "Bulgaria"
+      "country_name": "Bulgaria",
+      "iso3": "BGR"
     },
     {
       "country_code": "BL",
@@ -81,7 +90,8 @@
       "currency_code": "EUR",
       "phone_code": "+590",
       "tax_id_type": "Other",
-      "country_name": "Saint Barthelemy"
+      "country_name": "Saint Barthelemy",
+      "iso3": "BLM"
     },
     {
       "country_code": "BM",
@@ -89,7 +99,8 @@
       "currency_code": "BMD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Bermuda"
+      "country_name": "Bermuda",
+      "iso3": "BMU"
     },
     {
       "country_code": "BR",
@@ -97,7 +108,8 @@
       "currency_code": "BRL",
       "phone_code": "+55",
       "tax_id_type": "Other",
-      "country_name": "Brazil"
+      "country_name": "Brazil",
+      "iso3": "BRA"
     },
     {
       "country_code": "CA",
@@ -105,7 +117,8 @@
       "currency_code": "CAD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Canada"
+      "country_name": "Canada",
+      "iso3": "CAN"
     },
     {
       "country_code": "CD",
@@ -113,7 +126,8 @@
       "currency_code": "CDF",
       "phone_code": "+243",
       "tax_id_type": "Other",
-      "country_name": "Congo, Democratic Republic of the"
+      "country_name": "Congo, Democratic Republic of the",
+      "iso3": "COD"
     },
     {
       "country_code": "CG",
@@ -121,7 +135,8 @@
       "currency_code": "XAF",
       "phone_code": "+242",
       "tax_id_type": "Other",
-      "country_name": "Congo"
+      "country_name": "Congo",
+      "iso3": "COG"
     },
     {
       "country_code": "CH",
@@ -129,7 +144,8 @@
       "currency_code": "CHF",
       "phone_code": "+41",
       "tax_id_type": "Other",
-      "country_name": "Switzerland"
+      "country_name": "Switzerland",
+      "iso3": "CHE"
     },
     {
       "country_code": "CI",
@@ -137,7 +153,8 @@
       "currency_code": "XOF",
       "phone_code": "+225",
       "tax_id_type": "Other",
-      "country_name": "Côte d'Ivoire"
+      "country_name": "Côte d'Ivoire",
+      "iso3": "CIV"
     },
     {
       "country_code": "CL",
@@ -145,7 +162,8 @@
       "currency_code": "CLP",
       "phone_code": "+56",
       "tax_id_type": "Other",
-      "country_name": "Chile"
+      "country_name": "Chile",
+      "iso3": "CHL"
     },
     {
       "country_code": "CM",
@@ -153,7 +171,8 @@
       "currency_code": "XAF",
       "phone_code": "+237",
       "tax_id_type": "Other",
-      "country_name": "Cameroon"
+      "country_name": "Cameroon",
+      "iso3": "CMR"
     },
     {
       "country_code": "CN",
@@ -161,7 +180,8 @@
       "currency_code": "CNY",
       "phone_code": "+86",
       "tax_id_type": "Other",
-      "country_name": "China"
+      "country_name": "China",
+      "iso3": "CHN"
     },
     {
       "country_code": "CR",
@@ -169,7 +189,8 @@
       "currency_code": "CRC",
       "phone_code": "+506",
       "tax_id_type": "Other",
-      "country_name": "Costa Rica"
+      "country_name": "Costa Rica",
+      "iso3": "CRI"
     },
     {
       "country_code": "CV",
@@ -177,7 +198,8 @@
       "currency_code": "CVE",
       "phone_code": "+238",
       "tax_id_type": "Other",
-      "country_name": "Cabo Verde"
+      "country_name": "Cabo Verde",
+      "iso3": "CPV"
     },
     {
       "country_code": "CW",
@@ -185,7 +207,8 @@
       "currency_code": "ANG",
       "phone_code": "+599",
       "tax_id_type": "Other",
-      "country_name": "Curaçao"
+      "country_name": "Curaçao",
+      "iso3": "CUW"
     },
     {
       "country_code": "CY",
@@ -193,7 +216,8 @@
       "currency_code": "EUR",
       "phone_code": "+357",
       "tax_id_type": "Other",
-      "country_name": "Cyprus"
+      "country_name": "Cyprus",
+      "iso3": "CYP"
     },
     {
       "country_code": "CZ",
@@ -201,7 +225,8 @@
       "currency_code": "CZK",
       "phone_code": "+420",
       "tax_id_type": "Other",
-      "country_name": "Czechia"
+      "country_name": "Czechia",
+      "iso3": "CZE"
     },
     {
       "country_code": "DE",
@@ -209,7 +234,8 @@
       "currency_code": "EUR",
       "phone_code": "+49",
       "tax_id_type": "VAT",
-      "country_name": "Germany"
+      "country_name": "Germany",
+      "iso3": "DEU"
     },
     {
       "country_code": "DK",
@@ -217,7 +243,8 @@
       "currency_code": "DKK",
       "phone_code": "+45",
       "tax_id_type": "VAT",
-      "country_name": "Denmark"
+      "country_name": "Denmark",
+      "iso3": "DNK"
     },
     {
       "country_code": "DO",
@@ -225,7 +252,8 @@
       "currency_code": "DOP",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Dominican Republic"
+      "country_name": "Dominican Republic",
+      "iso3": "DOM"
     },
     {
       "country_code": "DZ",
@@ -233,7 +261,8 @@
       "currency_code": "DZD",
       "phone_code": "+213",
       "tax_id_type": "Other",
-      "country_name": "Algeria"
+      "country_name": "Algeria",
+      "iso3": "DZA"
     },
     {
       "country_code": "EC",
@@ -241,7 +270,8 @@
       "currency_code": "USD",
       "phone_code": "+593",
       "tax_id_type": "Other",
-      "country_name": "Ecuador"
+      "country_name": "Ecuador",
+      "iso3": "ECU"
     },
     {
       "country_code": "EE",
@@ -249,7 +279,8 @@
       "currency_code": "EUR",
       "phone_code": "+372",
       "tax_id_type": "Other",
-      "country_name": "Estonia"
+      "country_name": "Estonia",
+      "iso3": "EST"
     },
     {
       "country_code": "ES",
@@ -257,7 +288,8 @@
       "currency_code": "EUR",
       "phone_code": "+34",
       "tax_id_type": "VAT",
-      "country_name": "Spain"
+      "country_name": "Spain",
+      "iso3": "ESP"
     },
     {
       "country_code": "FI",
@@ -265,7 +297,8 @@
       "currency_code": "EUR",
       "phone_code": "+358",
       "tax_id_type": "VAT",
-      "country_name": "Finland"
+      "country_name": "Finland",
+      "iso3": "FIN"
     },
     {
       "country_code": "FM",
@@ -273,7 +306,8 @@
       "currency_code": "USD",
       "phone_code": "+691",
       "tax_id_type": "Other",
-      "country_name": "Micronesia, Federated States of"
+      "country_name": "Micronesia, Federated States of",
+      "iso3": "FSM"
     },
     {
       "country_code": "FR",
@@ -281,7 +315,8 @@
       "currency_code": "EUR",
       "phone_code": "+33",
       "tax_id_type": "VAT",
-      "country_name": "France"
+      "country_name": "France",
+      "iso3": "FRA"
     },
     {
       "country_code": "GB",
@@ -289,7 +324,8 @@
       "currency_code": "GBP",
       "phone_code": "+44",
       "tax_id_type": "VAT_UK",
-      "country_name": "United Kingdom"
+      "country_name": "United Kingdom",
+      "iso3": "GBR"
     },
     {
       "country_code": "GE",
@@ -297,7 +333,8 @@
       "currency_code": "GEL",
       "phone_code": "+995",
       "tax_id_type": "Other",
-      "country_name": "Georgia"
+      "country_name": "Georgia",
+      "iso3": "GEO"
     },
     {
       "country_code": "GG",
@@ -305,7 +342,8 @@
       "currency_code": "GBP",
       "phone_code": "+44",
       "tax_id_type": "Other",
-      "country_name": "Guernsey"
+      "country_name": "Guernsey",
+      "iso3": "GGY"
     },
     {
       "country_code": "GI",
@@ -313,7 +351,8 @@
       "currency_code": "GIP",
       "phone_code": "+350",
       "tax_id_type": "Other",
-      "country_name": "Gibraltar"
+      "country_name": "Gibraltar",
+      "iso3": "GIB"
     },
     {
       "country_code": "GR",
@@ -321,7 +360,8 @@
       "currency_code": "EUR",
       "phone_code": "+30",
       "tax_id_type": "Other",
-      "country_name": "Greece"
+      "country_name": "Greece",
+      "iso3": "GRC"
     },
     {
       "country_code": "HK",
@@ -329,7 +369,8 @@
       "currency_code": "HKD",
       "phone_code": "+852",
       "tax_id_type": "Other",
-      "country_name": "Hong Kong"
+      "country_name": "Hong Kong",
+      "iso3": "HKG"
     },
     {
       "country_code": "HR",
@@ -337,7 +378,8 @@
       "currency_code": "EUR",
       "phone_code": "+385",
       "tax_id_type": "Other",
-      "country_name": "Croatia"
+      "country_name": "Croatia",
+      "iso3": "HRV"
     },
     {
       "country_code": "HU",
@@ -345,7 +387,8 @@
       "currency_code": "HUF",
       "phone_code": "+36",
       "tax_id_type": "Other",
-      "country_name": "Hungary"
+      "country_name": "Hungary",
+      "iso3": "HUN"
     },
     {
       "country_code": "ID",
@@ -353,7 +396,8 @@
       "currency_code": "IDR",
       "phone_code": "+62",
       "tax_id_type": "Other",
-      "country_name": "Indonesia"
+      "country_name": "Indonesia",
+      "iso3": "IDN"
     },
     {
       "country_code": "IE",
@@ -361,7 +405,8 @@
       "currency_code": "EUR",
       "phone_code": "+353",
       "tax_id_type": "VAT_IE",
-      "country_name": "Ireland"
+      "country_name": "Ireland",
+      "iso3": "IRL"
     },
     {
       "country_code": "IL",
@@ -369,7 +414,8 @@
       "currency_code": "ILS",
       "phone_code": "+972",
       "tax_id_type": "Other",
-      "country_name": "Israel"
+      "country_name": "Israel",
+      "iso3": "ISR"
     },
     {
       "country_code": "IM",
@@ -377,7 +423,8 @@
       "currency_code": "GBP",
       "phone_code": "+44",
       "tax_id_type": "Other",
-      "country_name": "Isle of Man"
+      "country_name": "Isle of Man",
+      "iso3": "IMN"
     },
     {
       "country_code": "IN",
@@ -385,7 +432,8 @@
       "currency_code": "INR",
       "phone_code": "+91",
       "tax_id_type": "Other",
-      "country_name": "India"
+      "country_name": "India",
+      "iso3": "IND"
     },
     {
       "country_code": "IS",
@@ -393,7 +441,8 @@
       "currency_code": "ISK",
       "phone_code": "+354",
       "tax_id_type": "Other",
-      "country_name": "Iceland"
+      "country_name": "Iceland",
+      "iso3": "ISL"
     },
     {
       "country_code": "IT",
@@ -401,7 +450,8 @@
       "currency_code": "EUR",
       "phone_code": "+39",
       "tax_id_type": "VAT",
-      "country_name": "Italy"
+      "country_name": "Italy",
+      "iso3": "ITA"
     },
     {
       "country_code": "JE",
@@ -409,7 +459,8 @@
       "currency_code": "GBP",
       "phone_code": "+44",
       "tax_id_type": "Other",
-      "country_name": "Jersey"
+      "country_name": "Jersey",
+      "iso3": "JEY"
     },
     {
       "country_code": "JM",
@@ -417,7 +468,8 @@
       "currency_code": "JMD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Jamaica"
+      "country_name": "Jamaica",
+      "iso3": "JAM"
     },
     {
       "country_code": "JP",
@@ -425,7 +477,8 @@
       "currency_code": "JPY",
       "phone_code": "+81",
       "tax_id_type": "Other",
-      "country_name": "Japan"
+      "country_name": "Japan",
+      "iso3": "JPN"
     },
     {
       "country_code": "KR",
@@ -433,7 +486,8 @@
       "currency_code": "KRW",
       "phone_code": "+82",
       "tax_id_type": "Other",
-      "country_name": "Korea, Republic of"
+      "country_name": "Korea, Republic of",
+      "iso3": "KOR"
     },
     {
       "country_code": "KY",
@@ -441,7 +495,8 @@
       "currency_code": "KYD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Cayman Islands"
+      "country_name": "Cayman Islands",
+      "iso3": "CYM"
     },
     {
       "country_code": "KZ",
@@ -449,7 +504,8 @@
       "currency_code": "KZT",
       "phone_code": "+7",
       "tax_id_type": "Other",
-      "country_name": "Kazakhstan"
+      "country_name": "Kazakhstan",
+      "iso3": "KAZ"
     },
     {
       "country_code": "LA",
@@ -457,7 +513,8 @@
       "currency_code": "LAK",
       "phone_code": "+856",
       "tax_id_type": "Other",
-      "country_name": "Laos"
+      "country_name": "Laos",
+      "iso3": "LAO"
     },
     {
       "country_code": "LS",
@@ -465,7 +522,8 @@
       "currency_code": "LSL",
       "phone_code": "+266",
       "tax_id_type": "Other",
-      "country_name": "Lesotho"
+      "country_name": "Lesotho",
+      "iso3": "LSO"
     },
     {
       "country_code": "LT",
@@ -473,7 +531,8 @@
       "currency_code": "EUR",
       "phone_code": "+370",
       "tax_id_type": "Other",
-      "country_name": "Lithuania"
+      "country_name": "Lithuania",
+      "iso3": "LTU"
     },
     {
       "country_code": "LU",
@@ -481,7 +540,8 @@
       "currency_code": "EUR",
       "phone_code": "+352",
       "tax_id_type": "VAT",
-      "country_name": "Luxembourg"
+      "country_name": "Luxembourg",
+      "iso3": "LUX"
     },
     {
       "country_code": "LV",
@@ -489,7 +549,8 @@
       "currency_code": "EUR",
       "phone_code": "+371",
       "tax_id_type": "Other",
-      "country_name": "Latvia"
+      "country_name": "Latvia",
+      "iso3": "LVA"
     },
     {
       "country_code": "MA",
@@ -497,7 +558,8 @@
       "currency_code": "MAD",
       "phone_code": "+212",
       "tax_id_type": "Other",
-      "country_name": "Morocco"
+      "country_name": "Morocco",
+      "iso3": "MAR"
     },
     {
       "country_code": "MC",
@@ -505,7 +567,8 @@
       "currency_code": "EUR",
       "phone_code": "+377",
       "tax_id_type": "Other",
-      "country_name": "Monaco"
+      "country_name": "Monaco",
+      "iso3": "MCO"
     },
     {
       "country_code": "MF",
@@ -513,7 +576,8 @@
       "currency_code": "EUR",
       "phone_code": "+590",
       "tax_id_type": "Other",
-      "country_name": "Saint Martin"
+      "country_name": "Saint Martin",
+      "iso3": "MAF"
     },
     {
       "country_code": "MK",
@@ -521,7 +585,8 @@
       "currency_code": "MKD",
       "phone_code": "+389",
       "tax_id_type": "Other",
-      "country_name": "North Macedonia"
+      "country_name": "North Macedonia",
+      "iso3": "MKD"
     },
     {
       "country_code": "MO",
@@ -529,7 +594,8 @@
       "currency_code": "MOP",
       "phone_code": "+853",
       "tax_id_type": "Other",
-      "country_name": "Macao"
+      "country_name": "Macao",
+      "iso3": "MAC"
     },
     {
       "country_code": "MT",
@@ -537,7 +603,8 @@
       "currency_code": "EUR",
       "phone_code": "+356",
       "tax_id_type": "VAT",
-      "country_name": "Malta"
+      "country_name": "Malta",
+      "iso3": "MLT"
     },
     {
       "country_code": "MX",
@@ -545,7 +612,8 @@
       "currency_code": "MXN",
       "phone_code": "+52",
       "tax_id_type": "Other",
-      "country_name": "Mexico"
+      "country_name": "Mexico",
+      "iso3": "MEX"
     },
     {
       "country_code": "MY",
@@ -553,7 +621,8 @@
       "currency_code": "MYR",
       "phone_code": "+60",
       "tax_id_type": "Other",
-      "country_name": "Malaysia"
+      "country_name": "Malaysia",
+      "iso3": "MYS"
     },
     {
       "country_code": "NG",
@@ -561,7 +630,8 @@
       "currency_code": "NGN",
       "phone_code": "+234",
       "tax_id_type": "Other",
-      "country_name": "Nigeria"
+      "country_name": "Nigeria",
+      "iso3": "NGA"
     },
     {
       "country_code": "NL",
@@ -569,7 +639,8 @@
       "currency_code": "EUR",
       "phone_code": "+31",
       "tax_id_type": "VAT",
-      "country_name": "Netherlands"
+      "country_name": "Netherlands",
+      "iso3": "NLD"
     },
     {
       "country_code": "NO",
@@ -577,7 +648,8 @@
       "currency_code": "NOK",
       "phone_code": "+47",
       "tax_id_type": "Other",
-      "country_name": "Norway"
+      "country_name": "Norway",
+      "iso3": "NOR"
     },
     {
       "country_code": "NZ",
@@ -585,7 +657,8 @@
       "currency_code": "NZD",
       "phone_code": "+64",
       "tax_id_type": "Other",
-      "country_name": "New Zealand"
+      "country_name": "New Zealand",
+      "iso3": "NZL"
     },
     {
       "country_code": "PH",
@@ -593,7 +666,8 @@
       "currency_code": "PHP",
       "phone_code": "+63",
       "tax_id_type": "Other",
-      "country_name": "Philippines"
+      "country_name": "Philippines",
+      "iso3": "PHL"
     },
     {
       "country_code": "PL",
@@ -601,7 +675,8 @@
       "currency_code": "PLN",
       "phone_code": "+48",
       "tax_id_type": "Other",
-      "country_name": "Poland"
+      "country_name": "Poland",
+      "iso3": "POL"
     },
     {
       "country_code": "PM",
@@ -609,7 +684,8 @@
       "currency_code": "EUR",
       "phone_code": "+508",
       "tax_id_type": "Other",
-      "country_name": "Saint Pierre and Miquelon"
+      "country_name": "Saint Pierre and Miquelon",
+      "iso3": "SPM"
     },
     {
       "country_code": "PR",
@@ -617,7 +693,8 @@
       "currency_code": "USD",
       "phone_code": "+1",
       "tax_id_type": "EIN",
-      "country_name": "Puerto Rico"
+      "country_name": "Puerto Rico",
+      "iso3": ""
     },
     {
       "country_code": "PS",
@@ -625,7 +702,8 @@
       "currency_code": "ILS",
       "phone_code": "+970",
       "tax_id_type": "Other",
-      "country_name": "Palestine"
+      "country_name": "Palestine",
+      "iso3": "PSE"
     },
     {
       "country_code": "PT",
@@ -633,7 +711,8 @@
       "currency_code": "EUR",
       "phone_code": "+351",
       "tax_id_type": "VAT",
-      "country_name": "Portugal"
+      "country_name": "Portugal",
+      "iso3": "PRT"
     },
     {
       "country_code": "PY",
@@ -641,7 +720,8 @@
       "currency_code": "PYG",
       "phone_code": "+595",
       "tax_id_type": "Other",
-      "country_name": "Paraguay"
+      "country_name": "Paraguay",
+      "iso3": "PRY"
     },
     {
       "country_code": "QA",
@@ -649,7 +729,8 @@
       "currency_code": "QAR",
       "phone_code": "+974",
       "tax_id_type": "Other",
-      "country_name": "Qatar"
+      "country_name": "Qatar",
+      "iso3": "QAT"
     },
     {
       "country_code": "RE",
@@ -657,7 +738,8 @@
       "currency_code": "EUR",
       "phone_code": "+262",
       "tax_id_type": "Other",
-      "country_name": "Reunion"
+      "country_name": "Reunion",
+      "iso3": "REU"
     },
     {
       "country_code": "RO",
@@ -665,7 +747,8 @@
       "currency_code": "RON",
       "phone_code": "+40",
       "tax_id_type": "Other",
-      "country_name": "Romania"
+      "country_name": "Romania",
+      "iso3": "ROU"
     },
     {
       "country_code": "RS",
@@ -673,7 +756,8 @@
       "currency_code": "RSD",
       "phone_code": "+381",
       "tax_id_type": "Other",
-      "country_name": "Serbia"
+      "country_name": "Serbia",
+      "iso3": "SRB"
     },
     {
       "country_code": "RU",
@@ -681,7 +765,8 @@
       "currency_code": "RUB",
       "phone_code": "+7",
       "tax_id_type": "Other",
-      "country_name": "Russian Federation"
+      "country_name": "Russian Federation",
+      "iso3": "RUS"
     },
     {
       "country_code": "SA",
@@ -689,7 +774,8 @@
       "currency_code": "SAR",
       "phone_code": "+966",
       "tax_id_type": "Other",
-      "country_name": "Saudi Arabia"
+      "country_name": "Saudi Arabia",
+      "iso3": "SAU"
     },
     {
       "country_code": "SE",
@@ -697,7 +783,8 @@
       "currency_code": "SEK",
       "phone_code": "+46",
       "tax_id_type": "VAT",
-      "country_name": "Sweden"
+      "country_name": "Sweden",
+      "iso3": "SWE"
     },
     {
       "country_code": "SG",
@@ -705,7 +792,8 @@
       "currency_code": "SGD",
       "phone_code": "+65",
       "tax_id_type": "Other",
-      "country_name": "Singapore"
+      "country_name": "Singapore",
+      "iso3": "SGP"
     },
     {
       "country_code": "SI",
@@ -713,7 +801,8 @@
       "currency_code": "EUR",
       "phone_code": "+386",
       "tax_id_type": "Other",
-      "country_name": "Slovenia"
+      "country_name": "Slovenia",
+      "iso3": "SVN"
     },
     {
       "country_code": "SK",
@@ -721,7 +810,8 @@
       "currency_code": "EUR",
       "phone_code": "+421",
       "tax_id_type": "Other",
-      "country_name": "Slovakia"
+      "country_name": "Slovakia",
+      "iso3": "SVK"
     },
     {
       "country_code": "SN",
@@ -729,7 +819,8 @@
       "currency_code": "XOF",
       "phone_code": "+221",
       "tax_id_type": "Other",
-      "country_name": "Senegal"
+      "country_name": "Senegal",
+      "iso3": "SEN"
     },
     {
       "country_code": "ST",
@@ -737,7 +828,8 @@
       "currency_code": "STN",
       "phone_code": "+239",
       "tax_id_type": "Other",
-      "country_name": "Sao Tome and Principe"
+      "country_name": "Sao Tome and Principe",
+      "iso3": "STP"
     },
     {
       "country_code": "SX",
@@ -745,7 +837,8 @@
       "currency_code": "ANG",
       "phone_code": "+1721",
       "tax_id_type": "Other",
-      "country_name": "Sint Maarten"
+      "country_name": "Sint Maarten",
+      "iso3": "SXM"
     },
     {
       "country_code": "TH",
@@ -753,7 +846,8 @@
       "currency_code": "THB",
       "phone_code": "+66",
       "tax_id_type": "Other",
-      "country_name": "Thailand"
+      "country_name": "Thailand",
+      "iso3": "THA"
     },
     {
       "country_code": "TL",
@@ -761,7 +855,8 @@
       "currency_code": "USD",
       "phone_code": "+670",
       "tax_id_type": "Other",
-      "country_name": "Timor-Leste"
+      "country_name": "Timor-Leste",
+      "iso3": "TLS"
     },
     {
       "country_code": "TR",
@@ -769,7 +864,8 @@
       "currency_code": "TRY",
       "phone_code": "+90",
       "tax_id_type": "Other",
-      "country_name": "Turkey"
+      "country_name": "Turkey",
+      "iso3": "TUR"
     },
     {
       "country_code": "TT",
@@ -777,7 +873,8 @@
       "currency_code": "TTD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "Trinidad and Tobago"
+      "country_name": "Trinidad and Tobago",
+      "iso3": "TTO"
     },
     {
       "country_code": "TW",
@@ -785,7 +882,8 @@
       "currency_code": "TWD",
       "phone_code": "+886",
       "tax_id_type": "Other",
-      "country_name": "Taiwan"
+      "country_name": "Taiwan",
+      "iso3": "TWN"
     },
     {
       "country_code": "UA",
@@ -793,7 +891,8 @@
       "currency_code": "UAH",
       "phone_code": "+380",
       "tax_id_type": "Other",
-      "country_name": "Ukraine"
+      "country_name": "Ukraine",
+      "iso3": "UKR"
     },
     {
       "country_code": "UM",
@@ -801,7 +900,8 @@
       "currency_code": "USD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "United States Minor Outlying Islands"
+      "country_name": "United States Minor Outlying Islands",
+      "iso3": "UMI"
     },
     {
       "country_code": "US",
@@ -809,7 +909,8 @@
       "currency_code": "USD",
       "phone_code": "+1",
       "tax_id_type": "EIN",
-      "country_name": "United States of America"
+      "country_name": "United States of America",
+      "iso3": "USA"
     },
     {
       "country_code": "UY",
@@ -817,7 +918,8 @@
       "currency_code": "UYU",
       "phone_code": "+598",
       "tax_id_type": "Other",
-      "country_name": "Uruguay"
+      "country_name": "Uruguay",
+      "iso3": "URY"
     },
     {
       "country_code": "VA",
@@ -825,7 +927,8 @@
       "currency_code": "EUR",
       "phone_code": "+39",
       "tax_id_type": "Other",
-      "country_name": "Holy See (Vatican City State)"
+      "country_name": "Holy See (Vatican City State)",
+      "iso3": "VAT"
     },
     {
       "country_code": "VI",
@@ -833,7 +936,8 @@
       "currency_code": "USD",
       "phone_code": "+1",
       "tax_id_type": "Other",
-      "country_name": "U. S. Virgin Islands"
+      "country_name": "U. S. Virgin Islands",
+      "iso3": "VIR"
     },
     {
       "country_code": "XK",
@@ -841,7 +945,8 @@
       "currency_code": "EUR",
       "phone_code": "+383",
       "tax_id_type": "Other",
-      "country_name": "Kosovo"
+      "country_name": "Kosovo",
+      "iso3": ""
     },
     {
       "country_code": "ZA",
@@ -849,7 +954,8 @@
       "currency_code": "ZAR",
       "phone_code": "+27",
       "tax_id_type": "Other",
-      "country_name": "South Africa"
+      "country_name": "South Africa",
+      "iso3": "ZAF"
     }
   ]
 }

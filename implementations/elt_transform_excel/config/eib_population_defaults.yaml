@@ -141,3 +141,32 @@ eib_populations:
       "B", "C", "E", "I", "K", "P", "R", "S", "X", "Y", "AP",
       "CV", "DA", "DH", "EQ", "FB"
     ]
+
+  # --------------------------------------------------------------------------
+  # MASTER-DATA EIBs (added 2026-10-12). One entity = a BLOCK of rows sharing the
+  # Spreadsheet Key (col B); written by the shared modEntityBlockWriter helper
+  # (registry concern entity_row_block). ar_customer_master uses "Customer" and
+  # ap_supplier_master uses "Supplier" (both 2026-10-12).
+  # Template tab names are the v46.2 master templates' (A1 reads "Submit Customer - v46.2" /
+  # "Submit Supplier - v46.2"; the TAB name has no version suffix). Header rows 2-5, data row 6.
+  # clear_published_rows_end_col = the last column of each Master sheet's dimension
+  # (asserted against the Master files with openpyxl: NT = 384, RH = 476).
+  # --------------------------------------------------------------------------
+  "Customer":
+    target_sheet_name: "Submit Customer"
+    target_data_start_row: 6
+    clear_published_rows_end_col: "NT"
+    add_only_default: "Y"
+    submit_flag_default: "Y"
+    # B Spreadsheet Key, C Add Only, L Submit (generic plumbing of every master block).
+    safe_shared_columns: ["B", "C", "L"]
+
+  "Supplier":
+    target_sheet_name: "Submit Supplier"
+    target_data_start_row: 6
+    clear_published_rows_end_col: "RH"
+    add_only_default: "Y"
+    approval_status_default: "APPROVED"
+    submit_flag_default: "Y"
+    # B Spreadsheet Key, C Add Only, Q Approval Status, R Submit.
+    safe_shared_columns: ["B", "C", "Q", "R"]

@@ -63,34 +63,37 @@ meta:
   # empty and the template does not mention them. See excluded: for the per-tab breakdown.
   eib_coverage:
     Customer Name: 4 of 16
-    Customer Groups: 3 of 3
+    Customer Groups: 3 of 3  # band row only; Additional Customer Group removed 2026-10-12
     Customer Payment: 4 of 6
     Customer Currencies: 4 of 4
     Customer Tax: 10 of 11
     Customer Address: 13 of 31
-    Customer Phone: 12 of 22
-    Customer Email: 8 of 14
+    Customer Phone: 12 of 22  # one phone: Phone 2/3 removed 2026-10-12
+    Customer Email: 8 of 14  # one email: Email CC/BCC removed 2026-10-12
     Customer Document Delivery: 6 of 17
 
 template:
   worksheet_name: Customer
   header_row: 1
   data_start_row: 2
-  grain: one row per customer, with exactly one address
+  grain: one row per customer (one address, one email, one phone, one bank account); the Master Customers EIB spills the address lines onto one EIB row each
 
   instructions:
     enabled: true
     worksheet_name: Instructions
 
   fan_out:
+    # Operator rule 2026-10-12 (see decision single_value_per_area_address_lines_spill). The input
+    # template is one flat row per customer. In the Master Customers EIB every area is ONE row,
+    # except the address, whose non-blank Address Line 1/2/3 each go on their own EIB row.
     Customer Name: 1 row
-    Customer Groups: 1 band row (auto) + 1 row if Additional Customer Group is set
+    Customer Groups: 1 row (the automatic alphabetical band)
     Customer Payment: 1 row
     Customer Currencies: 1 row
     Customer Tax: 1 row
-    Customer Address: 1 row (exactly one address per customer - see decisions)
-    Customer Phone: 1 row per populated Phone 1/2/3 slot
-    Customer Email: 1 row per ';' value across Email To/CC/BCC
+    Customer Address: 1 EIB row per non-blank Address Line 1/2/3 (ADDRESS_LINE_1, _2, _3)
+    Customer Phone: 1 row
+    Customer Email: 1 row
     Customer Document Delivery: 1 row
 
 # Shared reference datasets to materialise as tabs, named only - each one describes itself in
@@ -116,36 +119,37 @@ lookups:
 - ref_document_email_recipient_statement
 
 decisions:
-- id: flat_row_no_nested_multivalue
+- id: single_value_per_area_address_lines_spill
   decided: >
-    HARD CONSTRAINT. One flat row per customer. The template does not support the multi-line
-    entries the Workday EIB uses for nested multi-value datasets (multiple groups, multiple
-    addresses, multiple bank accounts, etc.). Multi-value is allowed only as fixed numbered slot
-    columns or a single ';'-delimited cell. Anything needing more than that is excluded and done
-    directly in Workday after the customer is created.
+    One address, one email, one phone number, one bank account, one customer group (the automatic
+    band) per customer. The input template stays one flat row per customer. The ONE exception in
+    the Master Customers EIB output: an address is several address lines, so each non-blank
+    Address Line 1/2/3 is written on its own EIB row (Spreadsheet Key repeated, Address Row ID 1
+    repeated, Address Line Row ID = k, Type ADDRESS_LINE_k, Address Line Data = the line text),
+    as in the 3+ sample. Everything else is written once on the first EIB row.
   by: Operator
   date: 2026-10-12
   rationale: >
-    Operator, 2026-10-12, in the session that built ap_supplier: "we do not support multiline
-    entries (like the workday EIBs have) for enabling multi-value nested datasets (like defining
-    multiple groups, multiple addresses etc) - this is a quick tool for getting the
-    customer/supplier defined and then creating in workday - everthing thing else they doi in
-    wokday."
+    Operator, 2026-10-12 (verbatim): "only address - i thought we said we only support 1 address
+    1 email 1 phone number 1 bank account details and you have stated that for addresses - it
+    means spilling to multiple lines since an address is multipe address lines".
   consequence: >
-    Never add a child tab, a row-per-address/account/group structure, or repeating rows to this
-    template. The one-address, one-extra-group and slot decisions below all follow from this.
+    Never add a child tab or repeating rows for more addresses, emails, phones, groups or bank
+    accounts. Removed 2026-10-12: Additional Customer Group, Email CC Address, Email BCC Address,
+    Phone 2/3 and their Device Types. Renamed: Phone 1 -> Phone, Phone 1 Device Type -> Phone
+    Device Type, Email To Address -> Email Address (single, no ';'). Supersedes the earlier
+    flat_row_no_nested_multivalue hard constraint, the one-extra-group decision and the
+    1:N phone / email wording. Anything more is done directly in Workday.
 - id: customer_group_band_auto_extras_selected
   decided: >
     The alphabetical band row (Customers A - L / M - Z / 0 - 9) is assigned automatically from
-    Customer Name's first character. AR pick only the ONE extra group, in Additional Customer
-    Group, from a drop-down backed by the ref_customer_group tab.
+    Customer Name's first character. There is no extra-group column (removed 2026-10-12, see
+    single_value_per_area_address_lines_spill).
   by: Operator
   date: 2026-07-15
   rationale: >
     The band is mechanically determined by a value AR already typed - asking for it would be
-    asking them to compute a substring. The extra groups are a genuine choice: the reference
-    pipeline derived them from the GP customer_class via ref_workday_group_additional, and that
-    column does not exist here.
+    asking them to compute a substring. 
   consequence: >
     The band boundaries are CONFIG (config/ingest_lookups/ref_customer_group.json first_char_from/to + is_fallback), not
     code. workday_customer_groups.sql hard-codes them in a SQL CASE; the transform must read the
@@ -229,11 +233,13 @@ decisions:
     across three legal entities (FA, WNSL, NFC) during migration. This template creates one new
     customer at a time directly in Workday, so there is no merge and no second address.
   consequence: >
-    Address Line 1/2/3 are three lines of ONE address. No child Address tab, no address array,
-    no Address Code column. Address ID is always customer_id_MAIN_1, and Address Primary is
+    Address Line 1/2/3 are three lines of ONE address (each non-blank line becomes its own EIB
+    row in the Master Customers EIB - see single_value_per_area_address_lines_spill). No child
+    Address tab, no address array, no Address Code column. Address ID is always customer_id_MAIN_1, and Address Primary is
     always Yes.
 - id: phone_slots_not_delimited
   decided: >
+    SUPERSEDED 2026-10-12 by single_value_per_area_address_lines_spill (one phone only).
     Phones use numbered slots with a Device Type each (Phone 1 + Phone 1 Device Type, ...), NOT
     a ';' list. Email keeps ';'.
   by: Operator
@@ -248,7 +254,7 @@ decisions:
     remain ';'-delimited.
 - id: area_code_not_required
   decided: >
-    No Area Code column. The whole number, including the area code, goes in Phone 1/2/3 and lands
+    No Area Code column. The whole number, including the area code, goes in Phone and lands
     in Phone Number (Customer Phone!H). Area Code (Customer Phone!G) stays empty.
   by: Implementation partner (confirmed to the operator), 2026-07-15
   date: 2026-07-15
@@ -325,8 +331,8 @@ columns:
       assignment = auto_band, matching first_char_from..first_char_to; the row with is_fallback = Y
       applies when the first character falls in no band (i.e. is not A-Z). The band boundaries are
       config, NOT code: the reference pipeline hard-codes them in a SQL CASE
-      (workday_customer_groups.sql) and that must not be reproduced in the transform. Additional
-      Customer Groups adds further rows on top of this one.
+      (workday_customer_groups.sql) and that must not be reproduced in the transform. This is the
+      customer's only group (no extra-group column).
 
 - name: Reference ID
   required: false
@@ -353,23 +359,7 @@ columns:
 
 # --- Customer Groups tab (3 of 3 columns live) -----------------------------------------------
 # Every customer gets an alphabetical band row automatically (see Customer Name's drives entry).
-# AR only choose the EXTRA groups, if any. 402 of 4,132 reference customers carry a second group.
-- name: Additional Customer Group
-  required: false
-  type: text
-  description: >
-    One extra Workday customer group, over and above the alphabetical band row the transform
-    assigns from Customer Name. Leave blank for most customers. Single-valued, not a ';' list:
-    measured on the reference output, every one of the 4,132 customers has exactly one band row,
-    and all 402 customers with an extra group have exactly ONE - none has two. That is also what
-    makes a drop-down possible here, since a drop-down cannot produce a delimited list.
-    The band values are excluded from the list on purpose: the band row is assigned automatically,
-    so picking one here would duplicate it.
-  example: "FA Learning"
-  picklist: {lookup: ref_customer_group, column: customer_group, where: {assignment: selectable}}
-  feeds:
-  - {tab: Customer Groups, column: C, field: Customer Group, note: "one EXTRA row, in addition to the auto-assigned band row"}
-
+# No extra-group column (removed 2026-10-12); the band is assigned automatically.
 # --- Customer Payment tab (4 of 6 columns live) ----------------------------------------------
 - name: Payment Terms
   required: true
@@ -604,15 +594,14 @@ columns:
   - {tab: Customer Address, column: W, field: Primary}
 
 # --- Customer Phone tab (12 of 22 columns live) ----------------------------------------------
-# Numbered slots, not a ';' list: each EIB phone row carries its own Device Type. Slot position
-# supplies Type and Primary (see transform_supplied). 3 slots covers all but 4 of 3,290
-# reference customers. No Fax slot - the reference output has zero fax rows (see decisions).
+# ONE phone per customer (operator 2026-10-12, see single_value_per_area_address_lines_spill).
+# No Fax slot - the reference output has zero fax rows (see decisions).
 - name: Phone Country Code
   required: false
   type: text
   default: GB
   description: >
-    ISO 3166-1 alpha-2 code for this customer's phones. One code for all of them: per-customer,
+    ISO 3166-1 alpha-2 code for this customer's phone. One code: per-customer,
     not per-slot, since only 4 of 3,290 reference customers had phones spanning two countries.
     A SEPARATE column from Address Country Code, not a copy - they differ on 75 of 3,432 reference
     rows. Drives three EIB columns, including both of the phone tab's Generated Fields.
@@ -624,7 +613,7 @@ columns:
   - {tab: Customer Phone, column: D, field: Phone Country, rule: "ref_country.country_name for this code"}
   - {tab: Customer Phone, column: F, field: International Phone Code, rule: "ref_country.phone_code for this code, '+' stripped (+44 -> 44)"}
 
-- name: Phone 1
+- name: Phone
   required: false
   type: text
   description: >
@@ -635,42 +624,14 @@ columns:
   feeds:
   - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=primary, Primary=Yes}
 
-- name: Phone 1 Device Type
+- name: Phone Device Type
   required: false
   type: text
-  description: Required when Phone 1 is populated. Mobile or Landline.
+  description: Required when Phone is populated. Mobile or Landline.
   example: Mobile
   picklist: {lookup: ref_phone_device, column: phone_device}
   feeds:
-  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 1 row}
-
-- name: Phone 2
-  required: false
-  type: text
-  feeds:
-  - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=secondary}
-
-- name: Phone 2 Device Type
-  required: false
-  type: text
-  description: Required when Phone 2 is populated.
-  picklist: {lookup: ref_phone_device, column: phone_device}
-  feeds:
-  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 2 row}
-
-- name: Phone 3
-  required: false
-  type: text
-  feeds:
-  - {tab: Customer Phone, column: H, field: Phone Number, note: own row; Type=tertiary}
-
-- name: Phone 3 Device Type
-  required: false
-  type: text
-  description: Required when Phone 3 is populated.
-  picklist: {lookup: ref_phone_device, column: phone_device}
-  feeds:
-  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the Phone 3 row}
+  - {tab: Customer Phone, column: K, field: Phone Device Type, note: the single phone row}
 
 - name: Phone Public
   required: true
@@ -681,32 +642,16 @@ columns:
   - {tab: Customer Phone, column: L, field: Public, note: repeated on every phone row}
 
 # --- Customer Email tab (8 of 14 columns live) -----------------------------------------------
-# ';'-delimited, unlike phones: every address in one column shares that column's Type, so there
-# is no per-value attribute for the transform to guess.
-- name: Email To Address
+# ONE email per customer, no ';' (a ';' rejects the customer); Type=BUSINESS, Use For=BILLING.
+- name: Email Address
   required: false
   type: text
-  multi_value: "';'-delimited list"
   description: >
     The reference pipeline dropped an address already used by ANOTHER customer (a legacy-data
     artifact). That de-duplication is not reproduced - see open_questions.
-  example: "ar@acme.com; billing@acme.com"
+  example: "ar@acme.com"
   feeds:
-  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=to}
-
-- name: Email CC Address
-  required: false
-  type: text
-  multi_value: "';'-delimited list"
-  feeds:
-  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=cc}
-
-- name: Email BCC Address
-  required: false
-  type: text
-  multi_value: "';'-delimited list"
-  feeds:
-  - {tab: Customer Email, column: D, field: Email Address, note: one row per ';' value; Type=bcc}
+  - {tab: Customer Email, column: D, field: Email Address, note: the one email; Type=BUSINESS, Use For=BILLING (Master EIB EH)}
 
 - name: Email Public
   required: true
@@ -762,13 +707,13 @@ columns:
 # template column above.
 transform_supplied:
 - {tab: Customer Address, column: J, field: Address ID, rule: "customer_id || '_MAIN_1' - one address per customer"}
-- {tab: Customer Phone, column: C, field: Phone ID, rule: "customer_id || '_PH<slot>_1'"}
+- {tab: Customer Phone, column: C, field: Phone ID, rule: "customer_id || '_PH1_1'"}
 - {tab: Customer Phone, column: I, field: Formatted Phone Number, rule: "copy of Phone Number - identical in every reference row"}
-- {tab: Customer Phone, column: M, field: Primary, rule: "Yes for the lowest populated phone slot, No for the others"}
-- {tab: Customer Phone, column: N, field: Type, rule: "slot position: 1=primary, 2=secondary, 3=tertiary"}
-- {tab: Customer Email, column: C, field: Email ID, rule: "customer_id || '_EM<1|2|3>_<n>' by column and position"}
-- {tab: Customer Email, column: G, field: Primary, rule: "Yes for the first address in Email To, No for the others"}
-- {tab: Customer Email, column: H, field: Type, rule: "which column it was typed into: to / cc / bcc"}
+- {tab: Customer Phone, column: M, field: Primary, rule: "Yes (one phone)"}
+- {tab: Customer Phone, column: N, field: Type, rule: "BUSINESS (one phone)"}
+- {tab: Customer Email, column: C, field: Email ID, rule: "customer_id || '_EM1_1'"}
+- {tab: Customer Email, column: G, field: Primary, rule: "Yes (one email)"}
+- {tab: Customer Email, column: H, field: Type, rule: "BUSINESS (one email)"}
 
 # EIB columns that exist but are NEVER populated. The template does not mention them and the
 # transform leaves them empty. 60 of the 124 columns across these 9 tabs.
@@ -794,8 +739,8 @@ mapping_phase_findings:
 - {master_column: L, field: Submit, value: "Y", note: "constant"}
 - {master_column: BI, field: "Business Entity Name*", value: "= Customer Name", note: "restatement of a template column"}
 - {master_column: "CQ / DR / EG", field: "Type* (address / phone / email)", value: BUSINESS, note: "constant"}
-- {master_column: "CR / DS / EH", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT (email: BILLING)", note: "address and phone have no template column; Email Use For is a template column"}
-- {master_column: various, field: reference IDs, value: "e.g. NET_30, EMAIL, BILL_TO_CONTACTS, STATEMENT_CONTACTS, Customer_of_Goods", note: "Master takes Workday reference IDs. Lookups with no reference_id yet, needed at mapping: ref_document_delivery_method, ref_document_email_recipient_invoice, ref_document_email_recipient_statement, ref_transaction_tax_status."}
+- {master_column: "CR / DS / EH", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT (email: BILLING)", note: "address and phone have no template column; Email Use For is a template column. SUPERSEDED 2026-10-12: Use For is BILLING only; Email Use For and Public inputs are not loaded"}
+- {master_column: various, field: reference IDs, value: "e.g. NET_30, EMAIL, BILL_TO_CONTACTS, STATEMENT_CONTACTS, Customer_of_Goods", note: "Master takes Workday reference IDs. Lookups with no reference_id yet, needed at mapping: ref_document_delivery_method, ref_document_email_recipient_invoice, ref_document_email_recipient_statement, ref_transaction_tax_status. SUPERSEDED 2026-10-12: the reference_ids now exist"}
 
 open_questions:
 - id: default_payment_type_default

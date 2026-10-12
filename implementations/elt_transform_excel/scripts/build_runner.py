@@ -58,6 +58,48 @@ MAPPING_LOOKUP_SOURCES = (
     ("default", "ref_default", "domain", "value"),
 )
 
+# Runtime lookup sheet (hidden), read by VBA modHelpers.LookupRuntimeValue. Long format
+# (lookup_name | key | field | value) composed at build time from config/ingest_lookups/*.json,
+# which stays the single source. The existing 'mapping' sheet above is left untouched. LOOKUP_SHEET_NAME
+# must match modHelpers LOOKUP_SHEET_NAME (checked by _check_sheet_name_parity at hygiene time).
+LOOKUP_SHEET_NAME = "lookups"
+LOOKUP_HEADER = ("lookup_name", "key", "field", "value")
+# (lookup name, fields emitted). Each row of the lookup becomes one sheet row per non-empty field,
+# keyed by the lookup's own key_column. Rows whose field is empty (e.g. a region with no resolved
+# reference_id) are omitted, so the VBA reader returns "" and the transform can flag the row.
+RUNTIME_LOOKUP_SOURCES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    # display value -> Workday reference id
+    ("ref_customer_category", ("reference_id",)),
+    ("ref_payment_term", ("reference_id",)),
+    ("ref_payment_type", ("reference_id",)),
+    ("ref_document_delivery_method", ("reference_id",)),
+    ("ref_document_email_recipient_invoice", ("reference_id",)),
+    ("ref_document_email_recipient_statement", ("reference_id",)),
+    ("ref_transaction_tax_status", ("reference_id",)),
+    ("ref_phone_device", ("reference_id",)),
+    # "<ISO2>|<tax ID type>" -> Workday Tax_ID_Type reference id (key_column = country_tax_key)
+    ("ref_country_tax_id_type", ("reference_id",)),
+    ("ref_currency_default", ("currency_id",)),
+    # "<ISO2>|<tax ID type>" -> supplier Tax_ID_Type reference id (key_column = country_tax_key)
+    ("ref_supplier_country_tax_id_type", ("reference_id",)),
+    # currency code -> default_allowed (Yes/No); 'All Currencies' is not a valid default currency
+    ("ref_supplier_currency", ("default_allowed",)),
+    ("ref_supplier_category", ("reference_id",)),
+    ("ref_supplier_status", ("reference_id",)),
+    ("ref_supplier_transaction_tax_status", ("reference_id",)),
+    ("ref_po_issue_option", ("reference_id",)),
+    ("ref_bank_account_type", ("reference_id",)),
+    # group band rows: display -> reference id plus the first-character band
+    ("ref_customer_group",
+     ("reference_id", "assignment", "first_char_from", "first_char_to", "is_fallback")),
+    ("ref_supplier_group",
+     ("reference_id", "assignment", "first_char_from", "first_char_to", "is_fallback")),
+    # country code -> name / dialling code / ISO3
+    ("ref_country", ("country_name", "phone_code", "iso3")),
+    # "<ISO2>|<region name>" -> Workday region reference id
+    ("ref_country_region", ("reference_id",)),
+)
+
 
 @dataclass(frozen=True)
 class BootstrapStatus:
@@ -337,6 +379,7 @@ def main() -> int:
     _write_shell_defaults_config_block(output_path, transform_bindings)
     _rewrite_runner_formulas_block(output_path, transform_bindings)
     _write_mapping_sheet_block(output_path)
+    _write_runtime_lookup_sheet_block(output_path)
 
     print("Prep complete. Next, apply the root-path substitution (Step 3):")
     print()
@@ -438,6 +481,7 @@ def _verify_built_workbook(
     _verify_transform_registry(output_path, transform_bindings)
     _verify_shell_defaults_config(output_path, transform_bindings)
     _verify_mapping_sheet(output_path)
+    _verify_lookup_sheet(output_path)
     _verify_workbook_modules(output_path, module_names)
 
     print("Verification passed.")
@@ -624,6 +668,7 @@ def _validate_vba_source_hygiene(
     vb_name_re = re.compile(rb'^\s*Attribute\s+VB_Name\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
     errors: list[str] = []
     warnings: list[str] = []
+    errors.extend(_check_sheet_name_parity(vba_source))
 
     for module_name in module_names:
         # Locate the file on disk: rglob *.bas / *.cls
@@ -2576,6 +2621,11 @@ def _validate_vba_source_hygiene(
                 for col_letter in supp_cols.values():
                     if isinstance(col_letter, str):
                         eib_column_map_keys.add(col_letter)
+            elif eib_type in MASTER_EIB_COLUMN_MAP_KEYS:
+                master_cols = constants_dict.get(MASTER_EIB_COLUMN_MAP_KEYS[eib_type]) or {}
+                for col_letter in master_cols.values():
+                    if isinstance(col_letter, str):
+                        eib_column_map_keys.add(col_letter.strip())
             for col_match in column_index_letter_re.finditer(raw):
                 try:
                     col = col_match.group(1).decode("ascii")
@@ -2761,7 +2811,15 @@ VALID_HEADER_DETECTIONS = {"literal_row", "scan_required_headers"}
 # one archetype branch in _validate_transform_constants_schema). This is the
 # single place to extend when Business later brings Setup EIBs on.
 SUPPORTED_EIB_POPULATION_TYPES: frozenset[str] = frozenset(
-    {"Supplier Invoice", "Customer Invoice", "Supplier Invoice Adjustment"}
+    {
+        "Supplier Invoice",
+        "Customer Invoice",
+        "Supplier Invoice Adjustment",
+        # Master-data EIB archetypes (Submit Customer / Submit Supplier): one entity = a block
+        # of rows written by the shared modEntityBlockWriter helper.
+        "Customer",
+        "Supplier",
+    }
 )
 
 
@@ -2806,7 +2864,7 @@ def _load_eib_defaults(defaults_path: Path) -> dict[str, dict[str, object]]:
             f"  Defined   (YAML): {sorted(yaml_types)}\n"
             f"  Missing in YAML:  {missing_from_yaml}\n"
             f"  Extra   in YAML:  {extra_in_yaml}\n"
-            "To add a new archetype (e.g. Supplier Setup / Customer Setup), add "
+            "To add a new archetype (e.g. a new Setup EIB), add "
             "its name to SUPPORTED_EIB_POPULATION_TYPES + add a YAML block with "
             "the 8 shared keys (target_sheet_name, target_data_start_row, etc.) "
             "+ add one archetype branch in _validate_transform_constants_schema."
@@ -2839,6 +2897,17 @@ def _load_eib_defaults(defaults_path: Path) -> dict[str, dict[str, object]]:
             "auto_complete_default",
             "submit_flag_default",
             "default_currency_default",
+            "safe_shared_columns",
+        ),
+        "Customer": required_keys_base + (
+            "add_only_default",
+            "submit_flag_default",
+            "safe_shared_columns",
+        ),
+        "Supplier": required_keys_base + (
+            "add_only_default",
+            "approval_status_default",
+            "submit_flag_default",
             "safe_shared_columns",
         ),
     }
@@ -3424,10 +3493,69 @@ def _validate_transform_constants_schema(
                 "hierarchy pipeline and NO tax pipeline (Spend Category is left blank per "
                 "the GP-ingest workday_supplier_credit_note.sql precedent). Remove those blocks."
             )
+    elif eib_type in MASTER_EIB_COLUMN_MAP_KEYS:
+        _validate_master_eib_columns(
+            profile_path, transform_consts, eib_type, MASTER_EIB_COLUMN_MAP_KEYS[eib_type]
+        )
     else:
         raise ValueError(
             f"Profile '{profile_path}' has unknown eib_population_type "
             f"{eib_type!r}; no transform_constants archetype rules defined."
+        )
+
+
+# Master-data EIB archetypes ("Customer" -> Submit Customer, "Supplier" -> Submit Supplier):
+# eib_population_type -> the transform_constants key that pins every EIB column letter the
+# transform writes. Same CONFIG-FIRST contract as supplier_eib_columns / customer_invoice_eib_columns
+# (the VBA never parses it; Step 6d checks each ColumnIndex("XX") literal against it), but these
+# archetypes have NO worktag / tax pipeline, so the map is a flat {field_name: column letters}.
+MASTER_EIB_COLUMN_MAP_KEYS: dict[str, str] = {
+    "Customer": "customer_master_eib_columns",
+    "Supplier": "supplier_master_eib_columns",
+}
+_MASTER_FORBIDDEN_PIPELINE_KEYS = (
+    "worktag_business_objects", "fixed_literal_worktags", "derived_worktags",
+    "uniform_tax", "per_row_tax", "tax_mode",
+)
+
+
+def _validate_master_eib_columns(
+    profile_path: Path, transform_consts: dict, eib_type: str, map_key: str
+) -> None:
+    """Validate the flat EIB column map of a master-data archetype (Customer / Supplier).
+
+    Requires transform_constants.<map_key> = non-empty mapping of field name -> column letters
+    (A..ZZZ uppercase). Rejects the invoice worktag/tax pipeline blocks, which do not apply to a
+    master-data block layout."""
+    import re as _re
+
+    eib_cols = transform_consts.get(map_key)
+    if eib_cols is None:
+        raise ValueError(
+            f"Profile '{profile_path}' ({eib_type}) has no transform_constants.{map_key} block. "
+            "CANONICAL RULE: the CODING AGENT drives .bas implementation FROM the YAML only, so "
+            "every EIB column letter the transform writes must be pinned in this map FIRST."
+        )
+    if not isinstance(eib_cols, dict) or not eib_cols:
+        raise ValueError(
+            f"Profile '{profile_path}' {map_key} must be a non-empty mapping of "
+            "field name -> EIB column letters."
+        )
+    letter_re = _re.compile(r"^[A-Z]{1,3}$")
+    bad = sorted(
+        str(k) for k, v in eib_cols.items()
+        if not isinstance(v, str) or not letter_re.match(v.strip())
+    )
+    if bad:
+        raise ValueError(
+            f"Profile '{profile_path}' {map_key} entries {bad} are not 1-3 uppercase column "
+            "letters (quote the YAML values so 'N'/'Y' are not coerced to booleans)."
+        )
+    forbidden = [k for k in _MASTER_FORBIDDEN_PIPELINE_KEYS if transform_consts.get(k) is not None]
+    if forbidden:
+        raise ValueError(
+            f"Profile '{profile_path}' is {eib_type} (master-data) archetype but declares "
+            f"{forbidden}. Master-data blocks carry NO worktag or tax pipeline; remove them."
         )
 
 
@@ -4309,7 +4437,7 @@ def _parse_transform_binding(
                 f"SUPPORTED_EIB_POPULATION_TYPES = "
                 f"{sorted(SUPPORTED_EIB_POPULATION_TYPES)}.\n"
                 "Typos like 'Supplier_Invoices' will be caught here. To add a new archetype "
-                "(e.g. Supplier Setup / Customer Setup), add its name to build_runner.py "
+                "(e.g. a new Setup EIB), add its name to build_runner.py "
                 "SUPPORTED_EIB_POPULATION_TYPES + add an eib_population_defaults.yaml entry "
                 "+ add one archetype branch in _validate_transform_constants_schema."
             )
@@ -4566,6 +4694,99 @@ def _write_mapping_sheet_block(workbook_path: Path) -> None:
         if archive is not None:
             archive.close()
         workbook.close()
+
+
+def _runtime_lookup_rows() -> list[tuple[str, str, str, str]]:
+    """Compose the Runner 'lookups' sheet rows (lookup_name, key, field, value) from the
+    ingest_lookups ref tables named in RUNTIME_LOOKUP_SOURCES. Same loader as every other
+    reference dataset (create_ingest_template.load_lookup). Empty field values are omitted;
+    a duplicate (lookup, key, field) is a config error (VBA lookup would be ambiguous)."""
+    from create_ingest_template import load_lookup
+
+    rows: list[tuple[str, str, str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for lookup_name, fields in RUNTIME_LOOKUP_SOURCES:
+        doc = load_lookup(lookup_name)
+        key_column = doc.get("key_column")
+        if not isinstance(key_column, str) or not key_column:
+            raise RuntimeError(f"Lookup {lookup_name!r} has no key_column; cannot emit runtime rows.")
+        for row in doc["rows"]:
+            key = str(row.get(key_column, "")).strip()
+            if not key:
+                continue
+            for field in fields:
+                if field not in row:
+                    raise RuntimeError(
+                        f"Lookup {lookup_name!r} row {key!r} has no field {field!r} "
+                        "(RUNTIME_LOOKUP_SOURCES names a field the JSON does not carry)."
+                    )
+                value = str(row[field]).strip() if row[field] is not None else ""
+                if not value:
+                    continue
+                ident = (lookup_name, key.casefold(), field)
+                if ident in seen:
+                    raise RuntimeError(
+                        f"Lookup {lookup_name!r} key {key!r} field {field!r} appears twice; the "
+                        "runtime lookup key must be unique within a lookup."
+                    )
+                seen.add(ident)
+                rows.append((lookup_name, key, field, value))
+    return rows
+
+
+def _write_runtime_lookup_sheet_block(workbook_path: Path) -> None:
+    """Regenerate the hidden Runner 'lookups' sheet from RUNTIME_LOOKUP_SOURCES (a build output)."""
+    load_workbook = _import_openpyxl()
+
+    lookup_rows = _runtime_lookup_rows()
+    workbook = load_workbook(workbook_path, keep_vba=True)
+    try:
+        if LOOKUP_SHEET_NAME in workbook.sheetnames:
+            worksheet = workbook[LOOKUP_SHEET_NAME]
+            for row_index in range(1, worksheet.max_row + 1):
+                for column_index in range(1, len(LOOKUP_HEADER) + 1):
+                    worksheet.cell(row=row_index, column=column_index).value = None
+        else:
+            worksheet = workbook.create_sheet(LOOKUP_SHEET_NAME)
+        for column_index, header in enumerate(LOOKUP_HEADER, start=1):
+            worksheet.cell(row=1, column=column_index).value = header
+        for row_offset, lookup_row in enumerate(lookup_rows, start=2):
+            for column_index, value in enumerate(lookup_row, start=1):
+                worksheet.cell(row=row_offset, column=column_index).value = value
+        worksheet.sheet_state = "hidden"
+        workbook.save(workbook_path)
+    finally:
+        archive = getattr(workbook, "vba_archive", None)
+        if archive is not None:
+            archive.close()
+        workbook.close()
+
+
+def _check_sheet_name_parity(vba_source: Path) -> list[str]:
+    """Return errors when a Python sheet-name constant drifts from its modHelpers twin."""
+    import re
+
+    pairs = (
+        ("MAPPING_LOOKUP_SHEET_NAME", MAPPING_SHEET_NAME, "MAPPING_SHEET_NAME"),
+        ("LOOKUP_SHEET_NAME", LOOKUP_SHEET_NAME, "LOOKUP_SHEET_NAME"),
+    )
+    helpers = next(iter(vba_source.rglob("modHelpers.bas")), None)
+    if helpers is None:
+        return [f"modHelpers.bas not found under {vba_source}; cannot check sheet-name constants."]
+    text = helpers.read_text(encoding="ascii", errors="replace")
+    errors: list[str] = []
+    for vba_const, py_value, py_name in pairs:
+        match = re.search(
+            rf'^\s*Public\s+Const\s+{vba_const}\s+As\s+String\s*=\s*"([^"]*)"', text, re.MULTILINE
+        )
+        if match is None:
+            errors.append(f"modHelpers.bas has no Public Const {vba_const} (build_runner {py_name}).")
+        elif match.group(1) != py_value:
+            errors.append(
+                f"modHelpers.bas {vba_const} = {match.group(1)!r} but build_runner.py "
+                f"{py_name} = {py_value!r}. Keep the two in sync."
+            )
+    return errors
 
 
 def _clear_runner_tab_technical_columns(workbook_path: Path) -> None:
@@ -5457,6 +5678,35 @@ def _verify_mapping_sheet(workbook_path: Path) -> None:
         raise RuntimeError(
             "Built workbook mapping sheet mismatch: "
             f"expected {expected_rows!r}, got {actual_rows!r}"
+        )
+
+
+def _verify_lookup_sheet(workbook_path: Path) -> None:
+    """The built Runner must carry the hidden 'lookups' sheet exactly as composed from config."""
+    load_workbook = _import_openpyxl()
+
+    expected_rows = [LOOKUP_HEADER, *_runtime_lookup_rows()]
+    workbook = load_workbook(workbook_path, read_only=True, keep_vba=True)
+    try:
+        if LOOKUP_SHEET_NAME not in workbook.sheetnames:
+            raise RuntimeError(f"Built workbook is missing worksheet: {LOOKUP_SHEET_NAME}")
+        worksheet = workbook[LOOKUP_SHEET_NAME]
+        actual_rows = [
+            tuple(str(cell if cell is not None else "").strip() for cell in row[: len(LOOKUP_HEADER)])
+            for row in worksheet.iter_rows(min_row=1, max_row=len(expected_rows), values_only=True)
+        ]
+    finally:
+        archive = getattr(workbook, "vba_archive", None)
+        if archive is not None:
+            archive.close()
+        workbook.close()
+
+    if actual_rows != expected_rows:
+        raise RuntimeError(
+            "Built workbook lookups sheet mismatch: "
+            f"{len(actual_rows)} rows read, {len(expected_rows)} expected "
+            f"(first differing row: "
+            f"{next((i for i, (a, b) in enumerate(zip(actual_rows, expected_rows), 1) if a != b), None)})"
         )
 
 

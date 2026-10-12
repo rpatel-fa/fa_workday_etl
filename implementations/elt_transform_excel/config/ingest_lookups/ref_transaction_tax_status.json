@@ -1,22 +1,27 @@
 {
   "description": "Workday customer Transaction Tax Status values for the AR customer template. Snapshot of the Customer EIB `TransactionTaxStatus` named range; `Customer of Goods` is surfaced first as the most common BAU value.",
   "key_column": "transaction_tax_status",
-  "provenance": "Transcribed 2026-07-22 from the Customer EIB `TransactionTaxStatus` named range (Tenant Default Named Ranges!AY2, FA E2E Customers V1.xlsm). A snapshot, not a link.",
+  "provenance": "Transcribed 2026-07-22 from the Customer EIB `TransactionTaxStatus` named range (Tenant Default Named Ranges!AY2, FA E2E Customers V1.xlsm). A snapshot, not a link. reference_id added 2026-10-12 from the Customer EIB Transaction Tax Status / Transaction Tax Status ID named ranges ('Tenant Default Named Ranges'!AY/AZ, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm`); cross-checked to the Master Customers sample (Transaction Tax Status = Customer_of_Goods).",
   "rows": [
     {
-      "transaction_tax_status": "Customer of Goods"
+      "transaction_tax_status": "Customer of Goods",
+      "reference_id": "Customer_of_Goods"
     },
     {
-      "transaction_tax_status": "Customer of Services"
+      "transaction_tax_status": "Customer of Services",
+      "reference_id": "Customer_of_Services"
     },
     {
-      "transaction_tax_status": "NI Customer of Triangulation"
+      "transaction_tax_status": "NI Customer of Triangulation",
+      "reference_id": "NI_Customer_of_Triangulation"
     },
     {
-      "transaction_tax_status": "NI Customer of Goods"
+      "transaction_tax_status": "NI Customer of Goods",
+      "reference_id": "NI_Customer_of_Goods"
     },
     {
-      "transaction_tax_status": "Customer of Triangulation"
+      "transaction_tax_status": "Customer of Triangulation",
+      "reference_id": "Customer_of_Triangulation"
     }
   ]
 }
