@@ -27,6 +27,16 @@ Public Const RESULT_LABEL_SELECTION_KEY As String = "Selection Key"
 Public Const RESULT_LABEL_LAST_RUN_AT As String = "Last Run At"
 
 Public Const MAPPING_LOOKUP_SHEET_NAME As String = "mapping"
+
+' Runner workbook's hidden runtime-lookup sheet (lookup_name | key | field | value), composed at build
+' time from config/ingest_lookups by build_runner.py. Must match build_runner.py LOOKUP_SHEET_NAME.
+Public Const LOOKUP_SHEET_NAME As String = "lookups"
+Private Const LOOKUP_KEY_SEPARATOR As String = "|"
+
+' Per-workbook cache of the lookups sheet as a keyed Collection (built on first use).
+Private mLookupCache As Collection
+Private mLookupCacheWorkbook As String
+Private mLookupCacheRows As Long
 Public Const REGISTRY_SHEET_NAME As String = "registry"
 Public Const RUNNER_SHEET_NAME As String = "Runner"
 
@@ -70,6 +80,71 @@ Public Function LookupMappingValue(ByVal runnerWorkbook As Workbook, ByVal entit
 
     LookupMappingValue = vbNullString
 End Function
+
+' Runtime reference lookup against the Runner workbook's hidden "lookups" sheet: returns the value
+' of field `fieldName` for row `keyValue` of ingest lookup `lookupName` (e.g. display value ->
+' reference_id, country code -> iso3, "GB|Warwickshire" -> region reference id). Matching is case
+' and surrounding-space insensitive. Returns vbNullString when the sheet is missing or nothing
+' matches; callers decide the fallback (e.g. reject the row). Separate from LookupMappingValue,
+' which is unchanged. The sheet is read once into a keyed Collection (cached per workbook).
+Public Function LookupRuntimeValue(ByVal runnerWorkbook As Workbook, ByVal lookupName As String, ByVal keyValue As String, ByVal fieldName As String) As String
+    Dim cacheKey As String
+
+    EnsureRuntimeLookupCache runnerWorkbook
+    If mLookupCache Is Nothing Then
+        LookupRuntimeValue = vbNullString
+        Exit Function
+    End If
+
+    cacheKey = LCase$(Trim$(lookupName)) & LOOKUP_KEY_SEPARATOR & LCase$(Trim$(fieldName)) & LOOKUP_KEY_SEPARATOR & LCase$(Trim$(keyValue))
+    On Error Resume Next
+    LookupRuntimeValue = CStr(mLookupCache(cacheKey))
+    If Err.Number <> 0 Then
+        Err.Clear
+        LookupRuntimeValue = vbNullString
+    End If
+    On Error GoTo 0
+End Function
+
+' Drops the runtime-lookup cache (call after the Runner workbook's lookups sheet is rebuilt in-session).
+Public Sub ResetRuntimeLookupCache()
+    Set mLookupCache = Nothing
+    mLookupCacheWorkbook = vbNullString
+    mLookupCacheRows = 0
+End Sub
+
+Private Sub EnsureRuntimeLookupCache(ByVal runnerWorkbook As Workbook)
+    Dim lookupSheet As Worksheet
+    Dim lastRow As Long
+    Dim rowIndex As Long
+    Dim cacheKey As String
+
+    On Error Resume Next
+    Set lookupSheet = runnerWorkbook.Worksheets(LOOKUP_SHEET_NAME)
+    On Error GoTo 0
+    If lookupSheet Is Nothing Then
+        ResetRuntimeLookupCache
+        Exit Sub
+    End If
+
+    lastRow = lookupSheet.Cells(lookupSheet.Rows.Count, 1).End(xlUp).Row
+    If Not mLookupCache Is Nothing Then
+        If StrComp(mLookupCacheWorkbook, runnerWorkbook.FullName, vbBinaryCompare) = 0 And mLookupCacheRows = lastRow Then Exit Sub
+    End If
+
+    Set mLookupCache = New Collection
+    For rowIndex = 2 To lastRow
+        cacheKey = LCase$(Trim$(CStr(lookupSheet.Cells(rowIndex, 1).Value))) & LOOKUP_KEY_SEPARATOR & _
+            LCase$(Trim$(CStr(lookupSheet.Cells(rowIndex, 3).Value))) & LOOKUP_KEY_SEPARATOR & _
+            LCase$(Trim$(CStr(lookupSheet.Cells(rowIndex, 2).Value)))
+        On Error Resume Next
+        mLookupCache.Add Trim$(CStr(lookupSheet.Cells(rowIndex, 4).Value)), cacheKey
+        Err.Clear
+        On Error GoTo 0
+    Next rowIndex
+    mLookupCacheWorkbook = runnerWorkbook.FullName
+    mLookupCacheRows = lastRow
+End Sub
 
 Public Function CloneTemplateWorkbook(ByVal templatePath As String, Optional ByVal outputPath As String = vbNullString) As Workbook
     Dim resolvedOutputPath As String

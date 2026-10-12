@@ -192,7 +192,7 @@ transform module — not a generic relational `FilterRows`/`JoinRows`/`GroupByRo
 | **`config/reference_paths.yaml`** | Single source of truth for the shared reference files (Workday customer extract, supplier extract, finance Mapping MASTER + tab). The build injects these into each transform's registry row unless the profile's `shell_defaults` overrides the key (profile wins). Loaded once per build; not globbed as a profile. | Edited when a Workday extract or the finance mapping master is reissued. | Yes — source of truth for the shared reference-file paths. |
 | **`config/transform_specs/`** | Per-transform canonical authoring files (see `docs/ADDING_A_TRANSFORM.md`). Hold the mapping, derived-field rules, shared-helper selections, and the finance decision record. Deliberately outside `config/transforms/` so the build never parses them as profiles. Parsed by hygiene/parity tooling to ensure the checked-in VBA stays justified by config. | Written/edited whenever the mapping or a coding decision changes. | Yes — source of truth for transform behaviour. |
 | **`vba_src/`** | Plain-text `.bas`/`.cls` implementation artifacts for every VBA module, including the bootstrap importer: dispatcher, shared helpers, shared source-table operations, shared finance-domain helpers, and one module per transform step. | Updated only in lock-step with the canonical config/specs and shared-helper registry. | Yes — text implementation artifact imported into the Runner, but never authoritative over config. |
-| **Deployed Runner** (`.xlsm`) | Runner Shell + every module from `vba_src/`, synchronised by `scripts/build_runner.py`. This is what finance users actually open. Carries the `mapping` lookup tab, regenerated from `config/ingest_lookups/ref_company.json` + `ref_default.json` at build time. | Rebuilt whenever `vba_src/` changes. | No — build output. |
+| **Deployed Runner** (`.xlsm`) | Runner Shell + every module from `vba_src/`, synchronised by `scripts/build_runner.py`. This is what finance users actually open. Carries the `mapping` lookup tab, regenerated from `config/ingest_lookups/ref_company.json` + `ref_default.json` at build time, and the hidden `lookups` runtime-lookup tab (see "Runtime lookup sheet"). | Rebuilt whenever `vba_src/` changes. | No — build output. |
 | **Output workbook** | A clone of the Target EIB template, populated directly from the source/customer-extract lookup join — no intermediate workbook. | Produced at the end of a successful run. | No — run output. |
 | **`RunnerLog.csv` / `RunnerStatus.txt` / `<output>.rejects.csv`** | Run observability files written by every transform via native VBA file I/O (no `FileSystemObject`). `RunnerLog.csv` (append-only run history) and `RunnerStatus.txt` (overwritten with live progress) are runner-scoped singletons written beside `Runner.xlsm`. The rejects file is written **beside the run's output EIB**, named to pair with it (`AP_Travel_output.xlsx` → `AP_Travel_output.rejects.csv`), reset per run, and lists each rejected source row with its reason and the source value the reject turned on (`BuildRejectLogPath` in `modHelpers`; falls back to `RunnerRejects_<transform>.csv` beside `Runner.xlsm` if the output location can't be resolved). Best-effort; see `docs/RUNBOOK.md`'s "Watching a Run". | Written on each run; survive rebuilds; user-deletable. | No — run output. |
 
@@ -235,6 +235,17 @@ Source Data, Customer Spreadsheet (user file paths)         Target EIB (user fil
   at runtime rather than baked into the VBA — contrast with the per-transform `mapping:` section in
   `config/transform_specs/<key>.yaml`, which is the canonical declaration of the field-mapping shape
   and shared-helper usage that the checked-in VBA must satisfy.
+- **Runtime lookup sheet** (`lookups`, hidden) — long-format `lookup_name | key | field | value` rows
+  read via `modHelpers.LookupRuntimeValue(runnerWorkbook, lookupName, key, field)` (cached into a keyed
+  Collection on first use). Added 2026-10-12 for the Customer / Supplier master EIBs, which must turn
+  the display values chosen in the ingest templates into Workday reference IDs: display -> `reference_id`
+  (payment term/type, categories, status, group bands, delivery method, email recipient options, tax
+  statuses, PO issue option, bank account type), country code -> `country_name` / `phone_code` / `iso3`, and
+  `"<ISO2>|<region>"` -> region `reference_id`. Composed by `scripts/build_runner.py`
+  (`RUNTIME_LOOKUP_SOURCES`) from `config/ingest_lookups/*.json`, which stays the single source; rows with
+  an empty value (e.g. a region with no resolved ID) are omitted so the reader returns an empty string.
+  It is separate from `mapping`, whose rows and reader are unchanged. `LOOKUP_SHEET_NAME` (VBA) and
+  `LOOKUP_SHEET_NAME` (`build_runner.py`) are checked for parity at hygiene time.
 - **Bootstrap importer macro** — sourced from `vba_src/bootstrap/BootstrapImporter.bas` and injected by
   `scripts/create_runner_shell.py`. Given a folder path, it imports every `.bas`/`.cls` file found into
   the workbook's VBA project and saves. This is what lets every other module be edited as a text file,
@@ -253,6 +264,15 @@ Source Data, Customer Spreadsheet (user file paths)         Target EIB (user fil
   Target EIB template, clearing previously-published output rows (`ClearPublishedRows`), reading a
   worksheet's used range into an in-memory 2D array in one bulk read, reading/writing the control
   sheet's labelled cells, and run status/progress/log emission. This module stays domain-free.
+- **Shared entity-block writer** (`modEntityBlockWriter.bas`, registry concern `entity_row_block` /
+  variant `item_index_block`) — writes ONE master-data entity (customer, supplier) as a block of
+  consecutive EIB rows sharing the Spreadsheet Key in column B: `EntityBlockReset`,
+  `EntityBlockAddItem(colLetter, itemIndex, value)`, `EntityBlockAddAncestor(colLetter, value,
+  areaColLetters)`, `EntityBlockFlush(ws, startRow, spreadsheetKey)` (returns the next free row). Block height =
+  the largest item index; row k gets item k of each list; the parent Row ID columns are repeated on
+  continuation rows that carry data for their area. Generic (no customer/supplier strings). Code-complete,
+  **pending the manual Excel import** (not yet run in Excel); no transform selects it until the
+  `ar_customer_master` / `ap_supplier_master` changes.
 - **Shared source-table module** (`modSourceTable.bas`) — the general table-operations layer that
   operates on the in-memory array produced by `modHelpers.ReadWorksheetTable`: `ColumnIndex`,
   `FindHeaderRow`, `FindColumnIndexInRow`/`FindOptionalColumnIndexInRow`, `RowContainsHeader`,

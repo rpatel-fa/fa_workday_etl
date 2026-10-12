@@ -1,13 +1,15 @@
 {
   "description": "Customer document delivery method values for the AR customer template. The migration SQL remains the source of truth here, so the allowed values follow the live `workday_customer_document_delivery.sql` output (`Email`, `Print`). The CCS `FA E2E Customers V1.xlsm` workbook is a secondary reference only when the migration leaves a genuine gap.",
   "key_column": "document_delivery_method",
-  "provenance": "Snapshot created 2026-07-22 from `elt_ingest_excel/config/transform/sql/finance/customer/workday_customer_document_delivery.sql`, which emits `Email` or `Print` for both invoice and statement delivery. The CCS workbook `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm` remains a supplemental reference, not the authority for this lookup.",
+  "provenance": "Snapshot created 2026-07-22 from `elt_ingest_excel/config/transform/sql/finance/customer/workday_customer_document_delivery.sql`, which emits `Email` or `Print` for both invoice and statement delivery. The CCS workbook `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm` remains a supplemental reference, not the authority for this lookup. reference_id added 2026-10-12 from the Customer EIB Invoice_Delivery_Method named range ('Tenant Default Named Ranges'!A/B, `/Users/Rakesh.Patel/Documents/__data/excel/threeplus/CCS/FA E2E Customers V1.xlsm`); cross-checked to the Master Customers sample (Invoice/Statement Delivery Type = EMAIL). 'Print' has NO entry in that tenant range (it lists Email, Mail only), so its reference_id is left empty rather than guessed; confirm the Workday ID before AR use.",
   "rows": [
     {
-      "document_delivery_method": "Email"
+      "document_delivery_method": "Email",
+      "reference_id": "EMAIL"
     },
     {
-      "document_delivery_method": "Print"
+      "document_delivery_method": "Print",
+      "reference_id": ""
     }
   ]
 }

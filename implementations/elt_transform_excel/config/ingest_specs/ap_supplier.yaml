@@ -29,7 +29,7 @@ meta:
     column to header row 3 of the EIB workbook below.
   validated_against: >
     Not yet. ~/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx (sheet
-    'Submit Supplier - v46.2', 2 sample suppliers) is the 3+ load file this template will be
+    'Submit Supplier', 2 sample suppliers) is the 3+ load file this template will be
     mapped to in a later step. It is recorded here as that target only; nothing in this spec has
     been validated against it beyond the notes in mapping_phase_findings.
   eib_workbook: FA E2E Suppliers V1.xlsm
@@ -281,7 +281,7 @@ columns:
     the 'Supplier Status Data (AL)' prep sheet); the 3+ Master load file carries it as Status*.
   picklist: {lookup: ref_supplier_status, column: supplier_status}
   feeds_master:
-    sheet: Submit Supplier - v46.2
+    sheet: Submit Supplier
     column: MI
     field: Status*
     status: unverified-until-mapping
@@ -744,7 +744,7 @@ excluded_tabs:
 - {tabs: "Supplier Contact Name, Supplier Contact Address, Supplier Contact Phone, Supplier Contact Email", reason: "not in publish_supplier.json - contacts are not migrated"}
 - {tabs: "Supplier Prep (AL), Supplier (AL), Supplier Class Prep (AL), Supplier Group Ref (AL), Supplier Currencies (AL), Supplier Status Data (AL), Supplier Class Data (AL), Supplier Class Field (AL)", reason: "workbook preparation sheets, not EIB load tabs"}
 
-# Recorded for the LATER mapping step to Master Suppliers.xlsx ('Submit Supplier - v46.2').
+# Recorded for the LATER mapping step to Master Suppliers.xlsx ('Submit Supplier').
 # Not template columns and not acted on now. Letters are Master sheet columns.
 mapping_phase_findings:
 - {master_column: Q, field: Approval Status, value: APPROVED, note: "constant on both samples"}

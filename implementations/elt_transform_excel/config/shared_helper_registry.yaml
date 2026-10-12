@@ -319,6 +319,57 @@ shared_helpers:
         - ar_bulk_invoice
 
   # --------------------------------------------------------------------------
+  # ENTITY ROW BLOCK (one entity -> N EIB rows; master-data EIBs)
+  # --------------------------------------------------------------------------
+  # Added 2026-10-12 as shared infrastructure for the Customer / Supplier master EIBs
+  # (population types "Customer" and "Supplier"). No transform selects it yet; examples
+  # are filled when the master transforms are added.
+  entity_row_block:
+
+    item_index_block:
+      description: >
+        Write ONE entity (customer, supplier, ...) as a BLOCK of consecutive EIB rows that share a
+        Spreadsheet Key (column B). The transform collects values per entity with
+        EntityBlockAddItem(colLetter, itemIndex, value) -- itemIndex is the 1-based position of the
+        value inside its multi-value list or child area (item 1 = single-valued fields and the first
+        list entry). Ancestor Row ID columns of a child area are registered once with
+        EntityBlockAddAncestor(colLetter, value, areaColLetters), where areaColLetters is the
+        comma-separated list of item columns that make up that child area. EntityBlockFlush then writes the block: height =
+        the largest itemIndex seen, row k receives item k of every list that has at least k items,
+        and the registered ancestor Row ID columns are repeated on every continuation row (k > 1)
+        that carries data for that area. Spreadsheet Key is written in column B on every block row.
+        The helper holds no entity-specific strings: column letters, values and the key come from
+        the calling transform, whose column letters are pinned in the profile's
+        customer_master_eib_columns / supplier_master_eib_columns map.
+      vba_module: modEntityBlockWriter.bas
+      vba_public_fn:
+        - EntityBlockReset
+        - EntityBlockAddItem
+        - EntityBlockAddAncestor
+        - EntityBlockFlush
+      execution_order:
+        - "1. EntityBlockReset clears the per-entity buffers (call once before each entity)."
+        - "2. EntityBlockAddItem(colLetter, itemIndex, value) for every value of the entity; item 1 carries single-valued fields."
+        - "3. EntityBlockAddAncestor(colLetter, value, areaColLetters) for each parent Row ID column; areaColLetters names the item columns of the child area the Row ID belongs to."
+        - "4. EntityBlockFlush(ws, startRow, spreadsheetKey) writes the block and returns the next free row."
+      invariants:
+        - rule: "Block height is the maximum itemIndex added; an entity with no items writes nothing and returns startRow."
+          rationale: "A zero-height block would otherwise emit a stray key-only row that Workday rejects."
+        - rule: "Row k receives item k of each column's list only; a column with fewer than k items stays blank on row k."
+          rationale: "Matches the observed Workday master sample layout where shorter lists do not repeat their values."
+        - rule: "Registered ancestor Row ID columns are repeated on continuation rows only where at least one of its area's item columns holds data on that row."
+          rationale: "Workday needs the parent Row ID on a child-area row to attach the child to the right parent; repeating it on rows with no child data would create phantom child rows."
+        - rule: "Spreadsheet Key is written to column B of every block row."
+          rationale: "The key is what groups the rows into one entity; a missing key splits the entity."
+        - rule: "Plain VBA Collection and arrays only (no Scripting.Dictionary, no ActiveX); column letters are resolved through the shared ColumnIndex at flush time."
+          rationale: "Identical behaviour on Mac and Windows Excel; matches modInvoiceGrouping."
+        - rule: "The module contains no customer or supplier specific strings."
+          rationale: "One generic helper serves both master EIBs; entity specifics belong in the transform and its YAML column map."
+      requires_columns:
+        - Spreadsheet Key (EIB column B)
+      examples: []
+
+  # --------------------------------------------------------------------------
   # ACCOUNTING STRING / FINAL CODE DERIVATION
   # --------------------------------------------------------------------------
   accounting_string_derivation:
