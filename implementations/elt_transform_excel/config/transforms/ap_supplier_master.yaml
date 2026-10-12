@@ -1,0 +1,176 @@
+version: 1
+
+transform:
+  key: ap_supplier_master
+  label: AP Supplier Master
+  source_type: AP Supplier
+  eib_population_type: Supplier
+  start_row: 6
+  description: >
+    The populated AP Supplier input template (config/ingest_specs/ap_supplier.yaml, sheet
+    "Supplier") is cloned into the 3+ Master Suppliers EIB (sheet "Submit Supplier", data from
+    row 6, template /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx).
+    One input row = one supplier = one block of EIB rows sharing the Spreadsheet Key (column B).
+    1:1 rule (operator, 2026-10-12): a single value per area -- Use For BILLING only, one
+    supplier group (the automatic alphabetical band), one payment type, one email, one phone,
+    one bank account, every Row ID = 1.
+    ONE exception (operator, 2026-10-12): each non-blank Address Line 1..3 is written on its own
+    EIB row, as in the 3+ sample (Master Suppliers rows 6-7); written through the shared
+    modEntityBlockWriter. Supplier ID and Reference ID are typed by AP (never generated).
+    No fallbacks: a missing required value or a missing Workday reference ID rejects the whole
+    supplier. See config/transform_specs/ap_supplier_master.yaml for the decision record + mapping.
+
+runtime:
+  step_list_macro: RunApSupplierMaster
+
+source_layout:
+  worksheet_resolution: named
+  worksheet_name: Supplier
+  header_row: 1
+  data_start_row: 2
+  header_detection: literal_row
+  # Every input-template column the macro reads (FindColumnIndexInRow raises on a missing one).
+  required_headers:
+    - Supplier ID
+    - Supplier Name
+    - Reference ID
+    - Supplier Category
+    - Supplier Status
+    - Payment Terms
+    - Default Payment Type
+    - Default Currency
+    - Transaction Tax Status
+    - Tax Status Country Code
+    - Tax ID
+    - Tax ID Type
+    - Tax ID Country Code
+    - Purchase Order Issue Option
+    - Use Supplier Reference as Default Supplier Payment Memo
+    - Bank Country Code
+    - Bank Currency
+    - Bank Account Type
+    - Bank Name
+    - Bank Account Name
+    - Bank Account Number
+    - Sort Code/Routing Number
+    - IBAN
+    - SWIFT/BIC
+    - Roll Number
+    - Check Digit
+    - Branch ID
+    - Address Country Code
+    - Address Line 1
+    - Address Line 2
+    - Address Line 3
+    - City
+    - Region
+    - Postcode
+    - Phone Country Code
+    - Phone
+    - Phone Device Type
+    - Email Address
+
+transform_constants:
+  # Master-data archetype: NO worktag / tax pipeline. The flat map below pins every EIB column
+  # letter the transform writes (Step 6d checks each ColumnIndex("XX") literal in the .bas against
+  # it). Letters verified against the Master Suppliers.xlsx 'Submit Supplier' header (rows 2-5).
+  # B, DM, DO, DP are written by modEntityBlockWriter (letters passed as strings, not ColumnIndex
+  # literals); they are pinned here so the contract is complete.
+  fixed_usage_type: BUSINESS
+  fixed_use_for: BILLING
+  fixed_yes_flag: "Y"
+  fixed_row_id: "1"
+  max_address_lines: 3
+  supplier_master_eib_columns:
+    spreadsheet_key:           B  # Spreadsheet Key* (written by EntityBlockFlush on every block row)
+    add_only:                  C  # Add Only -- fixed "Y"
+    supplier_id:               H  # Supplier ID (typed by AP)
+    supplier_reference_id:     I  # Supplier Reference ID (input "Reference ID", as typed)
+    supplier_name:             K  # Supplier Name
+    approval_status:           Q  # Approval Status -- fixed APPROVED
+    submit:                    R  # Submit -- fixed "Y"
+    tax_id_row_id:             AA # Tax ID Data+ Row ID** -- "1" when a Tax ID is typed
+    tax_id_text:               AC # Tax ID Text
+    tax_id_type:               AD # Tax ID Type* -- Tax_ID_Type reference_id
+    tax_id_transaction:        AE # Transaction Tax ID -- fixed "Y"
+    tax_id_primary:            AF # Primary Tax ID -- fixed "Y"
+    tax_status_row_id:         AP # Tax Status Data+ Row ID** -- "1"
+    tax_status_country:        AR # Country* (ISO2)
+    transaction_tax_status:    AS # Transaction Tax Status -- reference_id
+    supplier_category:         AU # Supplier Category -- reference_id
+    supplier_group:            AV # Supplier Group+ -- automatic band reference_id (only group)
+    po_issue_option:           BW # Purchase Order Issue Option -- reference_id
+    po_email_row_id:           BZ # Default PO Issue Email Row ID** -- "1" when an email is typed
+    po_email_address:          CC # Default PO Issue Email Address = the email
+    payment_terms:             CR # Payment Terms -- reference_id
+    payment_types_accepted:    CT # Payment Types Accepted+ -- the Default Payment Type reference_id only
+    default_payment_type:      CU # Default Payment Type -- reference_id
+    business_entity_name:      CZ # Business Entity Name = Supplier Name
+    address_row_id:            DD # Address Data+ Row ID* -- "1" on every block row of an address line
+    address_format_type:       DF # Address Format Type -- fixed BASIC
+    address_effective_date:    DJ # Address Effective Date -- fixed 1900-01-01 (text)
+    address_country:           DK # Address Country (ISO2)
+    address_line_row_id:       DM # Address Line Data+ Row ID* = k (writer item)
+    address_line_type:         DO # Address line Type = ADDRESS_LINE_k (writer item)
+    address_line_data:         DP # Address Line Data (writer item)
+    address_city:              DQ # Municipality = City
+    address_iso2:              DS # ISO 3166 1 Alpha 2 Code
+    address_region:            DX # Country Region -- region reference_id
+    address_region_descriptor: DY # Country Region Descriptor = Region
+    address_postcode:          ED # Postal Code
+    address_usage_row_id:      EE # Usage Data+ Row ID* (address)
+    address_public:            EF # Public -- fixed "Y"
+    address_type_row_id:       EG # Type Data+ Row ID** (address)
+    address_primary:           EH # Primary -- fixed "Y"
+    address_type:              EI # Type* -- fixed BUSINESS
+    address_use_for:           EJ # Use For+ -- fixed BILLING
+    address_id:                EP # Address ID = <Supplier ID>_MAIN_1
+    phone_row_id:              EQ # Phone Data+ Row ID*
+    phone_iso3:                FA # Country ISO Code (ISO3)
+    phone_intl_code:           FB # International Phone Code (no '+')
+    phone_number:              FC # Phone Number
+    phone_device_type:         FE # Phone Device Type -- reference_id
+    phone_usage_row_id:        FF # Usage Data+ Row ID* (phone)
+    phone_public:              FG # Public -- fixed "Y"
+    phone_type_row_id:         FH # Type Data+ Row ID** (phone)
+    phone_primary:             FI # Primary -- fixed "Y"
+    phone_type:                FJ # Type* -- fixed BUSINESS
+    phone_use_for:             FK # Use For+ -- fixed BILLING
+    email_row_id:              FP # Email Address Data+ Row ID*
+    email_address:             FS # Email Address
+    email_usage_row_id:        FU # Usage Data+ Row ID* (email)
+    email_public:              FV # Public -- fixed "Y"
+    email_type_row_id:         FW # Type Data+ Row ID** (email)
+    email_primary:             FX # Primary -- fixed "Y"
+    email_type:                FY # Type* -- fixed BUSINESS
+    email_use_for:             FZ # Use For+ -- fixed BILLING
+    email_id:                  GD # ID = <Supplier ID>_EM1_1
+    bank_row_id:               HM # Settlement Account Data+ Row ID** -- "1"
+    bank_country:              HP # Bank Country (ISO2)
+    bank_currency:             HQ # Bank Currency
+    bank_account_type:         HS # Bank Account Type -- reference_id (DDA / SA)
+    bank_name:                 HT # Bank Name
+    bank_routing:              HU # Routing Transit Number = Sort Code/Routing Number (text)
+    bank_branch_id:            HV # Branch ID (text)
+    bank_account_number:       HX # Bank Account Number (text)
+    bank_check_digit:          HY # Check Digit (text)
+    bank_account_name:         HZ # Bank Account Name
+    bank_roll_number:          IA # Roll Number (text)
+    bank_iban:                 IB # IBAN (text)
+    bank_swift:                IC # SWIFT Bank Identification Code (text)
+    status_row_id:             MH # Status Data+ Row ID* -- "1"
+    status:                    MI # Status* -- the sample's upper-case form (ACTIVE)
+    payment_memo_flag:         MQ # Use Supplier Reference as Default Supplier Payment Memo (Y/N)
+    currency:                  MT # Currency = Default Currency
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/supplier/source/ap_supplier.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/supplier/target/Master_Suppliers_ap_supplier_master_output.xlsx
+  source_worksheet_resolution: named
+  source_worksheet_name: Supplier
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet are inherited from
+  # config/reference_paths.yaml but NOT loaded at runtime: every Workday reference ID comes from
+  # the Runner's hidden 'lookups' sheet (modHelpers.LookupRuntimeValue).

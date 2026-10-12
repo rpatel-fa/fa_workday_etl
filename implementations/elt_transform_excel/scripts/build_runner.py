@@ -80,6 +80,10 @@ RUNTIME_LOOKUP_SOURCES: tuple[tuple[str, tuple[str, ...]], ...] = (
     # "<ISO2>|<tax ID type>" -> Workday Tax_ID_Type reference id (key_column = country_tax_key)
     ("ref_country_tax_id_type", ("reference_id",)),
     ("ref_currency_default", ("currency_id",)),
+    # "<ISO2>|<tax ID type>" -> supplier Tax_ID_Type reference id (key_column = country_tax_key)
+    ("ref_supplier_country_tax_id_type", ("reference_id",)),
+    # currency code -> default_allowed (Yes/No); 'All Currencies' is not a valid default currency
+    ("ref_supplier_currency", ("default_allowed",)),
     ("ref_supplier_category", ("reference_id",)),
     ("ref_supplier_status", ("reference_id",)),
     ("ref_supplier_transaction_tax_status", ("reference_id",)),

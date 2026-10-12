@@ -322,8 +322,8 @@ shared_helpers:
   # ENTITY ROW BLOCK (one entity -> N EIB rows; master-data EIBs)
   # --------------------------------------------------------------------------
   # Added 2026-10-12 as shared infrastructure for the Customer / Supplier master EIBs
-  # (population types "Customer" and "Supplier"). ar_customer_master selects it (2026-10-12) for
-  # the address-line rows; ap_supplier_master will follow.
+  # (population types "Customer" and "Supplier"). ar_customer_master and ap_supplier_master select it
+  # (2026-10-12) for the address-line rows.
   entity_row_block:
 
     item_index_block:

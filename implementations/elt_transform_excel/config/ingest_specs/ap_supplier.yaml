@@ -9,6 +9,10 @@
 # derives nothing from them. Every value that has a tenant list is a drop-down built from the
 # EIB workbook's own named ranges, so AP pick rather than type.
 #
+# Operator, 2026-10-12 (final rule, see decision single_value_per_area_address_lines_spill): one
+# address, one email, one phone, one bank account, one group, one payment type. The Master
+# Suppliers EIB is produced by transform ap_supplier_master (config/transforms/ap_supplier_master.yaml).
+#
 # Operator, 2026-10-12: "we need to do the same for suppliers ... like we did for customer make
 # all the required drop down selections so it is easier for AP team to create their supplier
 # lists". Mapping to the 3+ Master Suppliers.xlsx load file is a LATER step ("first get an
@@ -21,17 +25,16 @@ meta:
   eib_population_type: Supplier
   purpose: >
     A simple form for creating new suppliers directly in Workday. One row per supplier, with one
-    address and one settlement (bank) account. AP supply final Workday values, mostly by picking
+    address, one email, one phone and one settlement (bank) account. AP supply final Workday values, mostly by picking
     from drop-downs; the transform copies them to the EIB.
   derived_from: >
     The populated columns of elt_ingest_excel's workday_supplier_*.sql outputs, measured against
     the live DuckDB on 2026-10-12 (the current 319-supplier GFS batch), cross-checked column by
     column to header row 3 of the EIB workbook below.
   validated_against: >
-    Not yet. ~/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx (sheet
-    'Submit Supplier', 2 sample suppliers) is the 3+ load file this template will be
-    mapped to in a later step. It is recorded here as that target only; nothing in this spec has
-    been validated against it beyond the notes in mapping_phase_findings.
+    Mapped (2026-10-12) to ~/Documents/__data/excel/finance_ref/eib/eib_template/Master Suppliers.xlsx
+    (sheet 'Submit Supplier', 2 sample suppliers) by transform ap_supplier_master. The Excel run
+    of that transform is still pending (docs/TODO.md).
   eib_workbook: FA E2E Suppliers V1.xlsm
   eib_header_row: 3
   eib_data_row: 4
@@ -41,37 +44,40 @@ meta:
   # width of that tab. The rest are listed per tab under excluded:.
   eib_coverage:
     Supplier Name: 4 of 22
-    Supplier Groups: 3 of 3
+    Supplier Groups: 3 of 3  # band row only; Additional Supplier Group removed 2026-10-12
     Supplier Currencies: 4 of 4
     Supplier Tax: 9 of 18
     Supplier Payment: 5 of 11
     Supplier Procurement: 4 of 20
     Supplier Settlement Account: 14 of 24
     Supplier Address: 13 of 30
-    Supplier Phone: 10 of 16
-    Supplier Email: 8 of 15
+    Supplier Phone: 10 of 16  # one phone: Phone 2/3 removed 2026-10-12
+    Supplier Email: 8 of 15  # one email (no ';' list)
 
 template:
   worksheet_name: Supplier
   header_row: 1
   data_start_row: 2
-  grain: one row per supplier, with exactly one address and exactly one settlement account
+  grain: one row per supplier (one address, one email, one phone, one bank account); the Master Suppliers EIB spills the address lines onto one EIB row each
 
   instructions:
     enabled: true
     worksheet_name: Instructions
 
   fan_out:
+    # Operator rule 2026-10-12 (see decision single_value_per_area_address_lines_spill). The input
+    # template is one flat row per supplier. In the Master Suppliers EIB every area is ONE row,
+    # except the address, whose non-blank Address Line 1/2/3 each go on their own EIB row.
     Supplier Name: 1 row
-    Supplier Groups: 1 band row (auto) + 1 row if Additional Supplier Group is set
+    Supplier Groups: 1 row (the automatic alphabetical band)
     Supplier Currencies: 1 row
     Supplier Tax: 1 row
     Supplier Payment: 1 row
     Supplier Procurement: 1 row
-    Supplier Settlement Account: 1 row (exactly one account per supplier - see decisions)
-    Supplier Address: 1 row (exactly one address per supplier - see decisions)
-    Supplier Phone: 1 row per populated Phone 1/2/3 slot
-    Supplier Email: 1 row per ';' value in Email Address
+    Supplier Settlement Account: 1 row (exactly one account per supplier)
+    Supplier Address: 1 EIB row per non-blank Address Line 1/2/3 (ADDRESS_LINE_1, _2, _3)
+    Supplier Phone: 1 row
+    Supplier Email: 1 row
 
 # Shared reference datasets materialised as tabs, named only - each describes itself in
 # config/ingest_lookups/<name>.json. 8 are supplier-specific (built from FA E2E Suppliers
@@ -96,36 +102,47 @@ lookups:
 - ref_bank_account_type
 
 decisions:
-- id: flat_row_no_nested_multivalue
+- id: single_value_per_area_address_lines_spill
   decided: >
-    HARD CONSTRAINT. One flat row per supplier. The template does not support the multi-line
-    entries the Workday EIB uses for nested multi-value datasets (multiple groups, multiple
-    addresses, multiple bank accounts, etc.). Multi-value is allowed only as fixed numbered slot
-    columns or a single ';'-delimited cell. Anything needing more than that is excluded and done
-    directly in Workday after the supplier is created.
+    One address, one email, one phone number, one bank account, one supplier group (the automatic
+    band) and one payment type per supplier. The input template stays one flat row per supplier.
+    The ONE exception in the Master Suppliers EIB output: an address is several address lines, so
+    each non-blank Address Line 1/2/3 is written on its own EIB row (Spreadsheet Key repeated,
+    Address Row ID 1 repeated, Address Line Row ID = k, Type ADDRESS_LINE_k, Address Line Data =
+    the line text), as in the 3+ sample. Everything else is written once on the first EIB row.
   by: Operator
   date: 2026-10-12
   rationale: >
-    Operator, 2026-10-12, in the session that built ap_supplier: "we do not support multiline
-    entries (like the workday EIBs have) for enabling multi-value nested datasets (like defining
-    multiple groups, multiple addresses etc) - this is a quick tool for getting the
-    customer/supplier defined and then creating in workday - everthing thing else they doi in
-    wokday."
+    Operator, 2026-10-12 (verbatim): "only address - i thought we said we only support 1 address
+    1 email 1 phone number 1 bank account details and you have stated that for addresses - it
+    means spilling to multiple lines since an address is multipe address lines".
   consequence: >
-    Never add a child tab, a row-per-address/account/group structure, or repeating rows to this
-    template. The one-address, one-extra-group, one-settlement-account and slot decisions below all follow from this.
+    Never add a child tab or repeating rows for more addresses, emails, phones, groups, payment
+    types or bank accounts. Removed 2026-10-12: Additional Supplier Group, Additional Payment Type
+    Accepted 1/2, Phone 2/3 and their Device Types. Renamed: Phone 1 -> Phone, Phone 1 Device Type
+    -> Phone Device Type. Email Address is a single address (no ';'). Supersedes the earlier
+    flat_row_no_nested_multivalue hard constraint, the one-extra-group decision, the
+    payment_types_as_default_plus_slots decision and the 1:N phone / email wording. Anything more
+    is done directly in Workday.
+- id: ids_typed_by_ap
+  decided: >
+    Supplier ID is typed by AP (required) and Reference ID is copied as typed; the transform never
+    generates a Workday ID.
+  by: Operator
+  date: 2026-10-12
+  rationale: >
+    Operator, 2026-10-12 (verbatim): "we wont entertain auto generating the workday id for the
+    custoer/suplier - they have to present them".
+  consequence: A row without a Supplier ID is rejected by ap_supplier_master.
 - id: supplier_group_band_auto_extras_selected
   decided: >
     The alphabetical band row (Suppliers A - L / M - Z / 0 - 9) is assigned automatically from
-    Supplier Name's first character. AP pick only the ONE extra group, in Additional Supplier
-    Group, from a drop-down backed by the ref_supplier_group tab (selectable rows only).
+    Supplier Name's first character. There is no extra-group column (removed 2026-10-12, see
+    single_value_per_area_address_lines_spill).
   by: Operator
   date: 2026-10-12
   rationale: >
     Same rule as ar_customer. The band is mechanically determined by a value AP already typed.
-    Measured on the reference output: 638 group rows for 319 suppliers, every supplier has
-    exactly 2 (its band + 'Barclays Girls Football Schools Partnerships'), none has more - so one
-    extra-group column covers it and can be a drop-down.
   consequence: >
     Band boundaries are CONFIG (ref_supplier_group.json first_char_from/to + is_fallback), not
     the hard-coded CASE in workday_supplier_groups.sql.
@@ -155,7 +172,10 @@ decisions:
   consequence: >
     Do not reintroduce a mapping table or format-sniffing rule for any column here.
 - id: one_address_per_supplier
-  decided: One address per supplier. Address ID is always supplier_id_MAIN_1, Address Primary Yes.
+  decided: >
+    One address per supplier. Address ID is always supplier_id_MAIN_1, Address Primary Yes.
+    (Each non-blank Address Line 1/2/3 becomes its own EIB row in the Master Suppliers EIB - see
+    single_value_per_area_address_lines_spill.)
   by: Operator
   date: 2026-10-12
   rationale: The reference output has exactly one MAIN_1 address on each of its 319 suppliers.
@@ -169,28 +189,27 @@ decisions:
     more (account_rnk > 1 => For Supplier Connections Only = Y), but none occur in the batch.
   consequence: >
     No Settlement Bank Account ID column (Settlement!C stays empty, as in the reference output).
-    A second account is added in Workday, not here (flat_row_no_nested_multivalue).
+    A second account is added in Workday, not here (single_value_per_area_address_lines_spill).
 - id: payment_types_as_default_plus_slots
   decided: >
-    Payment types are a Default Payment Type plus two Additional Payment Type Accepted slots,
-    each a drop-down - NOT a '|'-delimited list. The transform writes Payment Types Accepted
-    (Payment!D) as Default | Additional 1 | Additional 2, blanks skipped.
+    SUPERSEDED 2026-10-12 by single_value_per_area_address_lines_spill: ONE payment type. Default
+    Payment Type only; Payment Types Accepted (Payment!D / Master CT) is that one value. The
+    Additional Payment Type Accepted 1/2 slot columns are removed.
   by: Operator
   date: 2026-10-12
   rationale: >
-    A drop-down cannot produce a delimited list. The reference output is 'BACS|Manual' with BACS
-    as default on all 319 rows; the SQL can emit up to 3 (e.g. SEPA|Wire|Manual), hence 2 extra
-    slots.
-  consequence: Default Payment Type is always the first value of Payment Types Accepted.
+    Operator rule "1 address 1 email 1 phone number 1 bank account" and the final single-valued
+    choices (2026-10-12): Payment Types Accepted+ = the Default Payment Type's reference_id only.
+  consequence: Default Payment Type is the only value of Payment Types Accepted.
 - id: email_first_value_primary_and_default_po
   decided: >
-    Email Address is a ';' list. The first value is Primary = Yes and Default PO = Yes; the
-    others are No.
+    One email address (single value, no ';' list; a ';' rejects the supplier in ap_supplier_master).
+    It is Primary = Yes and the Default PO email = Yes.
   by: Operator
   date: 2026-10-12
   rationale: >
-    Matches the reference output (primary_flag and default_po both Yes on 283 first rows, No on
-    9 others).
+    Operator rule 2026-10-12 (single_value_per_area_address_lines_spill): 1 email. Supersedes the
+    earlier ';' list (first value primary, others No), which matched the reference output.
   consequence: Primary and Default PO are transform_supplied, not template columns.
 - id: no_ref_tax_code
   decided: No Default Tax Code column and no ref_tax_code lookup tab.
@@ -251,7 +270,7 @@ columns:
       The supplier's alphabetical band row, assigned automatically - AP do not type it. The first
       character of Supplier Name is banded via config/ingest_lookups/ref_supplier_group.json rows
       where assignment = auto_band, matching first_char_from..first_char_to; the is_fallback = Y
-      row applies when the first character is not A-Z. Additional Supplier Group adds one row.
+      row applies when the first character is not A-Z. This is the supplier's only group.
 
 - name: Reference ID
   required: false
@@ -287,17 +306,6 @@ columns:
     status: unverified-until-mapping
 
 # --- Supplier Groups tab (3 of 3 columns live) -----------------------------------------------
-- name: Additional Supplier Group
-  required: false
-  type: text
-  description: >
-    One extra Workday supplier group, over and above the alphabetical band row the transform
-    assigns from Supplier Name. Single-valued: every reference supplier has exactly one extra.
-    Band values are excluded from the list - the band row is automatic.
-  example: Barclays Girls Football Schools Partnerships
-  picklist: {lookup: ref_supplier_group, column: supplier_group, where: {assignment: selectable}}
-  feeds:
-  - {tab: Supplier Groups, column: C, field: Supplier Group, note: "one EXTRA row, in addition to the auto-assigned band row"}
 
 # --- Supplier Payment tab (5 of 11 columns live) ---------------------------------------------
 - name: Payment Terms
@@ -318,30 +326,12 @@ columns:
   default: BACS
   description: >
     How the supplier is paid by default. BACS on all 319 reference suppliers. Also written as
-    the first value of Payment Types Accepted.
+    the one value of Payment Types Accepted.
   picklist: {lookup: ref_payment_type, column: payment_type}
   feeds:
   - {tab: Supplier Payment, column: E, field: Default Payment Type}
-  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "first value of the '|'-joined list"}
+  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "the one value"}
 
-- name: Additional Payment Type Accepted 1
-  required: false
-  type: text
-  default: Manual
-  description: >
-    A further accepted payment type, after the default. The reference output accepts
-    'BACS|Manual' on all 319 suppliers. Leave blank if the default is the only one.
-  picklist: {lookup: ref_payment_type, column: payment_type}
-  feeds:
-  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "'|'-joined after Default Payment Type"}
-
-- name: Additional Payment Type Accepted 2
-  required: false
-  type: text
-  description: A third accepted payment type, if any.
-  picklist: {lookup: ref_payment_type, column: payment_type}
-  feeds:
-  - {tab: Supplier Payment, column: D, field: Payment Types Accepted, note: "'|'-joined after Additional 1"}
 
 # --- Supplier Currencies tab (4 of 4 columns live) -------------------------------------------
 - name: Accepted Currencies
@@ -622,12 +612,12 @@ columns:
   feeds:
   - {tab: Supplier Address, column: W, field: Primary}
 
-# --- Supplier Phone tab (10 of 16 columns live) - mirrors ar_customer ------------------------
+# --- Supplier Phone tab (10 of 16 columns live) - mirrors ar_customer; ONE phone (2026-10-12) ---
 - name: Phone Country Code
   required: false
   type: text
   default: GB
-  description: ISO2 code for this supplier's phones (one for all slots).
+  description: ISO2 code for this supplier's phone.
   picklist: {lookup: ref_country, column: country_code}
   feeds:
   - {tab: Supplier Phone, column: E, field: Country Code, note: repeated on every phone row}
@@ -635,49 +625,21 @@ columns:
   - {tab: Supplier Phone, column: D, field: Phone Country, rule: "ref_country.country_name for this code"}
   - {tab: Supplier Phone, column: F, field: International Phone Code, rule: "ref_country.phone_code for this code, '+' stripped (+44 -> 44)"}
 
-- name: Phone 1
+- name: Phone
   required: false
   type: text
   description: Include the area code - Area Code (column G) is never populated.
   example: 01234 567890
   feeds:
-  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row; Primary=Yes}
+  - {tab: Supplier Phone, column: H, field: Phone Number, note: the one phone; Primary=Yes}
 
-- name: Phone 1 Device Type
+- name: Phone Device Type
   required: false
   type: text
-  description: Required when Phone 1 is populated.
+  description: Required when Phone is populated.
   picklist: {lookup: ref_phone_device, column: phone_device}
   feeds:
-  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 1 row}
-
-- name: Phone 2
-  required: false
-  type: text
-  feeds:
-  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row}
-
-- name: Phone 2 Device Type
-  required: false
-  type: text
-  description: Required when Phone 2 is populated.
-  picklist: {lookup: ref_phone_device, column: phone_device}
-  feeds:
-  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 2 row}
-
-- name: Phone 3
-  required: false
-  type: text
-  feeds:
-  - {tab: Supplier Phone, column: H, field: Phone Number, note: own row}
-
-- name: Phone 3 Device Type
-  required: false
-  type: text
-  description: Required when Phone 3 is populated.
-  picklist: {lookup: ref_phone_device, column: phone_device}
-  feeds:
-  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the Phone 3 row}
+  - {tab: Supplier Phone, column: J, field: Phone Device Type, note: the single phone row}
 
 - name: Phone Public
   required: true
@@ -685,17 +647,16 @@ columns:
   default: "Yes"
   picklist: {lookup: ref_yes_no, column: yes_no}
   feeds:
-  - {tab: Supplier Phone, column: K, field: Public, note: repeated on every phone row}
+  - {tab: Supplier Phone, column: K, field: Public, note: "not loaded into the Master EIB (FG is fixed Y)"}
 
 # --- Supplier Email tab (8 of 15 columns live) -----------------------------------------------
 - name: Email Address
   required: false
   type: text
-  multi_value: "';'-delimited list"
-  description: The first address is the primary and the default PO email.
-  example: "accounts@supplier.com; remit@supplier.com"
+  description: "The one email address: it is the primary email and the default PO email. No ';' list."
+  example: "accounts@supplier.com"
   feeds:
-  - {tab: Supplier Email, column: C, field: Email Address, note: one row per ';' value}
+  - {tab: Supplier Email, column: C, field: Email Address, note: the one email; Type=BUSINESS, Use For=BILLING (Master EIB FZ)}
 
 - name: Email Public
   required: true
@@ -703,7 +664,7 @@ columns:
   default: "Yes"
   picklist: {lookup: ref_yes_no, column: yes_no}
   feeds:
-  - {tab: Supplier Email, column: F, field: Public, note: repeated on every email row}
+  - {tab: Supplier Email, column: F, field: Public, note: "not loaded into the Master EIB (FV is fixed Y)"}
 
 - name: Email Use For
   required: true
@@ -711,19 +672,18 @@ columns:
   default: SHIPPING|BILLING|REMIT
   description: >
     Free text - the workbook has no tenant list for it. SHIPPING|BILLING|REMIT on all 292
-    reference email rows.
+    reference email rows. NOT loaded into the Master Suppliers EIB (2026-10-12: Use For is BILLING).
   feeds:
-  - {tab: Supplier Email, column: J, field: Use For, note: repeated on every email row}
+  - {tab: Supplier Email, column: J, field: Use For, note: "not loaded into the Master EIB (FZ is fixed BILLING)"}
 
-# Populated EIB columns that are NOT template columns: generated from Supplier ID or implied by
-# slot / list position. None is a derivation of AP's judgement.
+# Populated EIB columns that are NOT template columns: generated from Supplier ID or implied. None is a derivation of AP's judgement.
 transform_supplied:
 - {tab: Supplier Address, column: J, field: Address ID, rule: "supplier_id || '_MAIN_1' - one address per supplier"}
-- {tab: Supplier Phone, column: C, field: Phone ID, rule: "supplier_id || '_PH<slot>_1'"}
-- {tab: Supplier Phone, column: L, field: Primary, rule: "Yes for the lowest populated phone slot, No for the others"}
-- {tab: Supplier Email, column: E, field: Email ID, rule: "supplier_id || '_EM1_<n>' by position in Email Address"}
-- {tab: Supplier Email, column: G, field: Primary, rule: "Yes for the first address in Email Address, No for the others"}
-- {tab: Supplier Email, column: H, field: Default PO, rule: "Yes for the first address in Email Address, No for the others"}
+- {tab: Supplier Phone, column: C, field: Phone ID, rule: "supplier_id || '_PH1_1' (the Master Suppliers sample leaves Phone ID blank; not written by ap_supplier_master)"}
+- {tab: Supplier Phone, column: L, field: Primary, rule: "Yes (one phone)"}
+- {tab: Supplier Email, column: E, field: Email ID, rule: "supplier_id || '_EM1_1'"}
+- {tab: Supplier Email, column: G, field: Primary, rule: "Yes (one email)"}
+- {tab: Supplier Email, column: H, field: Default PO, rule: "Yes (one email)"}
 
 # EIB columns that exist (header row 3) but are NEVER populated. The template does not mention
 # them and the transform leaves them empty. count = number of letters listed.
@@ -744,8 +704,8 @@ excluded_tabs:
 - {tabs: "Supplier Contact Name, Supplier Contact Address, Supplier Contact Phone, Supplier Contact Email", reason: "not in publish_supplier.json - contacts are not migrated"}
 - {tabs: "Supplier Prep (AL), Supplier (AL), Supplier Class Prep (AL), Supplier Group Ref (AL), Supplier Currencies (AL), Supplier Status Data (AL), Supplier Class Data (AL), Supplier Class Field (AL)", reason: "workbook preparation sheets, not EIB load tabs"}
 
-# Recorded for the LATER mapping step to Master Suppliers.xlsx ('Submit Supplier').
-# Not template columns and not acted on now. Letters are Master sheet columns.
+# Master Suppliers.xlsx ('Submit Supplier') findings, now implemented by ap_supplier_master (see
+# config/transform_specs/ap_supplier_master.yaml). Not template columns. Letters are Master sheet columns.
 mapping_phase_findings:
 - {master_column: Q, field: Approval Status, value: APPROVED, note: "constant on both samples"}
 - {master_column: C, field: Add Only, value: "Y", note: "constant"}
@@ -754,10 +714,10 @@ mapping_phase_findings:
 - {master_column: DF, field: Address Format Type, value: BASIC, note: "constant"}
 - {master_column: DJ, field: Address Effective Date, value: "1900-01-01", note: "constant"}
 - {master_column: "EI / FJ / FY", field: "Type* (address / phone / email)", value: BUSINESS, note: "constant"}
-- {master_column: "EJ / FK / FZ", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT", note: "address and phone have no template column; email maps from Email Use For"}
+- {master_column: "EJ / FK / FZ", field: "Use For+ (address / phone / email)", value: "BILLING, SHIPPING, REMIT", note: "SUPERSEDED 2026-10-12: Use For is BILLING only on address, phone and email; Email Use For is not loaded"}
 - {master_column: DO, field: Address Line Type, value: "ADDRESS_LINE_<n>", note: "implied by Address Line 1/2/3 position"}
-- {master_column: CC, field: Default PO Issue Email, value: "= first Email Address", note: "restatement; FA E2E carries it as Email!H Default PO"}
-- {master_column: various, field: reference IDs, value: "e.g. DDA, EMAIL, Suppliers_A_L, ACTIVE, Supplier_of_Goods_Registered_in_this_Country", note: "Master takes Workday reference IDs, not display values. The supplier lookups carry reference_id where the tenant gives one; ref_supplier_status's tenant ID 'Active' differs from Master's 'ACTIVE' (Business_Entity_Status_Value_ID); ref_country is ISO2 but Master's phone Country ISO Code (FA) is ISO3 (GBR)."}
+- {master_column: CC, field: Default PO Issue Email, value: "= the Email Address", note: "restatement; FA E2E carries it as Email!H Default PO"}
+- {master_column: various, field: reference IDs, value: "e.g. DDA, EMAIL, Suppliers_A_L, ACTIVE, Supplier_of_Goods_Registered_in_this_Country", note: "Master takes Workday reference IDs, not display values. The supplier lookups carry reference_id where the tenant gives one; ref_supplier_status's tenant ID 'Active' differs from Master's 'ACTIVE' (Business_Entity_Status_Value_ID; ap_supplier_master writes the sample's ACTIVE - first-upload check in docs/TODO.md); ref_country is ISO2 but Master's phone Country ISO Code (FA) is ISO3 (GBR)."}
 
 open_questions:
 - id: supplier_classification
@@ -782,7 +742,8 @@ open_questions:
   owner: Finance (AP)
 - id: default_payment_type_default
   question: >
-    Default Payment Type defaults to BACS with Manual as the additional accepted type (all 319
-    reference suppliers). Confirm with AP that this is the right default for a new supplier.
+    Default Payment Type defaults to BACS (all 319 reference suppliers; the reference output also
+    accepted Manual, which is no longer carried: one payment type). Confirm with AP that this is
+    the right default for a new supplier.
   blocking: false
   owner: Finance (AP)

@@ -271,8 +271,8 @@ Source Data, Customer Spreadsheet (user file paths)         Target EIB (user fil
   areaColLetters)`, `EntityBlockFlush(ws, startRow, spreadsheetKey)` (returns the next free row). Block height =
   the largest item index; row k gets item k of each list; the parent Row ID columns are repeated on
   continuation rows that carry data for their area. Generic (no customer/supplier strings). Code-complete,
-  **pending the manual Excel import** (not yet run in Excel); no transform selects it until the
-  `ar_customer_master` / `ap_supplier_master` changes.
+  **pending the manual Excel import** (not yet run in Excel); selected by `ar_customer_master` and
+  `ap_supplier_master` (address lines).
 - **Shared source-table module** (`modSourceTable.bas`) — the general table-operations layer that
   operates on the in-memory array produced by `modHelpers.ReadWorksheetTable`: `ColumnIndex`,
   `FindHeaderRow`, `FindColumnIndexInRow`/`FindOptionalColumnIndexInRow`, `RowContainsHeader`,

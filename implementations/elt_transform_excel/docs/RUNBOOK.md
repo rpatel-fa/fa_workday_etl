@@ -223,6 +223,27 @@ and `modHelpers.LookupRuntimeValue` have not been run in Excel yet).
 6. After the Excel run, compare the output with `Master Customers.xlsx` sample rows 6 and 9 (see
    `config/transform_specs/ar_customer_master.yaml`).
 
+## Running AP Supplier Master (`ap_supplier_master`)
+
+Status 2026-10-12: code-complete, **pending the manual Excel import + verify** (the macro, `modEntityBlockWriter`
+and `modHelpers.LookupRuntimeValue` have not been run in Excel yet).
+
+1. Build the input template: `uv run --with openpyxl --with pyyaml --no-project python scripts/create_ingest_template.py ap_supplier --overwrite`
+   (writes `dist/ingest_templates/ap_supplier.xlsx`; 46 columns after the 2026-10-12 simplification, was 53).
+2. AP fill sheet `Supplier`, one row per supplier, and save it as the Source Data path in the Runner config.
+   Supplier ID is required and typed by AP (operator, 2026-10-12: "we wont entertain auto generating the workday id
+   for the custoer/suplier - they have to present them"); Reference ID is copied as typed.
+3. Build/import the Runner as above (steps 1-5 of Current Workflow), pick **AP Supplier Master**, click **Run Transform**.
+4. Output: `Master_Suppliers_ap_supplier_master_output.xlsx` (clone of the 3+ Master Suppliers EIB, sheet
+   `Submit Supplier`, data from row 6) plus a `.rejects.csv` beside it for rejected suppliers.
+5. Rule (operator, 2026-10-12): one address, one email, one phone number, one bank account, one supplier group,
+   one payment type per supplier. The EIB has one row per supplier EXCEPT the address lines: each non-blank
+   Address Line 1/2/3 goes on its own EIB row (columns B, DD, DM, DO, DP only on rows 2+). Nothing else repeats.
+   Use For is BILLING (the 3+ sample's SHIPPING / REMIT / PROCUREMENT rows are not produced). A missing value or a
+   missing Workday reference ID rejects the whole supplier (no fallbacks).
+6. After the Excel run, compare the output with `Master Suppliers.xlsx` sample rows 6 and 10 (see
+   `config/transform_specs/ap_supplier_master.yaml`) and check the Status value (`ACTIVE` vs `Active`, see `docs/TODO.md`).
+
 ## Related Docs
 
 - `PRD.md`
