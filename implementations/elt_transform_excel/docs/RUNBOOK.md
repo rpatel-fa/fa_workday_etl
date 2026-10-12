@@ -247,6 +247,7 @@ and `modHelpers.LookupRuntimeValue` have not been run in Excel yet).
 ## Related Docs
 
 - `PRD.md`
+- `docs/MASTER_CUSTOMER_SUPPLIER.md` (entry point for AR Customer Master / AP Supplier Master)
 - `docs/ARCHITECTURE.md`
 - `docs/CONFIGURATION.md`
 - `docs/ops/CLI.md`
