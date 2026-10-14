@@ -13,7 +13,7 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/workday/extract/customer",
-    "workbookFileName": "Extract_Customers_20260810_1615.xlsx",
+    "workbookFileName": "Extract_Customers_20261008.xlsx",
     "sheets": [
       {
         "sheetName": "Sheet1",
@@ -110,6 +110,18 @@
         "headerRow": "1",
         "dataRow": "2",
         "targetTableName": "pff_gp_discipline_customer"
+      }
+    ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/org_services",
+    "workbookFileName": "Pro club details Extract.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "os_pro_club"
       }
     ]
   },
