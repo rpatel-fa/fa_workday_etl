@@ -12,3 +12,5 @@ document types:
 misc charge
 credit notes
 returns
+
+test
