@@ -1,0 +1,224 @@
+version: 1
+
+transform:
+  key: ap_stationery_v2
+  label: AP Stationery v2
+  source_type: AP Stationery Workday_Upload
+  eib_population_type: Supplier Invoice
+  description: >
+    v2 of the GENERIC stationery / courier supplier-invoice transform. Reads the
+    Finance-prepared "Workday_Upload" tab (columns A-T) and writes the Workday Supplier
+    Invoice EIB. Runs ALONGSIDE v1 (ap_stationery, "Proactis Upload" tab); v1 is unchanged.
+
+    WHAT CHANGED vs v1 (user instruction 2026-10-15):
+      (1) SupplierID (A) already holds the Workday Supplier ID (e.g. S-002170). No
+          "{Company}-{CreditorID}" split and no Reference ID lookup. The value is written
+          straight to EIB U after confirming it exists in the Supplier extract's
+          "Supplier ID" column; unknown IDs reject the row.
+      (2) Company (E) already holds the Workday company (e.g. "THE FA GROUP - FA") and is
+          written straight to EIB R. No derivation from SupplierID.
+      (3) All 10 worktags (Spend Category, Reporting Type, Cost Centre, Event, Camp,
+          FA Learning Course, Commercial Partner, Grant, Programme, Project) are read
+          DIRECTLY from their own source columns K-T (already Workday reference IDs,
+          filled in the source workbook by its "Fill Worktags" button). There is NO cost-code
+          column and NO Mapping MASTER lookup at runtime.
+      (4) Invoice Number (K) MIRRORS Suppliers Invoice Number (BG) = source InvoiceNumber (B).
+          The v1 composite (CreditorID-YYMM-RawInvNum) is dropped.
+      (5) Unit Cost (GE) is left BLANK; Extended Amount (GF) = Net (F).
+      (6) Memo (GQ) = Supplier (U) + ' ' + Suppliers Invoice Number (BG); no cost code.
+
+    UNCHANGED from v1:
+      * Multi-line grouping by InvoiceNumber: shared Spreadsheet Key (B); Line Order (EM)
+        and Row ID (EK) = per-group 1..N counter.
+      * Header consistency guard: Company / Supplier / Currency / InvoiceDate must be
+        identical on every row of the same InvoiceNumber, else build error before EIB write.
+      * Receipt Date (AG) and Control Amount Total (AS) left BLANK.
+      * Per-row tax from TaxCode (J): P20 -> GBR_Domestic_Purchase_Of_Goods_And_Services /
+        GBR_Standard / Fully_Recoverable; P0/PZ -> zero-rated triple.
+      * Currency (T) from Currency (D); line description (EP) from Description (I).
+
+    SCOPE: ALL stationery companies use this v2 transform with the same Workday_Upload layout,
+    INCLUDING Addison Lee WNSL (no separate exclusion). Company is taken per row from the
+    source: Addison Lee WNSL invoices carry "THE FA GROUP - WNSL", FA invoices carry
+    "THE FA GROUP - FA". An FA invoice wrongly coded to WNSL is caught by Workday, not here.
+
+runtime:
+  step_list_macro: RunApStationeryV2SupplierInvoice
+
+source_layout:
+  worksheet_name: Workday_Upload
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  # Workday_Upload columns A-T, verified against invoice_594465_test.xlsm (2026-10-15).
+  required_headers:
+    - SupplierID            # A
+    - InvoiceNumber         # B
+    - InvoiceDate           # C
+    - Currency              # D
+    - Company               # E
+    - Net|Net Amount        # F  (v1 alias kept for older E-Courier layouts)
+    - Tax                   # G
+    - Gross                 # H
+    - Description           # I
+    - TaxCode               # J
+    - Spend Category        # K
+    - Reporting Type        # L
+    - Cost Centre           # M
+    - Event                 # N
+    - Camp                  # O
+    - FA Learning Course    # P
+    - Commercial Partner    # Q
+    - Grant                 # R
+    - Programme             # S
+    - Project               # T
+
+transform_constants:
+  # Source column -> EIB field bindings (same key convention as ap_stationery_addisonlee_wnsl).
+  source_columns:
+    supplier_id: SupplierID                 # A -> U
+    invoice_number: InvoiceNumber           # B -> BG, and mirrored to K
+    invoice_date: InvoiceDate               # C -> AF
+    currency: Currency                      # D -> T
+    company: Company                        # E -> R
+    net_amount: Net|Net Amount              # F -> GF
+    tax_amount: Tax                         # G
+    gross_amount: Gross                     # H
+    line_description: Description           # I -> EP
+    tax_code: TaxCode                       # J -> per_row_tax driver
+
+  # Supplier: the source already carries the Workday Supplier ID. Write it to U as-is,
+  # after an existence check against the Supplier extract (case-insensitive). No split,
+  # no Reference ID precedence.
+  supplier_resolution:
+    mode: direct_with_existence_check
+    source_column: SupplierID
+    target_eib_column: U
+    validated_via: Supplier Spreadsheet
+    validation_column: Supplier ID
+    on_not_found: reject_row
+
+  # Company: the source already carries the Workday company (e.g. THE FA GROUP - FA,
+  # THE FA GROUP - WNSL). Written to R as-is; no company is excluded.
+  company_resolution:
+    mode: direct
+    source_column: Company
+    target_eib_column: R
+    on_blank: reject_row
+
+  # Invoice number: K mirrors BG; both = source InvoiceNumber (B) raw.
+  invoice_number:
+    source_column: InvoiceNumber
+    suppliers_invoice_number_eib_column: BG
+    invoice_number_eib_column: K
+    k_mirrors_bg: true
+
+  # Amounts: Extended Amount (GF) = Net; Unit Cost (GE) left blank.
+  line_amounts:
+    extended_amount:
+      source_column: Net|Net Amount
+      target_eib_column: GF
+    unit_cost:
+      target_eib_column: GE
+      value: blank
+
+  # Memo (GQ): same space-joined style as v1, now Supplier (U) + ' ' + Suppliers Invoice
+  # Number (BG), e.g. "S-002170 594465". No cost code (v2 source has none).
+  memo_derivation:
+    strategy: concat_space_join
+    source_steps:
+      supplier_id:
+        source_column: SupplierID           # value written to U
+      suppliers_invoice_number:
+        source_column: InvoiceNumber        # value written to BG
+    concat_order:
+      - supplier_id
+      - suppliers_invoice_number
+    target_eib_column: GQ
+
+  # Per-row tax classification driven by TaxCode (J). Unchanged from v1.
+  per_row_tax:
+    driver_column: TaxCode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+
+  company_fallback: ""                      # no fallback: Company comes from the source row
+  mapping_sheet: MAPPING MASTER             # schema parity only; NOT opened at runtime (see worktag_resolution)
+
+  # Worktags: read verbatim from their own source columns. No accounting string, no
+  # Mapping MASTER lowest-hierarchy scan, no ResolveReportingTypeFromFinalCode.
+  worktag_resolution:
+    resolution: direct_from_source_columns
+    source_columns:
+      spend_category: Spend Category       # K
+      reporting_type: Reporting Type       # L
+      cost_centre: Cost Centre             # M
+      event: Event                         # N
+      camp: Camp                           # O
+      fa_learning: FA Learning Course      # P
+      commercial_partner: Commercial Partner  # Q
+      grant: Grant                         # R
+      program: Programme                   # S
+      project: Project                     # T
+    mandatory:                             # blank -> reject row; the other 7 may be blank
+      - spend_category
+      - reporting_type
+      - cost_centre
+    note: >
+      Source values are already Workday reference IDs (e.g. Staff_Travel_Other, CC06001,
+      ECOM2701, PART0037, GRT0052, PRJ00433) and Reporting Type display values
+      (e.g. "FA Operations", "FA Investments"). Optional worktags may be blank.
+  # Business-object names kept for the Supplier archetype schema; documentation only here.
+  worktag_business_objects:
+    spend_category: "Spend Category"
+    cost_centre: "Cost Center"
+    event: "Events - Custom Org"
+    camp: "Camps - Custom Org"
+    fa_learning: "FA Learning - Custom Org"
+    commercial_partner: "Commercial Partners - Custom Worktag"
+    grant: "Grant"
+    program: "Program - Delivered Org"
+    project: "Projects (Opex)"
+  fixed_literal_worktags: {}
+  derived_worktags:
+    reporting_type:
+      derivation: read directly from source column L "Reporting Type" (no cost-code derivation)
+      source_column: Reporting Type
+      target_column: GR
+  unmapped_handling: reject_mandatory_worktags
+  supplier_eib_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+
+shell_defaults:
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  source_worksheet_name: Workday_Upload
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml.
+  #
+  # Paths use the repo's authored root (/Users/Rakesh.Patel/Documents/__data); the Windows
+  # build profile in config/root_path_substitutions.yaml rewrites it to
+  # C:\Users\Chika.Etheridge\Documents\workday_finance\data.
+  variants:
+    - profile_key: ap_stationery_v2_e_courier
+      profile_label: AP Stationery v2 E-Courier
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/source/invoice_594465_test.xlsm
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/target/Submit_Supplier_Invoice_ap_stationery_v2_e_courier_output.xlsx
