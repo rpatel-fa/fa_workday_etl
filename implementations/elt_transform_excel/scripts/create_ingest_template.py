@@ -81,7 +81,7 @@ class SpecError(Exception):
 def load_spec(spec_path: Path) -> dict:
     if not spec_path.is_file():
         raise SpecError(f"spec not found: {spec_path}")
-    spec = yaml.safe_load(spec_path.read_text())
+    spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     for key in ("meta", "template", "columns"):
         if key not in spec:
             raise SpecError(f"{spec_path.name}: missing top-level '{key}'")
@@ -177,7 +177,7 @@ def load_lookup(name: str) -> dict:
         available = sorted(p.stem for p in LOOKUP_DIR.glob("*.json"))
         raise SpecError(f"unknown lookup {name!r}. Available: {available or 'none'}")
 
-    doc = json.loads(path.read_text())
+    doc = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(doc, dict) or "rows" not in doc:
         raise SpecError(f"lookup {name!r} must be an object with a 'rows' list")
     rows = doc["rows"]
