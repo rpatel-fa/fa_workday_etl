@@ -230,6 +230,10 @@ Then open `dist/Runner.xlsm`, check the **Run Button** status cell reads
 `Created -> modDispatcher.RunSelectedTransform`, pick a Transform, and smoke-test **Run
 Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 
+For the template-based transforms (AR Customer Master, AP Supplier Master), the sample file is a
+rendered input template — if you don't have one yet, see "Ingest template" (line 281)
+below, fill it in, and save it to the Source Data path.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -238,6 +242,7 @@ Transform** against sample files (`docs/RUNBOOK.md` → "Watching a Run").
 | *"No .bas or .cls files found under: C:\…\vba_src"* | `DetectSeparator`/`BaseName` colon quirk (fixed — see the box under Step 2) — you're running an imported `BootstrapImporter` module from before that fix, or Step 2 was skipped and the Bootstrap Source Folder cell is empty/wrong | Re-import `BootstrapImporter.bas` (re-run Step 2, then Step 4) to pick up the fix; or set the Bootstrap Source Folder cell by hand; or use the Immediate-window `BootstrapImportFromFolder` call |
 | `--verify`: *"reported N module(s), expected M"* | Import stopped partway | Re-open the workbook, re-run the import macro; check the **Bootstrap Import Current** cell for the file it stalled on, then check that `.bas` against the causes list under Step 4 above (name > 31 chars, non-ASCII, CRLF, unbalanced `End Sub`) |
 | Step 0: `LF-only line ending(s)` | git checkout stripped CRLF | `git config core.autocrlf true` and re-checkout `vba_src` (Step 0 above) |
+| Any Python step: *"'charmap' codec can't decode byte 0x.. in position N: character maps to &lt;undefined&gt;"* | A script read a UTF-8 config file (a `config/ingest_lookups/*.json` or spec YAML with a non-ASCII character) without `encoding="utf-8"`, so Python on Windows used its default `cp1252` codec. macOS defaults to UTF-8, so the same code never fails there | Workaround: run `$env:PYTHONUTF8 = "1"` in the same PowerShell window, then re-run the step (lasts until the window closes). Permanent fix: add `encoding="utf-8"` to the failing `read_text()` / `open()` call — works on both macOS and Windows |
 | `pyOpenVBA` import error from Step 1/2/3 | dependency not resolved | Use the exact `uv run --with pyOpenVBA --with openpyxl --with pyyaml --no-project ...` form; don't drop `--with` flags |
 | Built workbook points at reference/transform files that don't exist on this machine | Step 3 (`--substitute-root-paths`) was never run, or `config/root_path_substitutions.yaml`'s data-root rule doesn't match this host's actual data folder | Edit the rule's `with:` value (see its own `EDIT THIS` comment) and run/re-run Step 3; check the console's "Path substitution ... data-root fields: N value(s) rewritten" line to confirm it ran |
 | Step 3: *"Built workbook not found"* | Step 3 was run before Step 2 | Run Step 2 first — Step 3 patches an existing build, it does not create one |
