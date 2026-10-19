@@ -1725,7 +1725,12 @@ def _validate_vba_source_hygiene(
                         if other_module == module_path and other_key != binding.profile_key:
                             spec_candidates.append(transform_specs_dir / f"{other_key}.yaml")
                     try:
-                        all_existing_specs = sorted(transform_specs_dir.glob("*.yaml"))
+                        # Longest stem first, so the MOST specific prefix spec wins
+                        # (ap_stationery_v2_dhl -> ap_stationery_v2.yaml, not ap_stationery.yaml).
+                        all_existing_specs = sorted(
+                            transform_specs_dir.glob("*.yaml"),
+                            key=lambda p: (-len(p.stem), p.name),
+                        )
                     except (OSError, ValueError):
                         all_existing_specs = []
                     for existing_spec in all_existing_specs:

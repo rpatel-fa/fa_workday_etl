@@ -23,9 +23,12 @@ transform:
           filled in the source workbook by its "Fill Worktags" button). There is NO cost-code
           column and NO Mapping MASTER lookup at runtime.
       (4) Invoice Number (K) MIRRORS Suppliers Invoice Number (BG) = source InvoiceNumber (B).
-          The v1 composite (CreditorID-YYMM-RawInvNum) is dropped.
-      (5) Unit Cost (GE) is left BLANK; Extended Amount (GF) = Net (F).
-      (6) Memo (GQ) = Supplier (U) + ' ' + Suppliers Invoice Number (BG); no cost code.
+          The v1 composite (CreditorID-YYMM-RawInvNum) is dropped. K and BG are written as
+          TEXT on every row (cell format "@"), so numeric and alphanumeric invoice numbers
+          are stored the same way regardless of the template's per-row cell formats.
+      (5) Unit Cost (GE) is left BLANK; Extended Amount (GF) = Net (F), displayed to 2
+          decimal places (cell format "0.00"; stored value not rounded).
+      (6) Memo (GQ) = Supplier (U) + '_' + Suppliers Invoice Number (BG); no cost code.
 
     UNCHANGED from v1:
       * Multi-line grouping by InvoiceNumber: shared Spreadsheet Key (B); Line Order (EM)
@@ -42,6 +45,9 @@ transform:
     source: Addison Lee WNSL invoices carry "THE FA GROUP - WNSL", FA invoices carry
     "THE FA GROUP - FA". An FA invoice wrongly coded to WNSL is caught by Workday, not here.
 
+    See config/transform_specs/ap_stationery_v2.yaml for the decision record and per-column
+    mapping (module vba_src/transforms/modApStationeryV2SupInv.bas).
+
 runtime:
   step_list_macro: RunApStationeryV2SupplierInvoice
 
@@ -51,21 +57,25 @@ source_layout:
   header_row: 1
   data_start_row: 2
   header_detection: scan_required_headers
-  # Workday_Upload columns A-T, verified against invoice_594465_test.xlsm (2026-10-15).
+  # Workday_Upload columns A-T: identical header row in all 5 supplier source files (2026-10-16).
   required_headers:
     - SupplierID            # A
     - InvoiceNumber         # B
     - InvoiceDate           # C
     - Currency              # D
     - Company               # E
-    - Net|Net Amount        # F  (v1 alias kept for older E-Courier layouts)
+    - Net                   # F
     - Tax                   # G
     - Gross                 # H
     - Description           # I
     - TaxCode               # J
-    - Spend Category        # K
-    - Reporting Type        # L
-    - Cost Centre           # M
+    - Spend Category        # K  (mandatory worktag)
+    - Reporting Type        # L  (mandatory worktag)
+    - Cost Centre           # M  (mandatory worktag)
+  # Optional worktag columns: the header must be present (the .bas requires the column), but
+  # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
+  # data check (same convention as ap_cfa_claims).
+  optional_headers:
     - Event                 # N
     - Camp                  # O
     - FA Learning Course    # P
@@ -82,7 +92,7 @@ transform_constants:
     invoice_date: InvoiceDate               # C -> AF
     currency: Currency                      # D -> T
     company: Company                        # E -> R
-    net_amount: Net|Net Amount              # F -> GF
+    net_amount: Net                         # F -> GF
     tax_amount: Tax                         # G
     gross_amount: Gross                     # H
     line_description: Description           # I -> EP
@@ -92,7 +102,7 @@ transform_constants:
   # after an existence check against the Supplier extract (case-insensitive). No split,
   # no Reference ID precedence.
   supplier_resolution:
-    mode: direct_with_existence_check
+    mode: direct_workday_id_with_extract_check   # shared_helper_registry variant
     source_column: SupplierID
     target_eib_column: U
     validated_via: Supplier Spreadsheet
@@ -102,31 +112,34 @@ transform_constants:
   # Company: the source already carries the Workday company (e.g. THE FA GROUP - FA,
   # THE FA GROUP - WNSL). Written to R as-is; no company is excluded.
   company_resolution:
-    mode: direct
+    mode: per_row_direct_source_column           # shared_helper_registry variant
     source_column: Company
     target_eib_column: R
     on_blank: reject_row
 
-  # Invoice number: K mirrors BG; both = source InvoiceNumber (B) raw.
+  # Invoice number: K mirrors BG; both = source InvoiceNumber (B) raw, written as text.
   invoice_number:
     source_column: InvoiceNumber
     suppliers_invoice_number_eib_column: BG
     invoice_number_eib_column: K
     k_mirrors_bg: true
+    number_format: "@"                      # text on every row for K and BG
 
   # Amounts: Extended Amount (GF) = Net; Unit Cost (GE) left blank.
   line_amounts:
     extended_amount:
-      source_column: Net|Net Amount
+      source_column: Net
       target_eib_column: GF
+      number_format: "0.00"                 # display 2 decimal places; value not rounded
     unit_cost:
       target_eib_column: GE
       value: blank
 
-  # Memo (GQ): same space-joined style as v1, now Supplier (U) + ' ' + Suppliers Invoice
-  # Number (BG), e.g. "S-002170 594465". No cost code (v2 source has none).
+  # Memo (GQ): Supplier (U) + '_' + Suppliers Invoice Number (BG), e.g. "S-002170_594465".
+  # No cost code (v2 source has none).
   memo_derivation:
-    strategy: concat_space_join
+    strategy: concat_underscore_join
+    separator: "_"
     source_steps:
       supplier_id:
         source_column: SupplierID           # value written to U
@@ -171,29 +184,18 @@ transform_constants:
       - spend_category
       - reporting_type
       - cost_centre
+    reject_values:                         # source-workbook "unresolved" marker -> reject row
+      - NOT_FOUND
     note: >
       Source values are already Workday reference IDs (e.g. Staff_Travel_Other, CC06001,
       ECOM2701, PART0037, GRT0052, PRJ00433) and Reporting Type display values
       (e.g. "FA Operations", "FA Investments"). Optional worktags may be blank.
-  # Business-object names kept for the Supplier archetype schema; documentation only here.
-  worktag_business_objects:
-    spend_category: "Spend Category"
-    cost_centre: "Cost Center"
-    event: "Events - Custom Org"
-    camp: "Camps - Custom Org"
-    fa_learning: "FA Learning - Custom Org"
-    commercial_partner: "Commercial Partners - Custom Worktag"
-    grant: "Grant"
-    program: "Program - Delivered Org"
-    project: "Projects (Opex)"
-  fixed_literal_worktags: {}
-  derived_worktags:
-    reporting_type:
-      derivation: read directly from source column L "Reporting Type" (no cost-code derivation)
-      source_column: Reporting Type
-      target_column: GR
-  unmapped_handling: reject_mandatory_worktags
-  supplier_eib_columns:
+      The worktag pipeline is INACTIVE (same model as ap_cfa_claims): no
+      worktag_business_objects / derived_worktags, so no Mapping MASTER lookup and no
+      ResolveReportingTypeFromFinalCode at runtime. The source workbook's Fill Worktags
+      macro writes NOT_FOUND where a cost code did not map; such rows are rejected.
+  # Standard 9-pack worktag column letters for v46.2 Supplier Invoice EIB (+ Reporting Type).
+  worktag_target_columns:
     spend_category: EW
     reporting_type: GR
     cost_centre: GT
@@ -217,8 +219,27 @@ shell_defaults:
   # Paths use the repo's authored root (/Users/Rakesh.Patel/Documents/__data); the Windows
   # build profile in config/root_path_substitutions.yaml rewrites it to
   # C:\Users\Chika.Etheridge\Documents\workday_finance\data.
+  #
+  # All 5 variants verified 2026-10-16: identical Workday_Upload header A-T, S- Supplier IDs
+  # in A, Workday company in E. Same mapping for every supplier; only paths differ.
   variants:
+    - profile_key: ap_stationery_v2_addison_lee_fa
+      profile_label: AP Stationery v2 Addison Lee FA
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/FA/source/FA_3443196_30.9.26_BACKUP.xlsm
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/FA/target/Submit_Supplier_Invoice_ap_stationery_v2_addison_lee_fa_output.xlsx
+    - profile_key: ap_stationery_v2_addison_lee_wnsl
+      profile_label: AP Stationery v2 Addison Lee WNSL
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/WNSL/source/WNSL_3446978_30.9.26_BACK UP.xlsm
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/ADDISON LEE/WNSL/target/Submit_Supplier_Invoice_ap_stationery_v2_addison_lee_wnsl_output.xlsx
+    - profile_key: ap_stationery_v2_ambassador_taxi
+      profile_label: AP Stationery v2 Ambassador Taxi
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/AMBASSADOR TAXI/source/FA Invoice (497) - Sep 26.xlsm
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/AMBASSADOR TAXI/target/Submit_Supplier_Invoice_ap_stationery_v2_ambassador_taxi_output.xlsx
+    - profile_key: ap_stationery_v2_dhl
+      profile_label: AP Stationery v2 DHL
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/DHL/source/LONR011387962 updated csv SH.xlsm
+      output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/DHL/target/Submit_Supplier_Invoice_ap_stationery_v2_dhl_output.xlsx
     - profile_key: ap_stationery_v2_e_courier
       profile_label: AP Stationery v2 E-Courier
-      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/source/invoice_594465_test.xlsm
+      source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/source/invoice_594465.xlsm
       output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/Stationery Companies/E-COURIER/target/Submit_Supplier_Invoice_ap_stationery_v2_e_courier_output.xlsx
