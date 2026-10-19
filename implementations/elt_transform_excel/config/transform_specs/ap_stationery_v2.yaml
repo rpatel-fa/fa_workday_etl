@@ -1,0 +1,298 @@
+# Transform spec - ap_stationery_v2
+#
+# GENERIC v2 transform (ONE config covers ALL stationery / courier suppliers: Addison Lee FA,
+# Addison Lee WNSL, Ambassador Taxi, DHL, E-Courier). Human decision record + authoritative
+# target-column mapping. The mapping: section is the source of truth the .bas mirrors
+# (vba_src/transforms/modApStationeryV2SupInv.bas). Lives in config/transform_specs/ (NOT
+# config/transforms/, which is the build-globbed runnable set).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and
+# source layout (worksheet, header row, required headers) - live in the build profile
+# config/transforms/ap_stationery_v2.yaml (the build-consumed source of truth). Not restated here.
+#
+# Runs ALONGSIDE v1 (ap_stationery, "Proactis Upload" tab). v1, ap_stationery_addisonlee_wnsl
+# and ap_cfa_claims are unchanged by v2.
+#
+# Source = each supplier's .xlsm, tab "Workday_Upload" (header row 1, data rows 2..N),
+# 20 columns A-T, IDENTICAL header row in all 5 supplier files (verified 2026-10-16):
+#   A SupplierID, B InvoiceNumber, C InvoiceDate, D Currency, E Company, F Net, G Tax,
+#   H Gross, I Description, J TaxCode, K Spend Category, L Reporting Type, M Cost Centre,
+#   N Event, O Camp, P FA Learning Course, Q Commercial Partner, R Grant, S Programme,
+#   T Project.
+# The tab is prepared by the source workbook's own macros (Extract Cost Code -> Fill Worktags
+# -> Copy to Workday_Upload). Those macros already:
+#   * resolve the 10 worktags to Workday ref ids (NOT_FOUND where a cost code did not map);
+#   * group source lines into one Workday_Upload line per worktag set + VAT/no-VAT;
+#   * set TaxCode per line from Net/Tax/Gross (Tax = 0 -> PZ, else P20).
+# v2 therefore copies values across; it does NOT re-derive coding or tax.
+#
+# Decision record (user instructions 2026-10-15 / 2026-10-16):
+#   Rule 1  - Supplier (EIB U): SupplierID (A) = Workday Supplier ID (S-XXXXXX) written
+#             verbatim, after an existence check against the Supplier extract "Supplier ID"
+#             column (case-insensitive, trimmed). Not found / blank -> reject row.
+#             No hyphen split, no Reference ID precedence (v1 Rules 1-2 RETIRED for v2).
+#   Rule 2  - Company (EIB R): Company (E) written verbatim (THE FA GROUP - FA /
+#             THE FA GROUP - WNSL). Blank -> reject row. No runner company mapping, no
+#             fallback, no WNSL exclusion (Addison Lee WNSL now uses v2 too).
+#   Rule 3  - Suppliers Invoice Number (EIB BG) = InvoiceNumber (B) raw.
+#   Rule 4  - Invoice Number (EIB K) MIRRORS BG (same value). v1 composite
+#             CreditorID-YYMM-RawInvNum RETIRED for v2. K and BG are both written as TEXT
+#             (cell NumberFormat "@" set before the write) on every row, so a numeric
+#             invoice number (497) is stored the same way as an alphanumeric one
+#             (LONR011387962) regardless of the EIB template's per-row cell formats.
+#   Rule 5  - Invoice Date (EIB AF) = InvoiceDate (C) via NormalizeSourceDate (YYYY-MM-DD).
+#   Rule 6  - Receipt Date (EIB AG) and Control Amount Total (EIB AS): BLANK (as v1).
+#   Rule 7  - Currency (EIB T) = Currency (D); blank -> GBP (as v1).
+#   Rule 8  - Item Description (EIB EP) = UCase(Trim(Description (I))) (as v1).
+#   Rule 9  - Extended Amount (EIB GF) = Net (F) verbatim (ResolveAmount; no Gross-Tax
+#             fallback, no sign flip), cell NumberFormat "0.00" (display 2 decimal places;
+#             stored value not rounded). Unit Cost (EIB GE) = BLANK.
+#             Net blank or 0 -> reject row (as v1 skip rule).
+#   Rule 10 - Tax: per row from TaxCode (J): P20 -> standard triple; P0 / PZ -> zero-rated
+#             triple; anything else -> reject (as v1). Triples in tax: below.
+#   Rule 11 - Worktags (EIB EW GR GT GV GX GZ HB HD HF HH) = source K..T verbatim.
+#             Spend Category, Reporting Type, Cost Centre are MANDATORY (blank -> reject).
+#             Any worktag cell = "NOT_FOUND" (source macro unresolved marker) -> reject.
+#             The other 7 may be blank. No Mapping MASTER lookup at runtime.
+#   Rule 12 - Memo (EIB GQ) = Supplier (U) & "_" & Suppliers Invoice Number (BG),
+#             e.g. "S-002170_594465" (underscore: Supplier IDs already contain a hyphen).
+#   Rule 13 - Multi-line grouping by InvoiceNumber (B): shared Spreadsheet Key (EIB B);
+#             Line Order (EIB EM) and Row ID (EIB EK) = per-group 1..N (as v1).
+#   Rule 14 - Header consistency guard: Company / Supplier / Currency / InvoiceDate must be
+#             identical on every row of the same InvoiceNumber; divergence -> run ERROR
+#             before any EIB row is written (as v1).
+
+meta:
+  key: ap_stationery_v2
+  label: AP Stationery v2
+  requester: Finance (AP)
+  date_confirmed: 2026-10-16
+  exemplar_to_fork: ap_stationery
+  note: >
+    Forked from ap_stationery (grouping, header consistency guard, per-row TaxCode switch,
+    date handling, run scaffold) with the pass-through worktag model of ap_cfa_claims
+    (worktag pipeline INACTIVE). Supplier / Company / worktags / TaxCode are all prepared in
+    the source workbook; the transform copies them across with blank / NOT_FOUND / unknown
+    gates.
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_with_extract_check
+  company_resolution: per_row_direct_source_column
+  accounting_string_derivation: none          # no cost code column in the v2 source
+  worktag_hierarchy_lookup: none              # worktags pre-resolved in source; no Mapping MASTER
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  supplier:
+    source_code: per_row_direct_with_extract_check
+    source_column: SupplierID
+    source_column_letter: A
+    resolved_via: Supplier Spreadsheet
+    validation_column: Supplier ID
+    reject_if_unresolved: true
+    note: >
+      Value written to EIB U verbatim. Existence set = Supplier extract "Supplier ID" column
+      (BuildDelimitedReferenceLookup with Supplier ID as key and value).
+  company:
+    source_code: per_row_direct_source_column
+    source_column: Company
+    source_column_letter: E
+    reject_if_blank: true
+    note: Value written to EIB R verbatim. No runner company mapping, no fallback.
+
+worktags_pre_resolved:
+  # Pass-through mapping of pre-resolved source columns -> EIB worktag cells.
+  # mandatory = reject row when source cell BLANK. Every worktag rejects on "NOT_FOUND".
+  spend_category:     {source_column: Spend Category, source_column_letter: K, eib_column: EW, mandatory: true}
+  reporting_type:     {source_column: Reporting Type, source_column_letter: L, eib_column: GR, mandatory: true}
+  cost_centre:        {source_column: Cost Centre, source_column_letter: M, eib_column: GT, mandatory: true}
+  event:              {source_column: Event, source_column_letter: N, eib_column: GV, mandatory: false}
+  camp:               {source_column: Camp, source_column_letter: O, eib_column: GX, mandatory: false}
+  fa_learning:        {source_column: FA Learning Course, source_column_letter: P, eib_column: GZ, mandatory: false}
+  commercial_partner: {source_column: Commercial Partner, source_column_letter: Q, eib_column: HB, mandatory: false}
+  grant:              {source_column: Grant, source_column_letter: R, eib_column: HD, mandatory: false}
+  program:            {source_column: Programme, source_column_letter: S, eib_column: HF, mandatory: false}
+  project:            {source_column: Project, source_column_letter: T, eib_column: HH, mandatory: false}
+  reject_values: [NOT_FOUND]
+
+fields:
+  invoice_number:                             # EIB K (Rule 4) - mirror of BG
+    source_column: InvoiceNumber
+    rule: Rule 4 - K = BG = source InvoiceNumber (B) raw
+    number_format: "@"
+  suppliers_invoice_number:                   # EIB BG (Rule 3)
+    source_column: InvoiceNumber
+    number_format: "@"
+  spreadsheet_key_group_id:                   # EIB B (Rule 13)
+    group_key_source_column: InvoiceNumber
+  line_order_within_group:                    # EIB EM + EK (Rule 13)
+    group_key_source_column: InvoiceNumber
+  header_consistency_guard_within_group:      # Rule 14
+    group_key_source_column: InvoiceNumber
+    strict_fields: [Company, Supplier, Currency, InvoiceDate]
+  invoice_date:                               # EIB AF (Rule 5)
+    source_column: InvoiceDate
+    format: NormalizeSourceDate -> YYYY-MM-DD text
+  receipt_date:                               # EIB AG (Rule 6)
+    function: leave_blank
+  currency:                                   # EIB T (Rule 7)
+    source_column: Currency
+    default: GBP
+  item_description:                           # EIB EP (Rule 8)
+    source_column: Description
+    post_process: UCase(Trim(value))
+  extended_amount:                            # EIB GF (Rule 9)
+    source_column: Net
+    function: ResolveAmount (verbatim; no fallback, no sign flip)
+    number_format: "0.00"
+  unit_cost:                                  # EIB GE (Rule 9)
+    function: leave_blank
+  memo:                                       # EIB GQ (Rule 12)
+    rule: Supplier (U) + '_' + Suppliers Invoice Number (BG)
+    concat_with_separator: "_"
+    concat_fields: [SupplierID, InvoiceNumber]
+
+tax:
+  mode: per_row
+  driver_source_column: TaxCode
+  sets:
+    - when_value: [P20]
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    - when_value: [P0, PZ]
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+  on_unknown_when_value: reject_and_report
+
+skip_rule:
+  drop_when:
+    - condition: "ALL blank: SupplierID AND InvoiceNumber AND Description AND Net AND Gross"
+      disposition: skip_silently_not_counted_as_reject
+      rationale: Trailing blank / total rows below the data (3 consecutive blank rows end the scan)
+    - InvoiceNumber (B) is blank
+    - SupplierID (A) is blank
+    - InvoiceDate (C) is blank
+    - Company (E) is blank
+    - Net (F) is blank or 0
+    - TaxCode (J) is blank
+    - Spend Category (K) / Reporting Type (L) / Cost Centre (M) is blank
+    - any worktag (K..T) is NOT_FOUND
+    - SupplierID not found in Supplier extract "Supplier ID" column
+    - TaxCode not P20 / P0 / PZ
+  on_drop: reject_row_and_report
+
+open_questions: []
+
+mapping:
+  # Submit_Supplier_Invoice_v46.2 column letters. House defaults: I=Y, FH=INVOICE/ADJUSTMENT_DATE,
+  # FL=CALC_TAX_DUE.
+  - target: B
+    function: invoice_line_grouping
+    note: "Spreadsheet Key per InvoiceNumber group via AssignInvoiceLineGroup (Rule 13)."
+  - target: I
+    default: "Y"
+  - target: K
+    source_column: InvoiceNumber
+    number_format: "@"
+    note: "Invoice Number = Suppliers Invoice Number (BG) mirror, written as text (Rule 4)."
+  - target: R
+    source_column: Company
+    note: "Company verbatim; blank rejects (Rule 2)."
+  - target: T
+    source_column: Currency
+    default: GBP
+  - target: U
+    source_column: SupplierID
+    lookup:
+      file: Supplier Spreadsheet
+      input_column: Supplier ID
+      output_column: Supplier ID
+      on_fail: reject
+    note: "Workday Supplier ID verbatim after existence check (Rule 1)."
+  - target: AF
+    source_column: InvoiceDate
+    normalize_source_date: true
+  - target: AG
+    function: leave_blank
+  - target: AS
+    function: leave_blank
+  - target: BG
+    source_column: InvoiceNumber
+    number_format: "@"
+  - target: EL
+    function: leave_blank
+    note: "Supplier Invoice Line ID blank; Workday assigns from Line Order (EM)."
+  - target: EK
+    function: invoice_line_grouping
+    note: "Row ID = exact mirror of Line Order (EM)."
+  - target: EM
+    function: invoice_line_grouping
+    note: "Line Order = 1..N within the InvoiceNumber group."
+  - target: EP
+    source_column: Description
+    post_process: UCase(Trim(value))
+  - target: EW
+    source_column: Spend Category
+    passthrough: true
+  - target: FE
+    function: per_row_tax_applicability
+    source_column: TaxCode
+  - target: FF
+    function: per_row_tax_code
+    source_column: TaxCode
+  - target: FH
+    default: INVOICE/ADJUSTMENT_DATE
+  - target: FK
+    function: per_row_tax_recoverability
+    source_column: TaxCode
+  - target: FL
+    default: CALC_TAX_DUE
+  - target: GE
+    function: leave_blank
+    note: "Unit Cost blank (Rule 9)."
+  - target: GF
+    source_column: Net
+    number_format: "0.00"
+    note: "Extended Amount = Net verbatim, displayed to 2 decimal places (Rule 9)."
+  - target: GQ
+    function: concat_underscore_supplier_id_invoice_number
+    note: "Memo = SupplierID & '_' & InvoiceNumber (Rule 12)."
+  - target: GR
+    source_column: Reporting Type
+    passthrough: true
+  - target: GT
+    source_column: Cost Centre
+    passthrough: true
+  - target: GV
+    source_column: Event
+    passthrough: true
+    optional: true
+  - target: GX
+    source_column: Camp
+    passthrough: true
+    optional: true
+  - target: GZ
+    source_column: FA Learning Course
+    passthrough: true
+    optional: true
+  - target: HB
+    source_column: Commercial Partner
+    passthrough: true
+    optional: true
+  - target: HD
+    source_column: Grant
+    passthrough: true
+    optional: true
+  - target: HF
+    source_column: Programme
+    passthrough: true
+    optional: true
+  - target: HH
+    source_column: Project
+    passthrough: true
+    optional: true

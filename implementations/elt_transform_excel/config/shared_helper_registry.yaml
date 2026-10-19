@@ -126,6 +126,27 @@ shared_helpers:
         - ap_commercial_invoice
         - ap_wnl_grants_invoice
 
+    direct_workday_id_with_extract_check:
+      description: >
+        Supplier reference read DIRECTLY, per row, from a Finance-prepared
+        Workday Supplier ID column in the source file (S-XXXXXX value) and
+        written to EIB U verbatim -- like direct_workday_id_passthrough, NO
+        hyphen split and NO company precedence -- PLUS an existence check:
+        the value must appear (case-insensitive, trimmed) in the Supplier
+        Spreadsheet extract's "Supplier ID" column, otherwise the row is
+        rejected (unresolvedSupplierRows++). A blank cell also rejects. The
+        check set is built by calling BuildDelimitedReferenceLookup with the
+        "Supplier ID" column as BOTH key and value column, then
+        LookupCollectionValue per row. No new shared helper; it has NO
+        bare-helper hint in build_runner.CONCERN_VARIANT_TO_BARE_HELPER_HINTS.
+      vba_module: modFinanceCommon.bas
+      vba_public_fn: BuildDelimitedReferenceLookup + LookupCollectionValue
+      requires_columns:
+        - source Workday Supplier ID column
+        - Supplier Spreadsheet extract "Supplier ID" column
+      examples:
+        - ap_stationery_v2
+
   # --------------------------------------------------------------------------
   # COMPANY RESOLUTION
   # --------------------------------------------------------------------------
@@ -199,6 +220,21 @@ shared_helpers:
         - source Workday Supplier ID column
       examples:
         - ap_travel_places_v2
+
+    per_row_direct_source_column:
+      description: >
+        Company read DIRECTLY, per row, from a Finance-prepared source
+        "Company" column that already holds the Workday company value (e.g.
+        "THE FA GROUP - FA" / "THE FA GROUP - WNSL") and written to EIB R
+        verbatim. NO runner entity=company mapping lookup, NO fallback, NO
+        derivation from the Supplier ID; a blank cell rejects the row. Used
+        where the source workbook's own macro has already set Company per
+        line (one source layout shared by FA and WNSL invoices).
+      vba_module: local transform (inline Trim of the source Company column; blank rejects)
+      requires_columns:
+        - source Company column carrying the Workday company value
+      examples:
+        - ap_stationery_v2
 
   # --------------------------------------------------------------------------
   # CUSTOMER NAME RESOLUTION (name -> Workday Customer ID)
@@ -317,6 +353,7 @@ shared_helpers:
         - ar_invoice
         - ar_invoice_run
         - ar_bulk_invoice
+        - ap_stationery_v2
 
   # --------------------------------------------------------------------------
   # ENTITY ROW BLOCK (one entity -> N EIB rows; master-data EIBs)
@@ -449,6 +486,7 @@ shared_helpers:
       vba_public_fn: null
       examples:
         - ap_cfa_claims
+        - ap_stationery_v2
 
     direct_distribution_reference_code:
       description: >
@@ -580,6 +618,7 @@ shared_helpers:
         - one pre-resolved Workday-ref-id source column per active worktag
       examples:
         - ap_cfa_claims
+        - ap_stationery_v2
 
   # --------------------------------------------------------------------------
   # ROW NET AMOUNT RESOLUTION (for RowIsSkippable)
@@ -617,6 +656,7 @@ shared_helpers:
         - ap_prize_funds
         - ap_referees
         - ap_referees_v2
+        - ap_stationery_v2
 
   # --------------------------------------------------------------------------
   # ROW TRAILER / EMPTY DETECTION
@@ -646,6 +686,7 @@ shared_helpers:
         - ap_prize_funds
         - ap_referees
         - ap_referees_v2
+        - ap_stationery_v2
 
     none:
       description: >
@@ -769,3 +810,4 @@ shared_helpers:
         - ar_invoice
         - ar_invoice_run
         - ar_multi_line_invoice
+        - ap_stationery_v2
