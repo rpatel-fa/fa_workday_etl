@@ -147,6 +147,7 @@ shared_helpers:
       examples:
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
   # --------------------------------------------------------------------------
   # COMPANY RESOLUTION
@@ -237,6 +238,7 @@ shared_helpers:
       examples:
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
   # --------------------------------------------------------------------------
   # CUSTOMER NAME RESOLUTION (name -> Workday Customer ID)
@@ -357,6 +359,7 @@ shared_helpers:
         - ar_bulk_invoice
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
   # --------------------------------------------------------------------------
   # ENTITY ROW BLOCK (one entity -> N EIB rows; master-data EIBs)
@@ -491,6 +494,7 @@ shared_helpers:
         - ap_cfa_claims
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
     direct_distribution_reference_code:
       description: >
@@ -624,6 +628,7 @@ shared_helpers:
         - ap_cfa_claims
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
   # --------------------------------------------------------------------------
   # ROW NET AMOUNT RESOLUTION (for RowIsSkippable)
@@ -663,6 +668,7 @@ shared_helpers:
         - ap_referees_v2
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
   # --------------------------------------------------------------------------
   # ROW TRAILER / EMPTY DETECTION
@@ -694,6 +700,7 @@ shared_helpers:
         - ap_referees_v2
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
 
     none:
       description: >
@@ -819,3 +826,4 @@ shared_helpers:
         - ar_multi_line_invoice
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_gfsp
