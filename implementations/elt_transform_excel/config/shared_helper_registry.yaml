@@ -146,6 +146,7 @@ shared_helpers:
         - Supplier Spreadsheet extract "Supplier ID" column
       examples:
         - ap_stationery_v2
+        - ap_taxi_v2
 
   # --------------------------------------------------------------------------
   # COMPANY RESOLUTION
@@ -235,6 +236,7 @@ shared_helpers:
         - source Company column carrying the Workday company value
       examples:
         - ap_stationery_v2
+        - ap_taxi_v2
 
   # --------------------------------------------------------------------------
   # CUSTOMER NAME RESOLUTION (name -> Workday Customer ID)
@@ -354,6 +356,7 @@ shared_helpers:
         - ar_invoice_run
         - ar_bulk_invoice
         - ap_stationery_v2
+        - ap_taxi_v2
 
   # --------------------------------------------------------------------------
   # ENTITY ROW BLOCK (one entity -> N EIB rows; master-data EIBs)
@@ -487,6 +490,7 @@ shared_helpers:
       examples:
         - ap_cfa_claims
         - ap_stationery_v2
+        - ap_taxi_v2
 
     direct_distribution_reference_code:
       description: >
@@ -619,6 +623,7 @@ shared_helpers:
       examples:
         - ap_cfa_claims
         - ap_stationery_v2
+        - ap_taxi_v2
 
   # --------------------------------------------------------------------------
   # ROW NET AMOUNT RESOLUTION (for RowIsSkippable)
@@ -657,6 +662,7 @@ shared_helpers:
         - ap_referees
         - ap_referees_v2
         - ap_stationery_v2
+        - ap_taxi_v2
 
   # --------------------------------------------------------------------------
   # ROW TRAILER / EMPTY DETECTION
@@ -687,6 +693,7 @@ shared_helpers:
         - ap_referees
         - ap_referees_v2
         - ap_stationery_v2
+        - ap_taxi_v2
 
     none:
       description: >
@@ -811,3 +818,4 @@ shared_helpers:
         - ar_invoice_run
         - ar_multi_line_invoice
         - ap_stationery_v2
+        - ap_taxi_v2
