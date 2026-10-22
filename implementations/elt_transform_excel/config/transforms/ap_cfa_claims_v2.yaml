@@ -1,0 +1,218 @@
+version: 1
+
+transform:
+  key: ap_cfa_claims_v2
+  label: AP CFA Claims v2
+  source_type: AP CFA Claims Workday Upload Template
+  eib_population_type: Supplier Invoice
+  description: >
+    v2 of the CFA CLAIMS supplier-invoice transform, built on the ap_stationery_v2 model.
+    Reads the Finance-prepared "Workday Upload Template" tab (columns A-T, same header row as
+    the stationery v2 "Workday_Upload" tab) of the County FA (CFA) Claims workbook
+    ("1.0 CFA Claims - <Mon><YYYY>.xlsx") and writes the Workday Supplier Invoice EIB.
+    Runs ALONGSIDE v1 (ap_cfa_claims, "Sheet1" tab); v1 is unchanged. CFA Distributions are
+    NOT handled here (see ap_cfa_distributions).
+
+    WHAT CHANGED vs v1 (ap_cfa_claims):
+      (1) Source tab is "Workday Upload Template" (A-T) instead of "Sheet1" (A-AA). The v1
+          claim-tracking columns (Sheet Name, County FA, County FA GP ID, Head of Approval,
+          Processed By/Date, Budget Code Naming) are no longer in the source, so their
+          integrity gates and the v1 memo are dropped.
+      (2) SupplierID (A) holds the Workday Supplier ID (e.g. S-007535). Written straight to
+          EIB U after confirming it exists in the Supplier extract's "Supplier ID" column;
+          unknown IDs reject the row. (v1 passed col W through with a non-blank check only.)
+      (3) Company (E) and Currency (D) are read per row from the source (v1: constant FA / GBP).
+      (4) Tax is per row from TaxCode (J) using the stationery codes: P20 -> standard-rated,
+          P0/PZ -> zero-rated (v1: one fixed zero-rated triple).
+      (5) All 10 worktags are read DIRECTLY from source columns K-T. Mandatory =
+          Spend Category, Reporting Type, Cost Centre (blank or NOT_FOUND -> reject row).
+          (v1: only Cost Centre mandatory; Spend Category optional from 2026-09-25.)
+      (6) Invoice Number (K) MIRRORS Suppliers Invoice Number (BG) = source InvoiceNumber (B),
+          both written as TEXT on every row (cell format "@").
+      (7) Unit Cost (GE) is left BLANK; Extended Amount (GF) = Net (F), displayed to 2
+          decimal places (cell format "0.00"; stored value not rounded). (v1: D to GE and GF.)
+      (8) Memo (GQ) = Supplier (U) + '_' + Suppliers Invoice Number (BG),
+          e.g. "S-007535_1_1026_DWF_PartnerOct2026". (v1: "{C} | {A} | {U} | by {R}".)
+      (9) Receipt Date (AG) and Control Amount Total (AS) left BLANK. (v1: AG = Invoice Date.)
+
+    SAME AS ap_stationery_v2:
+      * Multi-line grouping by InvoiceNumber: shared Spreadsheet Key (B); Line Order (EM)
+        and Row ID (EK) = per-group 1..N counter. (Oct-2026 file: InvoiceNumber is unique
+        per row, so every invoice is single-line.)
+      * Header consistency guard: Company / Supplier / Currency / InvoiceDate must be
+        identical on every row of the same InvoiceNumber, else build error before EIB write.
+      * Line description (EP) from Description (I); Invoice Date (AF) from InvoiceDate (C).
+
+    See ap_stationery_v2 for the shared decision record (config/transform_specs/ap_stationery_v2.yaml).
+
+runtime:
+  step_list_macro: RunApCfaClaimsV2SupplierInvoice
+
+source_layout:
+  worksheet_name: Workday Upload Template
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  # Workday Upload Template columns A-T: identical header row to ap_stationery_v2 Workday_Upload
+  # (verified against "1.0 CFA Claims - Oct2026.xlsx", 2026-10-22).
+  required_headers:
+    - SupplierID            # A
+    - InvoiceNumber         # B
+    - InvoiceDate           # C
+    - Currency              # D
+    - Company               # E
+    - Net                   # F
+    - Tax                   # G
+    - Gross                 # H
+    - Description           # I
+    - TaxCode               # J
+    - Spend Category        # K  (mandatory worktag)
+    - Reporting Type        # L  (mandatory worktag)
+    - Cost Centre           # M  (mandatory worktag)
+  # Optional worktag columns: the header must be present (the .bas requires the column), but
+  # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
+  # data check (same convention as ap_stationery_v2 / ap_cfa_claims).
+  optional_headers:
+    - Event                 # N
+    - Camp                  # O
+    - FA Learning Course    # P
+    - Commercial Partner    # Q
+    - Grant                 # R
+    - Programme             # S
+    - Project               # T
+
+transform_constants:
+  # Source column -> EIB field bindings (same key convention as ap_stationery_v2).
+  source_columns:
+    supplier_id: SupplierID                 # A -> U
+    invoice_number: InvoiceNumber           # B -> BG, and mirrored to K
+    invoice_date: InvoiceDate               # C -> AF
+    currency: Currency                      # D -> T
+    company: Company                        # E -> R
+    net_amount: Net                         # F -> GF
+    tax_amount: Tax                         # G
+    gross_amount: Gross                     # H
+    line_description: Description           # I -> EP
+    tax_code: TaxCode                       # J -> per_row_tax driver
+
+  # Supplier: the source already carries the Workday Supplier ID. Write it to U as-is,
+  # after an existence check against the Supplier extract (case-insensitive).
+  supplier_resolution:
+    mode: direct_workday_id_with_extract_check   # shared_helper_registry variant
+    source_column: SupplierID
+    target_eib_column: U
+    validated_via: Supplier Spreadsheet
+    validation_column: Supplier ID
+    on_not_found: reject_row
+
+  # Company: the source carries the Workday company (THE FA GROUP - FA on every CFA row).
+  company_resolution:
+    mode: per_row_direct_source_column           # shared_helper_registry variant
+    source_column: Company
+    target_eib_column: R
+    on_blank: reject_row
+
+  # Invoice number: K mirrors BG; both = source InvoiceNumber (B) raw, written as text.
+  invoice_number:
+    source_column: InvoiceNumber
+    suppliers_invoice_number_eib_column: BG
+    invoice_number_eib_column: K
+    k_mirrors_bg: true
+    number_format: "@"                      # text on every row for K and BG
+
+  # Amounts: Extended Amount (GF) = Net; Unit Cost (GE) left blank.
+  line_amounts:
+    extended_amount:
+      source_column: Net
+      target_eib_column: GF
+      number_format: "0.00"                 # display 2 decimal places; value not rounded
+    unit_cost:
+      target_eib_column: GE
+      value: blank
+
+  # Memo (GQ): Supplier (U) + '_' + Suppliers Invoice Number (BG).
+  memo_derivation:
+    strategy: concat_underscore_join
+    separator: "_"
+    source_steps:
+      supplier_id:
+        source_column: SupplierID           # value written to U
+      suppliers_invoice_number:
+        source_column: InvoiceNumber        # value written to BG
+    concat_order:
+      - supplier_id
+      - suppliers_invoice_number
+    target_eib_column: GQ
+
+  # Per-row tax classification driven by TaxCode (J). Same as ap_stationery_v2:
+  # P20 -> standard-rated; P0/PZ -> zero-rated; any other value rejects the row.
+  per_row_tax:
+    driver_column: TaxCode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+
+  company_fallback: ""                      # no fallback: Company comes from the source row
+  mapping_sheet: MAPPING MASTER             # schema parity only; NOT opened at runtime (see worktag_resolution)
+
+  # Worktags: read verbatim from their own source columns. No accounting string, no
+  # Mapping MASTER lowest-hierarchy scan, no ResolveReportingTypeFromFinalCode.
+  worktag_resolution:
+    resolution: direct_from_source_columns
+    source_columns:
+      spend_category: Spend Category       # K
+      reporting_type: Reporting Type       # L
+      cost_centre: Cost Centre             # M
+      event: Event                         # N
+      camp: Camp                           # O
+      fa_learning: FA Learning Course      # P
+      commercial_partner: Commercial Partner  # Q
+      grant: Grant                         # R
+      program: Programme                   # S
+      project: Project                     # T
+    mandatory:                             # blank -> reject row; the other 7 may be blank
+      - spend_category
+      - reporting_type
+      - cost_centre
+    reject_values:                         # source-workbook "unresolved" marker -> reject row
+      - NOT_FOUND
+    note: >
+      Source values are already Workday reference IDs (e.g. Staff_Grant,
+      Programme_Costs_Professional_Fees, CC09020, GRT0031, PRG00031) and Reporting Type
+      display values ("National Game Board (NGB)", "FA Investments"). Optional worktags may
+      be blank. The worktag pipeline is INACTIVE (same model as ap_stationery_v2): no
+      worktag_business_objects / derived_worktags, so no Mapping MASTER lookup at runtime.
+  # Standard 9-pack worktag column letters for v46.2 Supplier Invoice EIB (+ Reporting Type).
+  worktag_target_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/source/1.0 CFA Claims - Oct2026.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_claims/target/Submit_Supplier_Invoice_ap_cfa_claims_v2_output.xlsx
+  source_worksheet_name: Workday Upload Template
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. supplier_spreadsheet IS loaded (Supplier ID
+  # existence check); mapping_spreadsheet is NOT used.
+  #
+  # Paths use the repo's authored root (/Users/Rakesh.Patel/Documents/__data); the Windows
+  # build profile in config/root_path_substitutions.yaml rewrites it to
+  # C:\Users\Chika.Etheridge\Documents\workday_finance\data.
