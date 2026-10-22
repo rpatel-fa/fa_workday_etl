@@ -65,9 +65,8 @@
 #   Rule 6 — Invoice Date + Receipt Date (EIB AF/AG): col K "Batch ID" via NormalizeSourceDate.
 #   Rule 7 — Item Description (EIB EP): col F TRIM verbatim.
 #   Rule 8 — Unit Cost (EIB GE): BLANK (not written).
-#   Rule 9 — Extended Amount (EIB GF): col H "Total" rounded to 2 dp (Excel ROUND semantics,
-#             half away from zero — Application.WorksheetFunction.Round, NOT VBA banker's Round)
-#             with cell NumberFormat "0.00".
+#   Rule 9 — Extended Amount (EIB GF): col H "Total" AS IS (NOT rounded) with cell
+#             NumberFormat "0.00" (display only; same as ap_gfsp / ap_cfa_claims_v2).
 #   Rule 10 — Worktags: Cost Centre (GT) + Spend Category (EW) mandatory, Reporting Type (GR) +
 #              7 optional worktags from col G via Mapping MASTER lowest-hierarchy match - UNCHANGED.
 #   Rule 11 — Tax per row (conditional_on_tax_amount) on col I - UNCHANGED.
@@ -86,7 +85,7 @@ meta:
     Reworked 2026-10-22 for "Distributions Oct26.xlsm": source tab "Finance Master sheet";
     Supplier = Old Creditor ID (D) via Supplier extract (CreditorID-FA then bare); Invoice
     Number + Item Description = Description - remittance (F); Unit Cost blank; Extended Amount =
-    Total (H) rounded 2 dp; Invoice/Receipt Date = Batch ID (K); grouping Supplier + Invoice
+    Total (H) formatted "0.00" (not rounded); Invoice/Receipt Date = Batch ID (K); grouping Supplier + Invoice
     Number. Supersedes the 2026-09-24 "Finance Master analysis" layout (cols T/U/V/Z/AA/AD).
 
 shared_helpers:
@@ -159,11 +158,11 @@ fields:
   line_amount:
     source_column: Total (H)
     basis: net
-    rounding: 2 dp, Excel ROUND (half away from zero) via Application.WorksheetFunction.Round
+    rounding: none
     number_format: "0.00"
     note: >
-      Written to EIB GF (Extended Amount) only. Col H is unrounded (e.g. 12670.404999…); Excel
-      ROUND reproduces Finance's own rounded figures, VBA's banker's Round would not on .xx5 rows.
+      Written to EIB GF (Extended Amount) only. Col H is unrounded (e.g. 12670.404999…) and is
+      written AS IS; the "0.00" NumberFormat only changes how the cell displays (user 2026-10-22).
   spend_category:
     derivation: per_row_lookup
     key_source_column: Distribution/Cost Code (G)
@@ -365,9 +364,8 @@ mapping:
 # GE (Unit Cost) intentionally NOT mapped — left blank (Rule 8).
 - target: GF
   source_column: Total (H)
-  function: round_2dp_excel
   number_format: "0.00"
-  note: Rule 9 — Extended Amount = ROUND(col H, 2), formatted "0.00".
+  note: Rule 9 — Extended Amount = col H as is (not rounded), formatted "0.00".
 - target: GQ
   function: concat_cola_docno_space_colg_distributioncostcode
   note: Rule 12 — Memo = col A + " " + col G.
