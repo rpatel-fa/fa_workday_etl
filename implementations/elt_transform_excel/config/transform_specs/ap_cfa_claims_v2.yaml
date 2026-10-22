@@ -1,0 +1,314 @@
+# Transform spec - ap_cfa_claims_v2
+#
+# v2 of the CFA CLAIMS supplier-invoice transform (one workbook per month, one Runner
+# dropdown entry). Human decision record + authoritative target-column mapping. The mapping:
+# section is the source of truth the .bas mirrors (vba_src/transforms/modApCfaClaimsV2SupInv.bas).
+# Lives in config/transform_specs/ (NOT config/transforms/, which is the build-globbed runnable set).
+#
+# Operational facts - identity, EIB population type, template/source/output paths, and
+# source layout (worksheet, header row, required headers) - live in the build profile
+# config/transforms/ap_cfa_claims_v2.yaml (the build-consumed source of truth). Not restated here.
+#
+# Runs ALONGSIDE v1 (ap_cfa_claims, "Sheet1" tab). v1 ap_cfa_claims, ap_cfa_distributions,
+# ap_stationery_v2 and ap_taxi_v2 are unchanged by v2.
+#
+# The core mapping MIRRORS ap_stationery_v2 (user instruction 2026-10-22): the CFA Claims
+# "Workday Upload Template" tab has the SAME 20-column A-T header row as the stationery v2
+# Workday_Upload tab.
+#
+# Source = "1.0 CFA Claims - <Mon><YYYY>.xlsx", tab "Workday Upload Template" (header row 1,
+# data rows 2..N), 20 columns A-T ("1.0 CFA Claims - Oct2026.xlsx" verified 2026-10-22):
+#   A SupplierID, B InvoiceNumber, C InvoiceDate, D Currency, E Company, F Net, G Tax,
+#   H Gross, I Description, J TaxCode, K Spend Category, L Reporting Type, M Cost Centre,
+#   N Event, O Camp, P FA Learning Course, Q Commercial Partner, R Grant, S Programme,
+#   T Project.
+# Finance prepare the tab in the source workbook: Workday Supplier IDs, Company, Currency,
+# TaxCode (PZ for CFA claims - no VAT) and the 10 worktags as Workday ref ids are already
+# filled in. v2 therefore copies values across; it does NOT re-derive coding or tax.
+#
+# Data shape: ONE claims workbook = MULTIPLE invoices. Oct-2026: 96 rows, 96 distinct
+# InvoiceNumbers (e.g. "1_1026_DWF_PartnerOct2026"), so every invoice is single-line; the
+# InvoiceNumber grouping still supports multi-line invoices if Finance send them.
+# Oct-2026 witness: all rows GBP / THE FA GROUP - FA / PZ / Tax 0 / InvoiceDate 2026-10-01;
+# all 96 SupplierIDs present in "Extract Suppliers 22.10.2026 BST.xlsx".
+#
+# Rejected rows (as ap_stationery_v2 / ap_taxi_v2): rows with a blank mandatory worktag or a
+# NOT_FOUND worktag are REJECTED by the Runner (reported in the reject log, not written to
+# the EIB). The correction is made in the source workbook.
+#
+# Decision record (v2 rules; what changed vs v1 ap_cfa_claims in brackets):
+#   Rule 1  - Supplier (EIB U): SupplierID (A) = Workday Supplier ID (S-XXXXXX) written
+#             verbatim, after an existence check against the Supplier extract "Supplier ID"
+#             column (case-insensitive, trimmed). Not found / blank -> reject row.
+#             [v1: col W "Workday Supplier ID Lookup" passthrough, non-blank check only.]
+#   Rule 2  - Company (EIB R): Company (E) written verbatim (THE FA GROUP - FA).
+#             Blank -> reject row. [v1: constant "FA" via ResolveMappedCompany.]
+#   Rule 3  - Suppliers Invoice Number (EIB BG) = InvoiceNumber (B) raw. [v1: col Y.]
+#   Rule 4  - Invoice Number (EIB K) MIRRORS BG (same value). K and BG are both written as
+#             TEXT (cell NumberFormat "@" set before the write) on every row. [v1: K = BG = Y.]
+#   Rule 5  - Invoice Date (EIB AF) = InvoiceDate (C) via NormalizeSourceDate (YYYY-MM-DD).
+#             [v1: col AA.]
+#   Rule 6  - Receipt Date (EIB AG) and Control Amount Total (EIB AS): BLANK.
+#             [v1: AG = col AA Invoice Date.]
+#   Rule 7  - Currency (EIB T) = Currency (D); blank -> GBP. [v1: constant GBP.]
+#   Rule 8  - Item Description (EIB EP) = UCase(Trim(Description (I))).
+#             [v1: col Z "Invoice Description" verbatim.]
+#   Rule 9  - Extended Amount (EIB GF) = Net (F) verbatim (ResolveAmount; no sign flip),
+#             cell NumberFormat "0.00" (display 2 decimal places; stored value not rounded).
+#             Unit Cost (EIB GE) = BLANK. Net blank or 0 -> reject row.
+#             [v1: col D "Total Claim (£)" to BOTH GE and GF; blank/0/negative rejected.]
+#   Rule 10 - Tax: per row from TaxCode (J): P20 -> standard triple; P0 / PZ -> zero-rated
+#             triple; anything else -> reject. Triples in tax: below.
+#             [v1: no tax columns; fixed zero-rated triple on every row.]
+#   Rule 11 - Worktags (EIB EW GR GT GV GX GZ HB HD HF HH) = source K..T verbatim.
+#             Spend Category, Reporting Type, Cost Centre are MANDATORY (blank -> reject).
+#             Any worktag cell = "NOT_FOUND" -> reject. The other 7 may be blank.
+#             No Mapping MASTER lookup at runtime.
+#             [v1: E..O passthrough; only Cost Centre mandatory, Spend Category optional
+#             since 2026-09-25, Reporting Type not checked.]
+#   Rule 12 - Memo (EIB GQ) = Supplier (U) & "_" & Suppliers Invoice Number (BG),
+#             e.g. "S-007535_1_1026_DWF_PartnerOct2026".
+#             [v1: "{County FA GP ID} | {Sheet Name} | {Budget Code Naming} | by {Processed By}".]
+#   Rule 13 - Multi-line grouping by InvoiceNumber (B): shared Spreadsheet Key (EIB B);
+#             Line Order (EIB EM) and Row ID (EIB EK) = per-group 1..N. [v1: same, by col Y.]
+#   Rule 14 - Header consistency guard: Company / Supplier / Currency / InvoiceDate must be
+#             identical on every row of the same InvoiceNumber; divergence -> run ERROR
+#             before any EIB row is written. [v1: none.]
+#   RETIRED - v1 integrity gates on Sheet Name (A), County FA GP ID (C), Processed Date (S),
+#             Budget Code Naming (U) and the County FA / Head of Approval trailer test: those
+#             columns are not on the Workday Upload Template tab.
+
+meta:
+  key: ap_cfa_claims_v2
+  label: AP CFA Claims v2
+  requester: Finance (AP)
+  date_confirmed: 2026-10-22
+  exemplar_to_fork: ap_stationery_v2
+  note: >
+    Forked from ap_stationery_v2 (same A-T upload layout, same mapping; the .bas is a
+    name-only copy, as ap_taxi_v2). Supplier / Company / Currency / worktags / TaxCode are
+    all prepared in the source workbook; the transform copies them across with blank /
+    NOT_FOUND / unknown gates. CFA-specific: source tab "Workday Upload Template" in the
+    monthly CFA Claims workbook under /ap/cfa_claims/source/.
+
+shared_helpers:
+  supplier_resolution: direct_workday_id_with_extract_check
+  company_resolution: per_row_direct_source_column
+  accounting_string_derivation: none          # no cost code column in the v2 source
+  worktag_hierarchy_lookup: none              # worktags pre-resolved in source; no Mapping MASTER
+  row_net_resolution: direct_amount
+  row_trailer_detection: text_cols_and_amount_cols_parameterized
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  supplier:
+    source_code: per_row_direct_with_extract_check
+    source_column: SupplierID
+    source_column_letter: A
+    resolved_via: Supplier Spreadsheet
+    validation_column: Supplier ID
+    reject_if_unresolved: true
+    note: >
+      Value written to EIB U verbatim. Existence set = Supplier extract "Supplier ID" column
+      (BuildDelimitedReferenceLookup with Supplier ID as key and value).
+  company:
+    source_code: per_row_direct_source_column
+    source_column: Company
+    source_column_letter: E
+    reject_if_blank: true
+    note: Value written to EIB R verbatim. No runner company mapping, no fallback.
+
+worktags_pre_resolved:
+  # Pass-through mapping of pre-resolved source columns -> EIB worktag cells.
+  # mandatory = reject row when source cell BLANK. Every worktag rejects on "NOT_FOUND".
+  spend_category:     {source_column: Spend Category, source_column_letter: K, eib_column: EW, mandatory: true}
+  reporting_type:     {source_column: Reporting Type, source_column_letter: L, eib_column: GR, mandatory: true}
+  cost_centre:        {source_column: Cost Centre, source_column_letter: M, eib_column: GT, mandatory: true}
+  event:              {source_column: Event, source_column_letter: N, eib_column: GV, mandatory: false}
+  camp:               {source_column: Camp, source_column_letter: O, eib_column: GX, mandatory: false}
+  fa_learning:        {source_column: FA Learning Course, source_column_letter: P, eib_column: GZ, mandatory: false}
+  commercial_partner: {source_column: Commercial Partner, source_column_letter: Q, eib_column: HB, mandatory: false}
+  grant:              {source_column: Grant, source_column_letter: R, eib_column: HD, mandatory: false}
+  program:            {source_column: Programme, source_column_letter: S, eib_column: HF, mandatory: false}
+  project:            {source_column: Project, source_column_letter: T, eib_column: HH, mandatory: false}
+  reject_values: [NOT_FOUND]
+
+fields:
+  invoice_number:                             # EIB K (Rule 4) - mirror of BG
+    source_column: InvoiceNumber
+    rule: Rule 4 - K = BG = source InvoiceNumber (B) raw
+    number_format: "@"
+  suppliers_invoice_number:                   # EIB BG (Rule 3)
+    source_column: InvoiceNumber
+    number_format: "@"
+  spreadsheet_key_group_id:                   # EIB B (Rule 13)
+    group_key_source_column: InvoiceNumber
+  line_order_within_group:                    # EIB EM + EK (Rule 13)
+    group_key_source_column: InvoiceNumber
+  header_consistency_guard_within_group:      # Rule 14
+    group_key_source_column: InvoiceNumber
+    strict_fields: [Company, Supplier, Currency, InvoiceDate]
+  invoice_date:                               # EIB AF (Rule 5)
+    source_column: InvoiceDate
+    format: NormalizeSourceDate -> YYYY-MM-DD text
+  receipt_date:                               # EIB AG (Rule 6)
+    function: leave_blank
+  currency:                                   # EIB T (Rule 7)
+    source_column: Currency
+    default: GBP
+  item_description:                           # EIB EP (Rule 8)
+    source_column: Description
+    post_process: UCase(Trim(value))
+  extended_amount:                            # EIB GF (Rule 9)
+    source_column: Net
+    function: ResolveAmount (verbatim; no fallback, no sign flip)
+    number_format: "0.00"
+  unit_cost:                                  # EIB GE (Rule 9)
+    function: leave_blank
+  memo:                                       # EIB GQ (Rule 12)
+    rule: Supplier (U) + '_' + Suppliers Invoice Number (BG)
+    concat_with_separator: "_"
+    concat_fields: [SupplierID, InvoiceNumber]
+
+tax:
+  mode: per_row
+  driver_source_column: TaxCode
+  sets:
+    - when_value: [P20]
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    - when_value: [P0, PZ]
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+  on_unknown_when_value: reject_and_report
+
+skip_rule:
+  drop_when:
+    - condition: "ALL blank: SupplierID AND InvoiceNumber AND Description AND Net AND Gross"
+      disposition: skip_silently_not_counted_as_reject
+      rationale: Trailing blank / total rows below the data (3 consecutive blank rows end the scan)
+    - InvoiceNumber (B) is blank
+    - SupplierID (A) is blank
+    - InvoiceDate (C) is blank
+    - Company (E) is blank
+    - Net (F) is blank or 0
+    - TaxCode (J) is blank
+    - Spend Category (K) / Reporting Type (L) / Cost Centre (M) is blank
+    - any worktag (K..T) is NOT_FOUND
+    - SupplierID not found in Supplier extract "Supplier ID" column
+    - TaxCode not P20 / P0 / PZ
+  on_drop: reject_row_and_report
+
+open_questions: []
+
+mapping:
+  # Submit_Supplier_Invoice_v46.2 column letters. House defaults: I=Y, FH=INVOICE/ADJUSTMENT_DATE,
+  # FL=CALC_TAX_DUE.
+  - target: B
+    function: invoice_line_grouping
+    note: "Spreadsheet Key per InvoiceNumber group via AssignInvoiceLineGroup (Rule 13)."
+  - target: I
+    default: "Y"
+  - target: K
+    source_column: InvoiceNumber
+    number_format: "@"
+    note: "Invoice Number = Suppliers Invoice Number (BG) mirror, written as text (Rule 4)."
+  - target: R
+    source_column: Company
+    note: "Company verbatim; blank rejects (Rule 2)."
+  - target: T
+    source_column: Currency
+    default: GBP
+  - target: U
+    source_column: SupplierID
+    lookup:
+      file: Supplier Spreadsheet
+      input_column: Supplier ID
+      output_column: Supplier ID
+      on_fail: reject
+    note: "Workday Supplier ID verbatim after existence check (Rule 1)."
+  - target: AF
+    source_column: InvoiceDate
+    normalize_source_date: true
+  - target: AG
+    function: leave_blank
+  - target: AS
+    function: leave_blank
+  - target: BG
+    source_column: InvoiceNumber
+    number_format: "@"
+  - target: EL
+    function: leave_blank
+    note: "Supplier Invoice Line ID blank; Workday assigns from Line Order (EM)."
+  - target: EK
+    function: invoice_line_grouping
+    note: "Row ID = exact mirror of Line Order (EM)."
+  - target: EM
+    function: invoice_line_grouping
+    note: "Line Order = 1..N within the InvoiceNumber group."
+  - target: EP
+    source_column: Description
+    post_process: UCase(Trim(value))
+  - target: EW
+    source_column: Spend Category
+    passthrough: true
+  - target: FE
+    function: per_row_tax_applicability
+    source_column: TaxCode
+  - target: FF
+    function: per_row_tax_code
+    source_column: TaxCode
+  - target: FH
+    default: INVOICE/ADJUSTMENT_DATE
+  - target: FK
+    function: per_row_tax_recoverability
+    source_column: TaxCode
+  - target: FL
+    default: CALC_TAX_DUE
+  - target: GE
+    function: leave_blank
+    note: "Unit Cost blank (Rule 9)."
+  - target: GF
+    source_column: Net
+    number_format: "0.00"
+    note: "Extended Amount = Net verbatim, displayed to 2 decimal places (Rule 9)."
+  - target: GQ
+    function: concat_underscore_supplier_id_invoice_number
+    note: "Memo = SupplierID & '_' & InvoiceNumber (Rule 12)."
+  - target: GR
+    source_column: Reporting Type
+    passthrough: true
+  - target: GT
+    source_column: Cost Centre
+    passthrough: true
+  - target: GV
+    source_column: Event
+    passthrough: true
+    optional: true
+  - target: GX
+    source_column: Camp
+    passthrough: true
+    optional: true
+  - target: GZ
+    source_column: FA Learning Course
+    passthrough: true
+    optional: true
+  - target: HB
+    source_column: Commercial Partner
+    passthrough: true
+    optional: true
+  - target: HD
+    source_column: Grant
+    passthrough: true
+    optional: true
+  - target: HF
+    source_column: Programme
+    passthrough: true
+    optional: true
+  - target: HH
+    source_column: Project
+    passthrough: true
+    optional: true
