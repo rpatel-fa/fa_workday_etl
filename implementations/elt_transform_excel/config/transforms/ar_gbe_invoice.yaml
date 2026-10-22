@@ -13,7 +13,10 @@ transform:
     each tab is run as a separate Runner dropdown selection (AR Invoice GBE Mens / AR Invoice
     GBE Womens) via shell_defaults.variants + a per-variant source_worksheet_name override -
     the same one-transform-many-sources pattern used by ap_stationery. One source row = one
-    single-line Workday Customer Invoice. AR now delivers a ready-made Workday Customer ID
+    invoice LINE; lines are grouped into one multi-line Workday Customer Invoice per Workday
+    Customer ID (2026-10-22): rows sharing a Customer (AJ) share one Spreadsheet Key (B), and
+    Row ID (DS) / Line Order (DV) run 1..N within it. Header fields BR / CQ / DB (and so G)
+    come from the customer's first row. AR now delivers a ready-made Workday Customer ID
     per row (source col A "WORKDAY ID" / "Customer ID" depending on tab): the customer (AJ)
     is a DIRECT PASSTHROUGH of that column - the earlier two-level club-name cascade match is
     no longer used for this transform (superseded 2026-09-17; the shared cascade helper
@@ -102,6 +105,17 @@ transform_constants:
     source_column: WORKDAY ID|Customer ID
     source_column_letter: A
     on_blank: reject
+  # Multi-line grouping (2026-10-22): the invoice-line grouping key is the Customer ID above.
+  # B = one Spreadsheet Key per distinct Customer (first-seen order); DS and DV = 1..N within
+  # that key, restarting at 1 per customer. Header BR / CQ / DB (and the composite G) come
+  # from the customer's first row. Output keeps source row order (no re-sort).
+  invoice_line_grouping:
+    group_key: WORKDAY ID|Customer ID
+    spreadsheet_key: B
+    row_id_line: DS
+    line_order: DV
+    header_values_from: first_row_of_group
+    header_columns: [BR, CQ, DB, G]
   # Company (J), Cost Centre (FX), Reporting Type (FY) and Revenue Category (EM) are now
   # supplied by AR as BATCH CONSTANTS: only the first data row (row 2) of source columns
   # K/L/M/N carries a value; that single value is read once per run and applied to every
