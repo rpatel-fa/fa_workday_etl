@@ -26,7 +26,7 @@ transform:
     so each row = one invoice).  SuppliersInvoiceNumber (EIB BG) = 1:1 MIRROR of K.
     Item Description (EIB EP) = col F "Description - remittance".
     Unit Cost (EIB GE) = BLANK.  Extended Amount (EIB GF) = col H "Total",
-    rounded to 2 decimal places and formatted "0.00".
+    formatted "0.00" (display only; the value is NOT rounded).
     InvoiceDate + ReceiptDate (EIB AF/AG) = col K "Batch ID" (01/10/2026 in the Oct file).
     Per-row Cost Centre, Spend Category, Reporting Type + 7 optional worktags are STILL resolved
     from "Distribution/Cost Code" (col G, accounting string 1077-504007-PNGC0001-0000) against the
@@ -112,8 +112,7 @@ transform_constants:
     invoice_description_column: F      # Description - remittance -> EIB EP
     unit_cost_column: null             # EIB GE left BLANK
     extended_amount_column: H          # Total -> EIB GF
-    extended_amount_decimal_places: 2  # GF value rounded to 2 dp (col H carries e.g. 12670.404999...)
-    extended_amount_number_format: "0.00"  # GF cell number format (same as ap_gfsp AMOUNT_NUMBER_FORMAT)
+    extended_amount_number_format: "0.00"  # GF cell number format only -- value NOT rounded (same as ap_gfsp)
     invoice_date_column: K             # Batch ID -> EIB AF + AG
     invoice_grouping_key: supplier_plus_invoice_number
 

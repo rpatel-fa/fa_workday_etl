@@ -13,7 +13,7 @@ Private mGrpNextKey As Long
 ' skipped here (reserved for credit notes / modApCfaDistribAmendment). Supplier = col D
 ' "Old Creditor ID" looked up in the Supplier extract (CreditorID-FA, then bare CreditorID).
 ' Invoice Number + Item Description = col F "Description - remittance"; Extended Amount = col H
-' "Total" rounded to 2 dp (Unit Cost left blank); Invoice/Receipt Date = col K "Batch ID".
+' "Total" formatted "0.00", not rounded (Unit Cost left blank); Invoice/Receipt Date = col K "Batch ID".
 ' Worktags/Reporting Type still resolve from Distribution/Cost Code (col G) via Mapping MASTER;
 ' tax stays conditional on Tax amount (I).
 
@@ -39,7 +39,6 @@ Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 Private Const CONSTANT_COMPANY_CODE As String = "FA"
 Private Const DOCUMENT_TYPE_INVOICE As String = "INVOICE"
 Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
-Private Const AMOUNT_DECIMAL_PLACES As Long = 2
 Private Const GROUP_KEY_SEPARATOR As String = "|"
 
 Private mCompanyId As String
@@ -87,7 +86,7 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     Dim documentTypeColumn As Long           ' E  Document type ("invoice" here; else skipped)
     Dim descriptionColumn As Long            ' F  Description - remittance (-> EIB K + BG + EP)
     Dim distributionRefCodeColumn As Long    ' G  Distribution/Cost Code (accounting string)
-    Dim totalColumn As Long                  ' H  Total (-> EIB GF, rounded 2 dp)
+    Dim totalColumn As Long                  ' H  Total (-> EIB GF, formatted "0.00")
     Dim taxAmountColumn As Long              ' I  Tax amount (conditional switch)
     Dim batchIdColumn As Long                ' K  Batch ID (-> EIB AF/AG)
     Dim companyId As String
@@ -398,7 +397,7 @@ End Sub
 '     EW Spend Category (col G lowest-hierarchy match; gated upstream)
 '     FE FF FH FK FL tax conditional_on_tax_amount (col I > 0 -> Standard, else Zero)
 '     GE Unit Cost -- intentionally NOT written (left blank)
-'     GF Extended Amount (col H Total, Excel ROUND to 2 dp, NumberFormat "0.00")
+'     GF Extended Amount (col H Total as is, NumberFormat "0.00" -- display only, not rounded)
 '     GQ Memo (DocNo colA + " " + Distribution/Cost Code colG)
 '     GR Reporting Type (col G second segment first char)
 '     GT Cost Centre (col G lowest-hierarchy match; gated upstream)
@@ -441,8 +440,7 @@ Private Function WriteOutputRow( _
     ' Col F feeds Invoice Number (K/BG) and Item Description (EP).
     invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, descriptionColumn)))
     descriptionValue = invoiceNumberValue
-    ' Excel ROUND (half away from zero) -- VBA Round is banker's and would differ on .xx5 values.
-    amount = Application.WorksheetFunction.Round(ResolveAmount(sourceTable(sourceRow, totalColumn)), AMOUNT_DECIMAL_PLACES)
+    amount = ResolveAmount(sourceTable(sourceRow, totalColumn))
     taxAmount = ResolveAmount(sourceTable(sourceRow, taxAmountColumn))
     distributionRefCodeValue = sourceTable(sourceRow, distributionRefCodeColumn)
     invoiceDateValue = NormalizeSourceDate(sourceTable(sourceRow, batchIdColumn))
