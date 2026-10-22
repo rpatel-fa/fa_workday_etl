@@ -1,19 +1,21 @@
 Attribute VB_Name = "modApCfaDistribSupplierInvoice"
 Option Explicit
 
-' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Invoice Number.
+' Invoice-line grouping state (shared modInvoiceGrouping): reset per run, keyed on Supplier + Invoice Number.
 Private mGrpKey As Collection
 Private mGrpLine As Collection
 Private mGrpNextKey As Long
 
 ' Source of truth: config/transform_specs/ap_cfa_distributions.yaml -- mapping SOT the .bas mirrors BY HAND (no auto-regen); build_runner.py enforces spec<->code column agreement -- edit both together
 
-' REWORKED 2026-09-24 for the September-2026 "Finance Master analysis" tab. INVOICES ONLY:
-' processes rows where col U "Invoice type" = "Invoice"; credit-note rows are filtered out here
-' and handled by modApCfaDistribAmendment (Supplier Invoice Adjustment EIB). Invoice Number (Z),
-' Invoice Description (AA), Invoice Date (AD) and Original Amount (V) are read directly; the CFAD
-' batch-token / DocNo invoice-number derivation is retired. Worktags/Reporting Type still resolve
-' from Distribution/Cost Code (col G) via Mapping MASTER; tax stays conditional on Tax amount (I).
+' REWORKED 2026-10-22 for the October-2026 "Finance Master sheet" tab. INVOICES ONLY:
+' processes rows where col E "Document type" = "invoice"; other non-blank document types are
+' skipped here (reserved for credit notes / modApCfaDistribAmendment). Supplier = col D
+' "Old Creditor ID" looked up in the Supplier extract (CreditorID-FA, then bare CreditorID).
+' Invoice Number + Item Description = col F "Description - remittance"; Extended Amount = col H
+' "Total" rounded to 2 dp (Unit Cost left blank); Invoice/Receipt Date = col K "Batch ID".
+' Worktags/Reporting Type still resolve from Distribution/Cost Code (col G) via Mapping MASTER;
+' tax stays conditional on Tax amount (I).
 
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
 Private Const TARGET_DATA_START_ROW As Long = 6
@@ -33,11 +35,15 @@ Private Const TAX_RECOVERABILITY_STANDARD As String = "Fully_Recoverable"
 Private Const OUTPUT_COMPANY_DEFAULT_FALLBACK As String = "THE FA GROUP - FA"
 Private Const DEFAULT_MAPPING_SHEET_NAME As String = "MAPPING MASTER"
 
-' Company is a constant "FA" (CFA always = THE FA GROUP). Only invoice rows are processed here.
+' Company is a constant "FA" (CFA always = THE FA GROUP); also the supplier-key company suffix.
 Private Const CONSTANT_COMPANY_CODE As String = "FA"
-Private Const INVOICE_TYPE_INVOICE As String = "INVOICE"
+Private Const DOCUMENT_TYPE_INVOICE As String = "INVOICE"
+Private Const AMOUNT_NUMBER_FORMAT As String = "0.00"
+Private Const AMOUNT_DECIMAL_PLACES As Long = 2
+Private Const GROUP_KEY_SEPARATOR As String = "|"
 
 Private mCompanyId As String
+Private mSupplierLookup As Collection
 Private mSpendCategoryLookup As Collection
 Private mEventLookup As Collection
 Private mCampLookup As Collection
@@ -53,9 +59,11 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     Dim outputFilePath As String
     Dim mappingSpreadsheetPath As String
     Dim mappingSheetName As String
+    Dim supplierSpreadsheetPath As String
     Dim selectionKey As String
     Dim sourceWorkbook As Workbook
     Dim mappingWorkbook As Workbook
+    Dim supplierWorkbook As Workbook
     Dim outputWorkbook As Workbook
     Dim sourceSheet As Worksheet
     Dim sourceTable As Variant
@@ -72,18 +80,16 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     Dim optionalWorktagBlankRows As Long
     Dim nonInvoiceRows As Long
     Dim rowIndex As Long
-    '  -- Finance Master analysis column indices (header row 5) --
+    '  -- Finance Master sheet column indices (header row 5) --
     Dim docNoColumn As Long                  ' A  DocNo / row key (headerless; = CFA_col - 1); memo trace
     Dim cfaNameColumn As Long                ' B  County FA name (anchor)
-    Dim creditorIdColumn As Long             ' D  Creditor ID (trace + skip gate only)
+    Dim creditorIdColumn As Long             ' D  Old Creditor ID (Supplier extract lookup key)
+    Dim documentTypeColumn As Long           ' E  Document type ("invoice" here; else skipped)
+    Dim descriptionColumn As Long            ' F  Description - remittance (-> EIB K + BG + EP)
     Dim distributionRefCodeColumn As Long    ' G  Distribution/Cost Code (accounting string)
+    Dim totalColumn As Long                  ' H  Total (-> EIB GF, rounded 2 dp)
     Dim taxAmountColumn As Long              ' I  Tax amount (conditional switch)
-    Dim workdayIdColumn As Long              ' T  Workday ID (supplier passthrough)
-    Dim invoiceTypeColumn As Long            ' U  Invoice type ("Invoice" here; else routed to amendments)
-    Dim originalAmountColumn As Long         ' V  Original Amount (net line; positive for invoices)
-    Dim invoiceNumberColumn As Long          ' Z  Invoice Number (pre-computed -> EIB K + BG)
-    Dim invoiceDescriptionColumn As Long     ' AA Invoice Description (pre-computed -> EIB EP)
-    Dim invoiceDateColumn As Long            ' AD Invoice Date (pre-computed -> EIB AF/AG)
+    Dim batchIdColumn As Long                ' K  Batch ID (-> EIB AF/AG)
     Dim companyId As String
     Dim supplierId As String
     Dim costCenterId As String
@@ -119,6 +125,7 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     outputFilePath = ReadControlValue(controlSheet, CONTROL_LABEL_OUTPUT_FILE_PATH)
     mappingSpreadsheetPath = ReadControlValue(controlSheet, CONTROL_LABEL_MAPPING_SPREADSHEET)
     mappingSheetName = ReadControlValue(controlSheet, CONTROL_LABEL_MAPPING_SHEET)
+    supplierSpreadsheetPath = ReadControlValue(controlSheet, CONTROL_LABEL_SUPPLIER_SPREADSHEET)
     worksheetNameStr = ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_WORKSHEET_NAME)
     worksheetResolutionStr = ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_WORKSHEET_RESOLUTION)
     sourceHeaderRow = CLng(Val(ReadControlValue(controlSheet, CONTROL_LABEL_SOURCE_HEADER_ROW)))
@@ -131,12 +138,17 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
 
     EnsureNonBlank outputFilePath, CONTROL_LABEL_OUTPUT_FILE_PATH
     EnsureNonBlank mappingSpreadsheetPath, CONTROL_LABEL_MAPPING_SPREADSHEET
+    EnsureNonBlank supplierSpreadsheetPath, CONTROL_LABEL_SUPPLIER_SPREADSHEET
     If LenB(mappingSheetName) = 0 Then mappingSheetName = DEFAULT_MAPPING_SHEET_NAME
 
-    ' Supplier resolution is DIRECT passthrough from col T "Workday ID" (no Supplier Spreadsheet).
+    ' Supplier = col D "Old Creditor ID" resolved via the Supplier extract (Reference ID -> Supplier ID).
+    Set supplierWorkbook = OpenWorkbookReadOnly(supplierSpreadsheetPath)
+    Set mSupplierLookup = BuildReferenceLookupFromWorkbook(supplierWorkbook, "Supplier")
+    supplierWorkbook.Close SaveChanges:=False
+    Set supplierWorkbook = Nothing
 
     '  Source of truth: config/transforms/ap_cfa_distributions.yaml source_layout.required_headers.
-    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApCfaDistribSupplierInvoice", 10)
+    requiredHeaders = ResolveRequiredHeadersFromConfig(controlSheet, "modApCfaDistribSupplierInvoice", 8)
 
     Set sourceWorkbook = OpenWorkbookReadOnly(sourceDataPath)
     Set sourceSheet = ResolveSourceWorksheet(sourceWorkbook, sheetToResolve)
@@ -188,15 +200,13 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
     ' Column A = DocNo / row key has no explicit header; DocNo = CFA_col - 1.
     cfaNameColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "CFA")
     docNoColumn = cfaNameColumn - 1
-    creditorIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Creditor ID")
+    creditorIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Old Creditor ID")
+    documentTypeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Document type")
+    descriptionColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Description - remittance")
     distributionRefCodeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Distribution/Cost Code")
+    totalColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Total")
     taxAmountColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Tax amount")
-    workdayIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Workday ID")
-    invoiceTypeColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice type")
-    originalAmountColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Original Amount")
-    invoiceNumberColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Number")
-    invoiceDescriptionColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Description|Invoice Desctiption")
-    invoiceDateColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Invoice Date")
+    batchIdColumn = FindColumnIndexInRow(sourceTable, headerRowIndex, "Batch ID")
 
     Set outputWorkbook = CloneTemplateWorkbook(targetEibPath, outputFilePath)
     Set targetSheet = outputWorkbook.Worksheets(TARGET_SHEET_NAME)
@@ -218,34 +228,34 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
         '  -- Blank / trailer row gate (formula scaffold rows below the data). --
         If RowIsEmptyOrTrailer(sourceTable, rowIndex, _
-            Array(docNoColumn, creditorIdColumn, invoiceTypeColumn, invoiceNumberColumn, workdayIdColumn), _
-            Array(originalAmountColumn), _
+            Array(docNoColumn, creditorIdColumn, documentTypeColumn, descriptionColumn), _
+            Array(totalColumn), _
             Array(docNoColumn)) Then
             If RowIsTrulyEmpty(sourceTable, rowIndex, _
-                Array(docNoColumn, creditorIdColumn, invoiceTypeColumn, invoiceNumberColumn, workdayIdColumn), _
-                Array(originalAmountColumn)) Then
+                Array(docNoColumn, creditorIdColumn, documentTypeColumn, descriptionColumn), _
+                Array(totalColumn)) Then
                 consecutiveEmptyRows = consecutiveEmptyRows + 1
                 If consecutiveEmptyRows >= 8 Then Exit For
             Else
                 consecutiveEmptyRows = 0
             End If
-        ElseIf RowIsNonInvoiceType(sourceTable, rowIndex, invoiceTypeColumn) Then
-            '  -- Credit notes / non-invoice rows: routed to ap_cfa_distributions_amendments.
-            '     Skip silently here (not a reject) so the two 1-input->1-output transforms
-            '     partition the same source by Invoice type.
+        ElseIf RowIsNonInvoiceType(sourceTable, rowIndex, documentTypeColumn) Then
+            '  -- Non-invoice document types (credit notes): reserved for
+            '     ap_cfa_distributions_amendments. Skip silently here (not a reject) so the two
+            '     1-input->1-output transforms partition the same source by document type.
             nonInvoiceRows = nonInvoiceRows + 1
             consecutiveEmptyRows = 0
         ElseIf RowIsSkippable(sourceTable, rowIndex, docNoColumn, creditorIdColumn, _
-            distributionRefCodeColumn, originalAmountColumn, workdayIdColumn, _
-            invoiceNumberColumn, invoiceDescriptionColumn, invoiceDateColumn) Then
+            documentTypeColumn, descriptionColumn, distributionRefCodeColumn, totalColumn, _
+            batchIdColumn) Then
             rowsSkipped = rowsSkipped + 1
             missingFieldRows = missingFieldRows + 1
             AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                "Missing required invoice field (DocNo/A / Creditor ID/D / Distribution-Cost-Code/G / " _
-                    & "Workday-ID/T / Invoice-Number/Z / Invoice-Description/AA / Invoice-Date/AD blank, " _
-                    & "or Original-Amount/V = 0)", _
+                "Missing required invoice field (DocNo/A / Old Creditor ID/D / Document type/E / " _
+                    & "Description-remittance/F / Distribution-Cost-Code/G / Batch-ID/K blank, " _
+                    & "or Total/H = 0)", _
                 Trim$(CStr(sourceTable(rowIndex, creditorIdColumn))), _
-                Trim$(CStr(sourceTable(rowIndex, invoiceNumberColumn)))
+                Trim$(CStr(sourceTable(rowIndex, descriptionColumn)))
         Else
             costCenterId = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(costCenterLookup, sourceTable(rowIndex, distributionRefCodeColumn))
             If LenB(costCenterId) = 0 Then
@@ -254,7 +264,7 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
                 AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
                     "Cost centre unresolved: Distribution/Cost Code did not resolve in '" & mappingSheetName & "' (" & WBO_COST_CENTER & ", Core vs Prism = Core, lowest hierarchy match)", _
                     Trim$(CStr(sourceTable(rowIndex, distributionRefCodeColumn))), _
-                    Trim$(CStr(sourceTable(rowIndex, invoiceDescriptionColumn)))
+                    Trim$(CStr(sourceTable(rowIndex, descriptionColumn)))
             Else
                 spendCategoryId = ResolveLowestHierarchyLookupAcrossFinalCodeSegments(mSpendCategoryLookup, sourceTable(rowIndex, distributionRefCodeColumn))
                 If LenB(spendCategoryId) = 0 Then
@@ -263,24 +273,26 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
                     AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
                         "Spend Category unresolved: Distribution/Cost Code did not resolve in '" & mappingSheetName & "' (" & WBO_SPEND_CATEGORY & ", Core vs Prism = Core, lowest hierarchy match)", _
                         Trim$(CStr(sourceTable(rowIndex, distributionRefCodeColumn))), _
-                        Trim$(CStr(sourceTable(rowIndex, invoiceDescriptionColumn)))
+                        Trim$(CStr(sourceTable(rowIndex, descriptionColumn)))
                 Else
-                    supplierId = Trim$(CStr(sourceTable(rowIndex, workdayIdColumn)))
+                    supplierId = ResolveSupplierWithCompanyPrecedence( _
+                        mSupplierLookup, _
+                        Trim$(CStr(sourceTable(rowIndex, creditorIdColumn))), _
+                        CONSTANT_COMPANY_CODE)
                     If LenB(supplierId) = 0 Then
                         rowsSkipped = rowsSkipped + 1
                         unresolvedSupplierRows = unresolvedSupplierRows + 1
                         AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
-                            "Supplier unresolved: Workday ID (Finance Master analysis col T) was BLANK. " _
-                                & "AP curate the Workday Supplier Reference (S-XXXXXX) directly in col T; " _
-                                & "Creditor ID / col D (for traceability): " _
-                                & Trim$(CStr(sourceTable(rowIndex, creditorIdColumn))), _
+                            "Supplier unresolved: Old Creditor ID (col D) did not resolve via the Supplier Spreadsheet" _
+                                & " (Reference ID -> Supplier ID, two-part company precedence:" _
+                                & " CreditorID ""-"" FA first, then bare CreditorID.)", _
                             Trim$(CStr(sourceTable(rowIndex, creditorIdColumn))), _
-                            Trim$(CStr(sourceTable(rowIndex, invoiceNumberColumn)))
+                            Trim$(CStr(sourceTable(rowIndex, descriptionColumn)))
                     Else
                         If WriteOutputRow( _
                             targetSheet, targetRow, sourceTable, rowIndex, _
-                            docNoColumn, distributionRefCodeColumn, originalAmountColumn, taxAmountColumn, _
-                            invoiceNumberColumn, invoiceDescriptionColumn, invoiceDateColumn, _
+                            docNoColumn, distributionRefCodeColumn, totalColumn, taxAmountColumn, _
+                            descriptionColumn, batchIdColumn, _
                             costCenterId, spendCategoryId, supplierId, optionalWorktagBlankRows) _
                         Then
                             rowsProcessed = rowsProcessed + 1
@@ -296,17 +308,18 @@ Public Sub RunApCfaDistributionsSupplierInvoice(ByVal runnerWorkbook As Workbook
 
     If missingFieldRows > 0 Then
         issueParts.Add "Skipped " & CStr(missingFieldRows) _
-            & " invoice row(s) with a missing required field (DocNo/A, Creditor ID/D, Distribution/Cost Code/G," _
-            & " Workday ID/T, Invoice Number/Z, Invoice Description/AA, Invoice Date/AD, or Original Amount/V = 0)."
+            & " invoice row(s) with a missing required field (DocNo/A, Old Creditor ID/D, Document type/E," _
+            & " Description - remittance/F, Distribution/Cost Code/G, Batch ID/K, or Total/H = 0)."
     End If
     If nonInvoiceRows > 0 Then
         issueParts.Add CStr(nonInvoiceRows) _
-            & " row(s) with Invoice type <> 'Invoice' (credit notes) were skipped here -- they are" _
-            & " handled by ap_cfa_distributions_amendments (Supplier Invoice Adjustment EIB)."
+            & " row(s) with Document type <> 'invoice' (credit notes) were skipped here -- they are" _
+            & " reserved for ap_cfa_distributions_amendments (Supplier Invoice Adjustment EIB)."
     End If
     If unresolvedSupplierRows > 0 Then
         issueParts.Add "Skipped " & CStr(unresolvedSupplierRows) _
-            & " invoice row(s) whose col T ""Workday ID"" was BLANK. AP must populate it on every row."
+            & " invoice row(s) whose col D ""Old Creditor ID"" did not resolve in the Supplier Spreadsheet" _
+            & " (tried CreditorID-FA, then bare CreditorID)."
     End If
     If unmappedCostCenterRows > 0 Then
         issueParts.Add "Skipped " & CStr(unmappedCostCenterRows) _
@@ -351,6 +364,7 @@ HandleFailure:
     On Error Resume Next
     If Not sourceWorkbook Is Nothing Then sourceWorkbook.Close SaveChanges:=False
     If Not mappingWorkbook Is Nothing Then mappingWorkbook.Close SaveChanges:=False
+    If Not supplierWorkbook Is Nothing Then supplierWorkbook.Close SaveChanges:=False
     If Not outputWorkbook Is Nothing Then outputWorkbook.Close SaveChanges:=False
     On Error GoTo 0
 
@@ -371,19 +385,20 @@ End Sub
 
 '  --------------------------------------------------------------
 '  Write one EIB output row (Submit_Supplier_Invoice_v46.2).
-'     B  Spreadsheet Key (AssignInvoiceLineGroup on Invoice Number)
+'     B  Spreadsheet Key (AssignInvoiceLineGroup on Supplier + "|" + Invoice Number)
 '     I  Submit (Y)
-'     K  Invoice Number (col Z, pre-computed)
+'     K  Invoice Number (col F Description - remittance)
 '     R  Company (constant FA -> THE FA GROUP - FA)
 '     T  Currency (GBP)
-'     U  Supplier (col T Workday ID passthrough)
-'     AF Invoice Date / AG Received Date (col AD via NormalizeSourceDate)
+'     U  Supplier (col D Old Creditor ID via Supplier extract; resolved upstream)
+'     AF Invoice Date / AG Received Date (col K Batch ID via NormalizeSourceDate)
 '     BG Suppliers Invoice Number (1:1 mirror of K)
-'     EK Row ID / EM Line Order (1..N within Invoice Number group)
-'     EP Item Description (col AA)
+'     EK Row ID / EM Line Order (1..N within Supplier + Invoice Number group)
+'     EP Item Description (col F Description - remittance)
 '     EW Spend Category (col G lowest-hierarchy match; gated upstream)
 '     FE FF FH FK FL tax conditional_on_tax_amount (col I > 0 -> Standard, else Zero)
-'     GE Unit Cost / GF Extended Amount (col V Original Amount)
+'     GE Unit Cost -- intentionally NOT written (left blank)
+'     GF Extended Amount (col H Total, Excel ROUND to 2 dp, NumberFormat "0.00")
 '     GQ Memo (DocNo colA + " " + Distribution/Cost Code colG)
 '     GR Reporting Type (col G second segment first char)
 '     GT Cost Centre (col G lowest-hierarchy match; gated upstream)
@@ -396,11 +411,10 @@ Private Function WriteOutputRow( _
     ByVal sourceRow As Long, _
     ByVal docNoColumn As Long, _
     ByVal distributionRefCodeColumn As Long, _
-    ByVal originalAmountColumn As Long, _
+    ByVal totalColumn As Long, _
     ByVal taxAmountColumn As Long, _
-    ByVal invoiceNumberColumn As Long, _
-    ByVal invoiceDescriptionColumn As Long, _
-    ByVal invoiceDateColumn As Long, _
+    ByVal descriptionColumn As Long, _
+    ByVal batchIdColumn As Long, _
     ByVal costCenterId As String, _
     ByVal spendCategoryId As String, _
     ByVal supplierId As String, _
@@ -424,12 +438,14 @@ Private Function WriteOutputRow( _
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
 
-    invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, invoiceNumberColumn)))
-    descriptionValue = Trim$(CStr(sourceTable(sourceRow, invoiceDescriptionColumn)))
-    amount = ResolveAmount(sourceTable(sourceRow, originalAmountColumn))
+    ' Col F feeds Invoice Number (K/BG) and Item Description (EP).
+    invoiceNumberValue = Trim$(CStr(sourceTable(sourceRow, descriptionColumn)))
+    descriptionValue = invoiceNumberValue
+    ' Excel ROUND (half away from zero) -- VBA Round is banker's and would differ on .xx5 values.
+    amount = Application.WorksheetFunction.Round(ResolveAmount(sourceTable(sourceRow, totalColumn)), AMOUNT_DECIMAL_PLACES)
     taxAmount = ResolveAmount(sourceTable(sourceRow, taxAmountColumn))
     distributionRefCodeValue = sourceTable(sourceRow, distributionRefCodeColumn)
-    invoiceDateValue = NormalizeSourceDate(sourceTable(sourceRow, invoiceDateColumn))
+    invoiceDateValue = NormalizeSourceDate(sourceTable(sourceRow, batchIdColumn))
 
     ' Tax code conditional switch: Tax amount > 0 -> Standard-rated, else Zero-rated.
     taxIsStandard = (taxAmount > 0#)
@@ -449,7 +465,9 @@ Private Function WriteOutputRow( _
         optionalWorktagBlankRows = optionalWorktagBlankRows + 1
     End If
 
-    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceNumberValue, mGrpNextKey, lineOrderValue)
+    ' Col F repeats across suppliers, so group on Supplier + Invoice Number (not Invoice Number alone).
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, _
+        supplierId & GROUP_KEY_SEPARATOR & invoiceNumberValue, mGrpNextKey, lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex("B")).Value = spreadsheetKeyValue
     targetSheet.Cells(targetRow, ColumnIndex("I")).Value = OUTPUT_SUBMIT
     targetSheet.Cells(targetRow, ColumnIndex("K")).Value = invoiceNumberValue
@@ -476,7 +494,7 @@ Private Function WriteOutputRow( _
     End If
     targetSheet.Cells(targetRow, ColumnIndex("FH")).Value = OUTPUT_TAX_POINT_DATE_TYPE
     targetSheet.Cells(targetRow, ColumnIndex("FL")).Value = OUTPUT_TAX_OPTION
-    targetSheet.Cells(targetRow, ColumnIndex("GE")).Value = amount
+    targetSheet.Cells(targetRow, ColumnIndex("GF")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GF")).Value = amount
     targetSheet.Cells(targetRow, ColumnIndex("GQ")).Value = Trim$(CStr(sourceTable(sourceRow, docNoColumn))) & " " & CStr(distributionRefCodeValue)
     targetSheet.Cells(targetRow, ColumnIndex("GR")).Value = ResolveReportingTypeFromFinalCode(distributionRefCodeValue)
@@ -492,49 +510,47 @@ Private Function WriteOutputRow( _
 End Function
 
 '  --------------------------------------------------------------
-'  RowIsNonInvoiceType -- TRUE when col U "Invoice type" is present and NOT "Invoice"
-'  (e.g. "Credit Note"). Such rows are handled by ap_cfa_distributions_amendments.
-'  A blank Invoice type is NOT treated as non-invoice here (it falls through to the
-'  missing-field gate below so genuine data gaps are still reported).
+'  RowIsNonInvoiceType -- TRUE when col E "Document type" is present and NOT "invoice"
+'  (case-insensitive; e.g. a credit note). Such rows are reserved for
+'  ap_cfa_distributions_amendments. A blank Document type is NOT treated as non-invoice here
+'  (it falls through to the missing-field gate below so genuine data gaps are still reported).
 '  --------------------------------------------------------------
 Private Function RowIsNonInvoiceType( _
     ByVal tableData As Variant, _
     ByVal rowIndex As Long, _
-    ByVal invoiceTypeColumn As Long _
+    ByVal documentTypeColumn As Long _
 ) As Boolean
     Dim v As String
-    v = Trim$(CStr(tableData(rowIndex, invoiceTypeColumn)))
+    v = Trim$(CStr(tableData(rowIndex, documentTypeColumn)))
     If LenB(v) = 0 Then
         RowIsNonInvoiceType = False
     Else
-        RowIsNonInvoiceType = (StrComp(UCase$(v), INVOICE_TYPE_INVOICE, vbBinaryCompare) <> 0)
+        RowIsNonInvoiceType = (StrComp(UCase$(v), DOCUMENT_TYPE_INVOICE, vbBinaryCompare) <> 0)
     End If
 End Function
 
 '  --------------------------------------------------------------
 '  RowIsSkippable -- per-row missing-field gate (matches skip_rule in the spec YAML).
-'  DocNo/A, Creditor ID/D, Distribution/Cost Code/G, Workday ID/T, Invoice Number/Z,
-'  Invoice Description/AA, Invoice Date/AD blank, OR Original Amount/V = 0.
+'  DocNo/A, Old Creditor ID/D, Document type/E, Description - remittance/F,
+'  Distribution/Cost Code/G, Batch ID/K blank, OR Total/H = 0.
 '  --------------------------------------------------------------
 Private Function RowIsSkippable( _
     ByVal tableData As Variant, _
     ByVal rowIndex As Long, _
     ByVal docNoColumn As Long, _
     ByVal creditorIdColumn As Long, _
+    ByVal documentTypeColumn As Long, _
+    ByVal descriptionColumn As Long, _
     ByVal distributionRefCodeColumn As Long, _
-    ByVal originalAmountColumn As Long, _
-    ByVal workdayIdColumn As Long, _
-    ByVal invoiceNumberColumn As Long, _
-    ByVal invoiceDescriptionColumn As Long, _
-    ByVal invoiceDateColumn As Long _
+    ByVal totalColumn As Long, _
+    ByVal batchIdColumn As Long _
 ) As Boolean
     RowIsSkippable = _
         LenB(Trim$(CStr(tableData(rowIndex, docNoColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, creditorIdColumn)))) = 0 Or _
+        LenB(Trim$(CStr(tableData(rowIndex, documentTypeColumn)))) = 0 Or _
+        LenB(Trim$(CStr(tableData(rowIndex, descriptionColumn)))) = 0 Or _
         LenB(Trim$(CStr(tableData(rowIndex, distributionRefCodeColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, workdayIdColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, invoiceNumberColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, invoiceDescriptionColumn)))) = 0 Or _
-        LenB(Trim$(CStr(tableData(rowIndex, invoiceDateColumn)))) = 0 Or _
-        ResolveAmount(tableData(rowIndex, originalAmountColumn)) = 0#
+        LenB(Trim$(CStr(tableData(rowIndex, batchIdColumn)))) = 0 Or _
+        ResolveAmount(tableData(rowIndex, totalColumn)) = 0#
 End Function
