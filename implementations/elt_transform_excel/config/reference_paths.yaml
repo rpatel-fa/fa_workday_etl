@@ -44,7 +44,7 @@ reference_paths:
   customer_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/workday/extract/Extract_Customers_20260810_1615.xlsx
 
   # Workday Supplier extract (Supplier entity: Reference ID -> Supplier ID). AP transforms.
-  supplier_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/workday/extract/Extract Suppliers 07.08.2026 2026-08-07 15_46 BST.xlsx
+  supplier_spreadsheet: /Users/Rakesh.Patel/Documents/__data/excel/workday/extract/Extract Suppliers 22.10.2026 BST.xlsx
 
   # Finance Mapping MASTER: account-string segments -> Workday hierarchies (Cost Centre,
   # Spend Category, worktags). The tab within the workbook is `mapping_sheet`.
