@@ -9,35 +9,38 @@ transform:
     *** CFA DISTRIBUTIONS - INVOICES ONLY (not CFA Claims; sibling ap_cfa_claims handles the
     County-FA claims workbook.  Credit notes from THIS same workbook are a SEPARATE transform,
     ap_cfa_distributions_amendments, which loads them to the Supplier Invoice Adjustment EIB). ***
-    County FA (CFA) grant-distribution workbook ("Distributions - <Month> <YYYY>.xlsm")
+    County FA (CFA) grant-distribution workbook ("Distributions <Mon><YY>.xlsm")
     transformed into the Workday Supplier Invoice EIB.
-    REWORKED 2026-09-24 for the September-2026 source: sources the Finance-prepared
-    "Finance Master analysis" tab (header row 5, data rows 6+), NOT the old "Finance Master sheet".
-    This transform processes ONLY invoice rows (col U "Invoice type" = "Invoice"); credit-note
-    rows (Invoice type = "Credit Note", negative Original Amount) are FILTERED OUT here and handled
-    by ap_cfa_distributions_amendments.
-    Workday Supplier ID is read DIRECTLY from col T "Workday ID" (AP-curated S-XXXXXX; Supplier
-    Spreadsheet lookup RETIRED; Creditor ID col D retained for trace + skip gate only).
+    REWORKED 2026-10-22 for the October-2026 source ("Distributions Oct26.xlsm"): sources the
+    "Finance Master sheet" tab (header row 5, data rows 6+, cols A..N), NOT "Finance Master
+    analysis" (whose Oct layout no longer carries the pre-computed Invoice Number / Description /
+    Date columns Z/AA/AD, and whose col T Workday ID is blank on some rows).
+    Only invoice rows are processed (col E "Document type" UPPER = "INVOICE"; all 54 Oct rows).
+    Supplier (EIB U) = col D "Old Creditor ID" looked up in the Supplier extract
+    (Reference ID -> Supplier ID) with company precedence: "<CreditorID>-FA" first, then bare
+    "<CreditorID>" (ResolveSupplierWithCompanyPrecedence). The col T / col N Workday ID
+    passthrough is RETIRED.
     Company = constant "FA" (CFA always = THE FA GROUP - FA).
-    PurchasesAmount (EIB GE/GF) = col V "Original Amount" (positive for invoices).
-    InvoiceNumber (EIB K) = col Z "Invoice Number" (pre-computed); SuppliersInvoiceNumber (EIB BG)
-    = 1:1 MIRROR of K.  Item Description (EIB EP) = col AA "Invoice Description".
-    InvoiceDate + ReceiptDate (EIB AF/AG) = col AD "Invoice Date" (01/09/2026 in the Sep file).
-    Retired 2026-09-24: the CFAD batch-token InvoiceNumber derivation and the DocNo-based
-    SuppliersInvoiceNumber (both now pre-computed in col Z).
+    InvoiceNumber (EIB K) = col F "Description - remittance" (e.g. "Oct2026FA Grant"); not unique
+    per row, so invoices group by Supplier + InvoiceNumber (Old Creditor IDs are unique per row,
+    so each row = one invoice).  SuppliersInvoiceNumber (EIB BG) = 1:1 MIRROR of K.
+    Item Description (EIB EP) = col F "Description - remittance".
+    Unit Cost (EIB GE) = BLANK.  Extended Amount (EIB GF) = col H "Total",
+    rounded to 2 decimal places and formatted "0.00".
+    InvoiceDate + ReceiptDate (EIB AF/AG) = col K "Batch ID" (01/10/2026 in the Oct file).
     Per-row Cost Centre, Spend Category, Reporting Type + 7 optional worktags are STILL resolved
     from "Distribution/Cost Code" (col G, accounting string 1077-504007-PNGC0001-0000) against the
     Mapping MASTER via lowest-hierarchy match (Core vs Prism = Core) - UNCHANGED.
     Tax applicability per-row: if col I "Tax amount" > 0 -> Standard Rated / Recoverable, otherwise
     -> Outside of Scope / Zero Rated / Nonrecoverable (conditional_on_tax_amount) - UNCHANGED.
     See config/transform_specs/ap_cfa_distributions.yaml for the decision record, Finance Master
-    analysis -> EIB derived-field rules, and mapping.
+    sheet -> EIB derived-field rules, and mapping.
 
 runtime:
   step_list_macro: RunApCfaDistributionsSupplierInvoice
 
 source_layout:
-  worksheet_name: "Finance Master analysis"
+  worksheet_name: "Finance Master sheet"
   worksheet_resolution: named
   header_row: 5
   data_start_row: 6
@@ -46,16 +49,14 @@ source_layout:
   # tool, which does NOT split pipe aliases). The .bas FindColumnIndexInRow calls may still use
   # pipe-alias literals independently. DocNo (col A) has no header (it is CFA_col - 1).
   required_headers:
-    - "CFA"                     # B - County FA name (anchor; DocNo = this col - 1)
-    - "Creditor ID"             # D - legacy creditor code (trace + skip gate)
-    - "Distribution/Cost Code"  # G - accounting string -> Mapping MASTER worktag lookup
-    - "Tax amount"              # I - conditional tax switch (>0 => standard rated)
-    - "Workday ID"              # T - DIRECT PASSTHROUGH supplier (S-XXXXXX)
-    - "Invoice type"            # U - row-type filter ("Invoice" here; "Credit Note" -> amendments)
-    - "Original Amount"         # V - PurchasesAmount (net line; signed - positive for invoices)
-    - "Invoice Number"          # Z - PRE-COMPUTED Invoice Number (EIB K + BG mirror)
-    - "Invoice Description"     # AA - PRE-COMPUTED Item Description (EIB EP)
-    - "Invoice Date"            # AD - PRE-COMPUTED Invoice Date + Receipt Date (EIB AF/AG)
+    - "CFA"                       # B - County FA name (anchor; DocNo = this col - 1)
+    - "Old Creditor ID"           # D - supplier lookup key -> Supplier extract Reference ID
+    - "Document type"             # E - row-type filter (UPPER = "INVOICE")
+    - "Description - remittance"  # F - Invoice Number (EIB K + BG mirror) + Item Description (EIB EP)
+    - "Distribution/Cost Code"    # G - accounting string -> Mapping MASTER worktag lookup
+    - "Total"                     # H - Extended Amount (EIB GF)
+    - "Tax amount"                # I - conditional tax switch (>0 => standard rated)
+    - "Batch ID"                  # K - Invoice Date + Receipt Date (EIB AF/AG)
 
 target_eib:
   template_name: Submit_Supplier_Invoice_v46.2
@@ -100,28 +101,32 @@ transform_constants:
     grant: HD
     program: HF
     project: HH
-  # NEW 2026-09-24: constants for the pre-computed Finance-Master-analysis layout.
+  # REWORKED 2026-10-22: constants for the Finance Master sheet layout (Oct-2026 source).
   finance_master_constants:
     constant_company_code: FA
-    invoice_type_filter_column: U      # process only rows where Invoice type = "Invoice"
-    invoice_type_invoice_value: Invoice
-    supplier_id_column: T              # Workday ID passthrough
-    amount_column: V                   # Original Amount (signed)
-    invoice_number_column: Z           # pre-computed -> EIB K + BG mirror
-    invoice_description_column: AA
-    invoice_date_column: AD
+    document_type_filter_column: E     # process only rows where UPPER(Document type) = "INVOICE"
+    document_type_invoice_value: INVOICE
+    supplier_lookup_key_column: D      # Old Creditor ID -> Supplier extract (CreditorID-FA, then bare)
+    supplier_lookup_precedence: company_suffix_then_bare
+    invoice_number_column: F           # Description - remittance -> EIB K + BG mirror
+    invoice_description_column: F      # Description - remittance -> EIB EP
+    unit_cost_column: null             # EIB GE left BLANK
+    extended_amount_column: H          # Total -> EIB GF
+    extended_amount_decimal_places: 2  # GF value rounded to 2 dp (col H carries e.g. 12670.404999...)
+    extended_amount_number_format: "0.00"  # GF cell number format (same as ap_gfsp AMOUNT_NUMBER_FORMAT)
+    invoice_date_column: K             # Batch ID -> EIB AF + AG
+    invoice_grouping_key: supplier_plus_invoice_number
 
 shell_defaults:
   # CFA DISTRIBUTIONS ONLY.  Invoices path.  Same source workbook as the amendments transform;
-  # each filters the input by Invoice type (1 input -> 1 output, no multi-output macros).
-  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/source/Distributions - Sep 2.xlsm
+  # each filters the input by row type (1 input -> 1 output, no multi-output macros).
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/source/Distributions Oct26.xlsm
   target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
   output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/cfa_distributions/target/Submit_Supplier_Invoice_ap_cfa_distributions_output.xlsx
-  source_worksheet_name: "Finance Master analysis"
+  source_worksheet_name: "Finance Master sheet"
   source_worksheet_resolution: named
   source_header_row: 5
   source_data_start_row: 6
   # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
-  # inherited from config/reference_paths.yaml. supplier_spreadsheet is inherited but NO LONGER
-  # loaded (supplier = col T passthrough). mapping_spreadsheet IS loaded for the col-G worktag
-  # hierarchy lookup.
+  # inherited from config/reference_paths.yaml. supplier_spreadsheet IS loaded again (col D Old
+  # Creditor ID lookup). mapping_spreadsheet IS loaded for the col-G worktag hierarchy lookup.

@@ -1,13 +1,13 @@
 # Transform spec - ap_cfa_distributions  (*** CFA DISTRIBUTIONS ONLY — NOT CFA CLAIMS ***)
 #
 # *** CRITICAL NAME CLARITY (2026-08-24):
-#     "CFA" is an ambiguous Finance shorthand. Two sibling transforms exist / will exist:
+#     "CFA" is an ambiguous Finance shorthand. Sibling transforms:
 #       1. ap_cfa_distributions  <- THIS transform, for the monthly FA Grant / EP Workforce
 #          & Leadership / EP WorkforceIS etc. CFA "distributions" workbook.  Source/target
-#          folders live under  .../eib/ap/cfa_distributions/  (renamed 2026-08-24 from
-#          the old ambiguous name  .../eib/ap/cfa/).  Labels = "CFA Distributions".
-#       2. ap_cfa_claims         <- FUTURE transform.  Will handle the SEPARATE CFA-Claims
-#          workbook (different schema).  Will live under .../eib/ap/cfa_claims/.
+#          folders live under  .../eib/ap/cfa_distributions/.  Labels = "CFA Distributions".
+#       2. ap_cfa_distributions_amendments <- credit notes from the SAME workbook
+#          (Supplier Invoice Adjustment EIB).  NOT yet reworked for the Oct-2026 layout.
+#       3. ap_cfa_claims / ap_cfa_claims_v2 <- the SEPARATE CFA-Claims workbook.
 #     Do not mix these up.  When searching / adding code grep for either "cfa_distributions"
 #     or "cfa_claims" explicitly, never bare "cfa".
 #
@@ -19,115 +19,78 @@
 # layout (worksheet, header row, required headers) - live in the build profile
 # config/transforms/ap_cfa_distributions.yaml (the build-consumed source of truth). Not restated here.
 #
-# Source workbook: Distributions - Aug (002) - analysis.xlsm
-# Data sheet: Finance Master sheet (header row 5, data rows 6.., cols A..U, 21 cols)
-#   Col A = DocNo / Row Key      (e.g. "AFAAug2026FA Grant" — 54/54 distinct per FA / EP row;
-#                                  used as SuppliersInvoiceNumber AU and InvoiceNumber suffix)
-#   B = CFA                       (County FA name: AFA / Army / Bedfordshire / … — informational,
-#                                  NOT the legal-entity Company code; Company = constant "FA")
-#   C = Type                      ("CFA" on all rows — informational)
-#   D = Creditor ID               (legacy AMA003 / ARM003 / BED013 / … County FA creditor codes;
-#                                  RETAINED for traceability + skip-row gate, but NO LONGER used
-#                                  to resolve the Workday Supplier — see Rule 0 below.)
-#   E = Document type             ("invoice" lowercase / INVOICE — gate checks UPPER == INVOICE)
-#   F = Description - remittance  (human-readable label; aliased same as old Decscription|Description)
+# REWORKED 2026-10-22 for the October-2026 source workbook "Distributions Oct26.xlsm".
+# Data sheet: "Finance Master sheet" (header row 5, data rows 6.., cols A..N, 54 data rows in Oct)
+#   Col A = DocNo / Row Key      (headerless; e.g. "AFAOct2026FA Grant" — 54/54 distinct;
+#                                  Memo trace + skip gate)
+#   B = CFA                       (County FA name: AFA / Army / … — anchor for col A; NOT the
+#                                  legal-entity Company code; Company = constant "FA")
+#   C = Type                      ("CFA" / "ED" — informational)
+#   D = Old Creditor ID           (GP creditor code AMA003 / ARM003 / BED013 / … — 54/54 distinct;
+#                                  SUPPLIER LOOKUP KEY into the Supplier extract, see Rule 0)
+#   E = Document type             ("invoice" — row filter, UPPER == INVOICE)
+#   F = Description - remittance  (e.g. "Oct2026FA Grant" — Invoice Number + Item Description;
+#                                  NOT unique per row: 3 distinct values across 54 rows in Oct)
 #   G = Distribution/Cost Code    (accounting string: 1077-504007-PNGC0001-0000)
-#   H = Total                     (net line amount per FA grant / EP allocation — PurchasesAmount)
-#   I = Tax amount                (0 on most rows; rows with >0 trigger Standard Rated tax treatment)
-#   J = Tax detail                (POS / VAT tax-detail marker per row; informational)
-#   K = Batch ID                  (per-file date: e.g. 2026-08-01 — authoritative InvoiceDate;
-#                                  also drives batchIdToken derivation: CFAD + MMYY from this date)
-#   L = Code lookup               (FA Grant | EP Workforce & Leadership — informational)
-#   M = Code desc                 (extended accounting-code desc; informational)
-#   N = Name on GP                (supplier GP name; informational)
-#   … gap cols O..T (empty in source)
-#   U = Workday ID                *** NEW COLUMN, Finance-team-curated ***
-#                                  Workday Supplier Reference ID, pre-selected by the AP team
-#                                  (e.g. S-000361 / S-000521 / …). THIS IS THE SOURCE OF TRUTH
-#                                  for the EIB Supplier column (O); the Creditor ID → Supplier
-#                                  Spreadsheet two-part lookup is BYPASSED completely.
+#   H = Total                     (net line amount, unrounded e.g. 12670.404999… — Extended Amount)
+#   I = Tax amount                (0 on all Oct rows; >0 triggers Standard Rated tax treatment)
+#   J = Tax detail                (POS — informational)
+#   K = Batch ID                  (per-file date 2026-10-01 — Invoice Date + Receipt Date)
+#   L = Code lookup / M = Code desc (informational)
+#   N = Workday Id Code           (Finance S-XXXXXX — informational ONLY, NOT read; the extract
+#                                  lookup on col D is authoritative. Oct: ROY001 col N = S-006003
+#                                  (ROY001-NFC) vs lookup S-006004 (ROY001-FA) — lookup value
+#                                  CONFIRMED correct by user 2026-10-22.)
 #
-# Key structural change (2026-08-24): Finance now populate "Workday ID" (col U) directly in the
-# Finance Master sheet, so the Creditor-ID-driven spreadsheet lookup is no longer needed.
-# Supplier resolution rule = "use col U verbatim, non-blank gate only".
+# Why not "Finance Master analysis" any more: the Oct layout of that tab dropped the pre-computed
+# Invoice Number / Invoice Description / Invoice Date columns (Z/AA/AD) and its col T Workday ID
+# is blank on some rows.
 #
-# Derived-field rules (Finance Master sheet -> EIB mapping). Finance Master IS the direct input.
+# Derived-field rules (Finance Master sheet -> EIB mapping).
 #
-#   Rule 0 — Supplier resolution (MAJOR CHANGE vs legacy Integration-tab transform):
-#             Supplier is read DIRECTLY from Finance Master col U ("Workday ID").
-#             The value is the Workday Supplier Reference (S-XXXXXX) pre-selected by AP team.
-#             We NO LONGER load the Supplier Spreadsheet, NO LONGER call
-#             ResolveSupplierWithCompanyPrecedence, and NO LONGER do the two-part
-#             CreditorID + Company suffix lookup. Supplier is a direct passthrough with
-#             a LenB>0 gate (blank Workday ID = skip + report unresolvedSupplierRows).
-#             Retained for backwards traceability ONLY: col D (Creditor ID) is still gated
-#             as non-blank at RowIsSkippable (so Finance cannot accidentally drop it),
-#             but it is not used for resolution.
-#   Rule 1 — Company / Legal Entity: CONSTANT "FA". The Finance Master sheet has no
-#             explicit Company column (col B = County FA NAME e.g. "AFA", not "FA").
-#             Company is resolved via ResolveMappedCompany("FA") → THE FA GROUP - FA.
-#             Uniformity check across batch is trivially satisfied (it's a constant).
-#   Rule 2 — BatchID token / Invoice-Number prefix: DERIVED from Finance Master col K
-#             (Batch ID = date e.g. 2026-08-01). Format = "CFAD" + two-digit-month +
-#             two-digit-year-last-2 (e.g. 2026-08-01 → "CFAD0826"). Spaces stripped (none
-#             in this derived token); validated non-blank and shared across every row of
-#             the batch (which is trivial — all rows share the same col K date).
-#             Month-on-month maintenance: Finance change the source file (e.g. September
-#             → "Distributions - Sep.xlsm") and set col K to 2026-09-01; the batchIdToken
-#             becomes "CFAD0926" with NO Private Const / YAML literal edits.
-#   Rule 3 — DocumentType: UPPER(TRIM(Finance Master E)). Gate matches UPPER == "INVOICE".
-#   Rule 4 — ItemDescription / Description: UPPER(TRIM(Finance Master F "Description - remittance")).
-#             Alias rule preserved (Decscription|Description accepted) for the underlying
-#             generic helpers, but the Finance Master header in col F is explicitly
-#             "Description - remittance" (no typo).
-#   Rule 5 — InvoiceDate: Finance Master col K ("Batch ID") AS IS (read via NormalizeSourceDate
-#             → YYYY-MM-DD text). ALL rows of the batch share the same InvoiceDate (date in K
-#             is a per-file batch date, not per-row). NOT derived from batchIdToken.
-#   Rule 6 — ReceiptDate: Finance Master col K (same as InvoiceDate). The Finance Master
-#             sheet carries no separate ReceiptDate; ReceiptDate = InvoiceDate is the
-#             operating assumption (downstream Finance can re-key in Workday if the true
-#             goods-receipt date differs materially).
-#   Rule 7 — DocNo / SuppliersInvoiceNumber (EIB AU): Finance Master col A VERBATIM
-#             (e.g. "AFAAug2026FA Grant"). Col A is 54/54 distinct per populated row →
-#             passes Workday per-supplier SuppliersInvoiceNumber uniqueness gate directly.
-#   Rule 8 — Invoice Number (EIB G): {batchIdToken}-{DocNo}.
-#             batchIdToken = "CFAD" + MMYY derived from Finance Master col K (Rule 2).
-#             DocNo = Finance Master col A (Rule 7). Result e.g. "CFAD0826-AFAAug2026FA Grant".
-#   Rule 9 — Distribution/Cost Code / Final Code / accounting string: Finance Master G
-#             AS IS. Written verbatim into the lowest-hierarchy worktag lookups (Cost Centre,
-#             Spend Category, Event…Project = cols EQ, DP, ER..EX).
-#   Rule 10 — PurchasesAmount (net line amount): Finance Master H AS IS.
-#   Rule 11 — TaxAmount: Finance Master I AS IS (informational; tax DS/DT/DY driven by TaxAmount>0).
-#   Rule 12 — TaxDetailID: Finance Master J AS IS (informational marker; not used in tax-code split).
-#   Rule 13 — Tax applicability per-row (conditional_on_tax_amount):
-#              If TaxAmount (Finance Master I) > 0  → GBR_Domestic_Purchase_Of_Goods_And_Services / GBR_Standard / Fully_Recoverable  (AP Supplier std-rated; changed 2026-09-14)
-#              Otherwise (TaxAmount == 0/blank) → Outside_of_Scope / Zero_Rated / Nonrecoverable_Allocate
-#   Rule 14 — Memo (EIB EO): DocNo + " " + Distribution/Cost Code (col A + " " + col G).
-#             Row traceability without reopening the source Excel.
+#   Rule 0 — Supplier (EIB U): col D "Old Creditor ID" looked up in the Supplier extract
+#             (Reference ID -> Supplier ID) via ResolveSupplierWithCompanyPrecedence:
+#             HIGH = "{CreditorID}-FA", LOW = bare "{CreditorID}". Not found = reject row
+#             (unresolvedSupplierRows++). Oct dry-run: 54/54 resolved.
+#   Rule 1 — Company (EIB R): CONSTANT "FA" -> ResolveMappedCompany -> THE FA GROUP - FA.
+#   Rule 2 — Row filter: only rows whose col E UPPER(TRIM()) = "INVOICE" are processed. Other
+#             non-blank Document types are skipped silently (counted) — reserved for credit notes /
+#             ap_cfa_distributions_amendments. Blank col E = missing-field reject.
+#   Rule 3 — Invoice Number (EIB K): col F TRIM verbatim (e.g. "Oct2026FA Grant").
+#   Rule 4 — Suppliers Invoice Number (EIB BG): 1:1 mirror of K.
+#   Rule 5 — Invoice grouping: Spreadsheet Key (B) + Row ID / Line Order (EK/EM) via
+#             AssignInvoiceLineGroup keyed on Supplier + "|" + Invoice Number. Col F repeats
+#             across suppliers, so grouping on K alone would merge suppliers; Old Creditor IDs
+#             are unique per row (user 2026-10-22), so each row = one single-line invoice.
+#   Rule 6 — Invoice Date + Receipt Date (EIB AF/AG): col K "Batch ID" via NormalizeSourceDate.
+#   Rule 7 — Item Description (EIB EP): col F TRIM verbatim.
+#   Rule 8 — Unit Cost (EIB GE): BLANK (not written).
+#   Rule 9 — Extended Amount (EIB GF): col H "Total" rounded to 2 dp (Excel ROUND semantics,
+#             half away from zero — Application.WorksheetFunction.Round, NOT VBA banker's Round)
+#             with cell NumberFormat "0.00".
+#   Rule 10 — Worktags: Cost Centre (GT) + Spend Category (EW) mandatory, Reporting Type (GR) +
+#              7 optional worktags from col G via Mapping MASTER lowest-hierarchy match - UNCHANGED.
+#   Rule 11 — Tax per row (conditional_on_tax_amount) on col I - UNCHANGED.
+#   Rule 12 — Memo (EIB GQ): col A + " " + col G - UNCHANGED.
 #
 # Reuses the standard Supplier Invoice EIB field block (see docs/ADDING_A_TRANSFORM.md); house
-# defaults inherited unchanged: f=Y, dd=1, dv=INVOICE/ADJUSTMENT_DATE, dz=CALC_TAX_DUE.
+# defaults inherited unchanged: I=Y, FH=INVOICE/ADJUSTMENT_DATE, FL=CALC_TAX_DUE.
 
 meta:
   key: ap_cfa_distributions
   label: AP CFA Distributions
   requester: Finance (AP)
-  date_confirmed: 2026-08-24
+  date_confirmed: 2026-10-22
   exemplar_to_fork: ap_referees
   note: >
-    Finance Master sheet IS the direct input (confirmed by Finance 2026-08-24). 21-column
-    layout (A..U) with header on row 5, data rows 6 onwards. KEY CHANGE vs the previous
-    Integration-tab-based transform: Finance now populate a "Workday ID" column (col U)
-    with the pre-selected Workday Supplier Reference ID (S-XXXXXX). The Creditor ID →
-    Supplier Spreadsheet two-part lookup (CreditorID-Company first, then bare CreditorID)
-    is NO LONGER PERFORMED; Supplier column (EIB O) = col U passthrough + non-blank gate.
-    Company is a constant "FA" (CFA = The FA Group legal entity); batchIdToken is derived
-    as "CFAD" + MMYY from Finance Master col K (Batch ID = per-file date); InvoiceDate and
-    ReceiptDate both = col K date; DocNo / SuppliersInvoiceNumber (AU) = col A (row key);
-    InvoiceNumber (G) = CFADMMYY-{col A}.
+    Reworked 2026-10-22 for "Distributions Oct26.xlsm": source tab "Finance Master sheet";
+    Supplier = Old Creditor ID (D) via Supplier extract (CreditorID-FA then bare); Invoice
+    Number + Item Description = Description - remittance (F); Unit Cost blank; Extended Amount =
+    Total (H) rounded 2 dp; Invoice/Receipt Date = Batch ID (K); grouping Supplier + Invoice
+    Number. Supersedes the 2026-09-24 "Finance Master analysis" layout (cols T/U/V/Z/AA/AD).
 
 shared_helpers:
-  supplier_resolution: direct_workday_id_passthrough
+  supplier_resolution: direct_gp_creditor_id_via_extract
   company_resolution: fixed_literal
   accounting_string_derivation: direct_final_code_column
   worktag_hierarchy_lookup: standard_9pack_lowest_specificity
@@ -138,82 +101,73 @@ shared_helpers:
 
 parties:
   supplier:
-    source_code: per_row_direct_passthrough
-    source_column: Workday ID
-    resolved_via: AP Team curated value in Finance Master col U (DIRECT PASSTHROUGH - no lookup)
-    key_column: N/A (no spreadsheet lookup)
-    value_column: Finance Master col U = Workday Supplier Reference ID (S-XXXXXX)
-    key_precedence: N/A (passthrough)
-    reference_id_delimiter: N/A
+    source_code: per_row_lookup
+    source_column: Old Creditor ID (D)
+    resolved_via: Supplier Spreadsheet (Workday Supplier extract, reference_paths.supplier_spreadsheet)
+    key_column: Reference ID (pipe-delimited)
+    value_column: Supplier ID (S-XXXXXX)
+    key_precedence:
+      - "{CreditorID}-FA"
+      - "{CreditorID}"
+    reference_id_delimiter: "|"
+    on_unresolved: reject
     note: >
-      Finance Master col U ("Workday ID") is the authoritative Workday Supplier Reference,
-      pre-selected by the AP team. NO Supplier Spreadsheet lookup is performed; the
-      Creditor-ID-driven two-part precedence (CreditorID-Company then bare CreditorID) is
-      OBSOLETE as of 2026-08-24. Col U non-blank gate only; blank = skip row + report.
-      Col D ("Creditor ID") retained purely for traceability + skip-row validation, not
-      resolution.
+      ResolveSupplierWithCompanyPrecedence(lookup, colD, "FA"). Col D is a plain GP creditor code
+      (no hyphen, no split). Oct dry-run 54/54 resolved. Finance's col N "Workday Id Code" is
+      NOT read.
   company:
     source_code: constant
     value: FA
     source_column_present: false
     resolved_via: ResolveMappedCompany("FA") → THE FA GROUP - FA
     note: >
-      Finance Master sheet has NO legal-entity Company column (col B = County FA NAME e.g.
-      "AFA", not the "FA" code). CFA distributions ALWAYS belong to THE FA GROUP - FA,
-      so the company code is a constant "FA" resolved via ResolveMappedCompany with
-      OUTPUT_COMPANY_DEFAULT_FALLBACK = "THE FA GROUP - FA" retained as a safety net.
+      Finance Master sheet has NO legal-entity Company column (col B = County FA NAME).
+      OUTPUT_COMPANY_DEFAULT_FALLBACK = "THE FA GROUP - FA" retained as a safety net. The
+      constant "FA" is also the company suffix in the supplier key precedence.
 
 fields:
   invoice_number:
-    rule: "{batchIdToken}-{DocNo}"
+    source_column: Description - remittance (F)
+    rule: "TRIM(F)"
     note: >
-      batchIdToken = "CFAD" + two-digit-month + two-digit-last-2-of-year derived from
-      Finance Master col K (Batch ID = per-file date). Example: col K = 2026-08-01 →
-      CFAD0826 → e.g. CFAD0826-AFAAug2026FA Grant. DocNo = Finance Master col A
-      (54/54 distinct per row → per-invoice uniqueness guaranteed).
+      e.g. "Oct2026FA Grant". NOT unique per row (3 distinct values across 54 Oct rows) — uniqueness
+      comes from the Supplier + Invoice Number grouping key (Workday invoice-number uniqueness is
+      per supplier).
+  suppliers_invoice_number:
+    rule: "1:1 mirror of invoice_number (EIB K)"
+    source_column: Description - remittance (F)
+  spreadsheet_key_group_id:
+    group_key_derived_field: "supplier_id + '|' + invoice_number"
+    note: >
+      AssignInvoiceLineGroup keyed on resolved Supplier ID + "|" + Invoice Number. Old Creditor IDs
+      are unique per row, so each row is its own single-line invoice (B increments per row,
+      EK = EM = 1).
   invoice_date:
     source_column: Batch ID (K)
-    format: Excel serial date / date-valued cell coerced to YYYY-MM-DD text via NormalizeSourceDate
-    note: >
-      Finance Master col K ("Batch ID") = per-file batch date. ALL rows of the batch share
-      the same date (it's a batch-level field, not per-row). NormalizeSourceDate handles
-      both Excel serial-date numeric cells and already-date-valued cells.
+    format: NormalizeSourceDate -> YYYY-MM-DD text
   receipt_date:
     source_column: Batch ID (K) - same as InvoiceDate
     format: NormalizeSourceDate (same as InvoiceDate)
-    note: >
-      Finance Master sheet carries no separate goods-receipt date. ReceiptDate is set equal
-      to InvoiceDate (col K) as the operating default.
-  suppliers_invoice_number:
-    source_column: DocNo / Row Key (A)
-    note: >
-      Finance Master col A is the per-row unique key (e.g. "AFAAug2026FA Grant"), 54/54
-      distinct per valid row. Used VERBATIM as EIB AU (SuppliersInvoiceNumber).
   item_description:
-    rule: "UPPER(TRIM(Description - remittance))"
     source_column: Description - remittance (F)
-    note: >
-      Finance Master col F = "Description - remittance" (no typo; no 'c' extra).
-      Uppercase trimmed for consistency with Referees / AMEX transforms; the underlying
-      SplitHeaderAliases helper continues to accept the legacy "Decscription|Description"
-      pipe-delimited alias in case a future Finance workbook uses the alternate spelling.
+    rule: "TRIM(F)"
   memo:
     rule: "ColA (DocNo) + ' ' + ColG (Distribution/Cost Code)"
-    note: >
-      EIB EO = Finance Master col A + " " + Finance Master col G. Downstream traceability
-      without reopening the source Distributions workbook.
+  unit_cost:
+    rule: BLANK
+    note: EIB GE intentionally not written (left blank) per Finance 2026-10-22.
   line_amount:
-    source_column: Total
+    source_column: Total (H)
     basis: net
+    rounding: 2 dp, Excel ROUND (half away from zero) via Application.WorksheetFunction.Round
+    number_format: "0.00"
     note: >
-      Net line amount per FA grant / per EP allocation (Finance Master col H). Tax per-row
-      (Rule 13) splits zero vs standard; CALC_TAX_DUE computes the VAT addition on
-      standard-rated rows from the tax code applied to the net amount.
+      Written to EIB GF (Extended Amount) only. Col H is unrounded (e.g. 12670.404999…); Excel
+      ROUND reproduces Finance's own rounded figures, VBA's banker's Round would not on .xx5 rows.
   spend_category:
     derivation: per_row_lookup
     key_source_column: Distribution/Cost Code (G)
     key_rule: lowest-hierarchy matching accounting-string segment
-    # --- SHARED --- standard_9pack_lowest_specificity.shared_lookup_skeleton
     use_shared_lookup: standard_9pack_lowest_specificity
     worktag_business_object_key: Spend Category
     specificity_standard: integration_default
@@ -224,7 +178,6 @@ fields:
   reporting_type:
     source_column: Distribution/Cost Code (G)
     rule: second accounting-string segment first character via reporting_type_from_final_code helper
-    note: Same reporting_type_from_final_code helper used by AMEX / Referees transforms; splits on "-".
   cost_centre:
     derivation: per_row_lookup
     key_source_column: Distribution/Cost Code (G)
@@ -235,53 +188,46 @@ fields:
     on_unresolved: skip_and_report
   related_worktags:
     event:
-      target: er
+      target: GV
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Events - Custom Org
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     camp:
-      target: es
+      target: GX
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Camps - Custom Org
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     fa_learning_course:
-      target: et
+      target: GZ
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: FA Learning - Custom Org
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     commercial_partner:
-      target: eu
+      target: HB
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Commercial Partners - Custom Worktag
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     grant:
-      target: ev
+      target: HD
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Grant
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     programme:
-      target: ew
+      target: HF
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Program - Delivered Org
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
     project:
-      target: ex
+      target: HH
       source_column: Distribution/Cost Code (G)
       worktag_business_object_key: Projects (Opex)
       use_shared_lookup: standard_9pack_lowest_specificity
-      specificity_standard: integration_default
       on_unresolved: skip_ok
 
 tax:
@@ -291,75 +237,56 @@ tax:
     code: GBR_Zero_Rated
     recoverability: Nonrecoverable_Allocate
   standard_rated:
-    # CHANGED 2026-09-14: AP Supplier-Invoice standard-rated uses the domestic PURCHASE ref-ids
-    # (was GBR_Standard_Rated / GBR_Standard_Rated / Recoverable_Allocate, which is the AR
-    # Customer-Invoice value). AP confirmed; matches ap_taxi / ap_stationery / ap_travel_places.
+    # AP Supplier-Invoice standard-rated uses the domestic PURCHASE ref-ids (AP confirmed 2026-09-14).
     applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
     code: GBR_Standard
     recoverability: Fully_Recoverable
   note: >
-    Tax code is per-row conditional based on Finance Master I (Tax amount):
-      TaxAmount > 0     → Standard Rated / Standard / Recoverable
+    Per-row on Finance Master sheet col I (Tax amount):
+      TaxAmount > 0     → Domestic Purchase / Standard / Fully Recoverable
       TaxAmount == 0/∅ → Outside of Scope / Zero Rated / Nonrecoverable
-    (Identical logic to the previous Integration-tab transform; only the source column letter
-    changed from Integration K to Finance Master I.)
 
 skip_rule:
+  silent_skip_when:
+    - Col E (Document type) non-blank AND UPPER != INVOICE   [reserved for credit notes / amendments]
   drop_when:
     - Col A (DocNo/Row Key) blank
-    - Col D (Creditor ID) blank                      [retained gate for data integrity — NOT used for resolution]
-    - Col E (Document type) UPPER != INVOICE         [accepts lowercase "invoice" via UCASE compare]
-    - Col F (Description) blank
-    - Col K (Batch ID / InvoiceDate) blank
+    - Col D (Old Creditor ID) blank
+    - Col E (Document type) blank
+    - Col F (Description - remittance / Invoice Number) blank
     - Col G (Distribution/Cost Code) blank
-    - Col H (Total / PurchasesAmount) == 0
-    - Col U (Workday ID) blank                       [new mandatory gate - AP curated supplier ID]
+    - Col K (Batch ID / InvoiceDate) blank
+    - Col H (Total) == 0
     - cost_centre unresolved
     - spend_category unresolved
-    - supplier unresolved = col U blank (Creditor-ID-spreadsheet path removed)
+    - supplier unresolved (col D not found in Supplier extract as "{D}-FA" or "{D}")
 
 trailer_row_handling:
   pattern: >
-    Exemplar data rows = 54 (rows 6..60 approx; 50 FA Grant + 3 EP Workforce + 1 EP WorkforceIS
-    in the August 002 file). consecutive-empty-rows stop-gate of >=3 blanks halts iteration
-    cleanly after the data block. If any Grand Total / summation row is present below, the
-    RowIsEmptyOrTrailer summation-keyword match (TOTAL / GRAND / SUBTOTAL / SUM whole-word)
-    absorbs it silently; otherwise RowIsSkippable rejects it on DocNo/Description blank.
+    54 data rows in the Oct file (50 FA Grant + 3 EP Workforce + 1 EP WorkforceIS). The
+    consecutive-empty-rows stop-gate (>= 8 blanks) halts iteration after the data block; any
+    TOTAL / GRAND / SUBTOTAL / SUM row is absorbed by RowIsEmptyOrTrailer.
 
 open_questions:
   - >-
-    ReceiptDate fallback: confirm ReceiptDate == InvoiceDate (col K) is acceptable. Finance
-    Master has no separate goods-receipt date column. If a true receipt date becomes
-    material, add a ReceiptDate column in Finance Master and thread it through directly.
+    ap_cfa_distributions_amendments still reads "Finance Master analysis" (cols T/U/V/Z/AA/AD).
+    Before the first month with credit notes, AP to confirm how a credit note appears on
+    "Finance Master sheet" (Document type value? negative Total?) so the two transforms
+    partition rows cleanly.
   - >-
-    Month-on-month maintenance (e.g. September → new "Distributions - Sep.xlsm"):
-    (1) shell_defaults.source_data = new file path;
-    (2) ensure Finance Master col K (Batch ID) = the correct month start date
-        (e.g. 2026-09-01 → batchIdToken auto-derives "CFAD0926" - NO code edits needed);
-    (3) ensure col U (Workday ID) is populated for every valid row (non-blank gate now live);
-    (4) ALL other layout + headers unchanged (dates from K per batch, not per-row, tax
-        conditional per-row from col I).
-  - >-
-    Optional worktags (ER through EX: Event/Camp/FA Learning/Commercial Partner/Grant/Program/
-    Project): treated as optional (row writes blank silently, no reject, no skip). Confirm
-    all seven are genuinely optional vs any should be mandatory like cost-centre/spend-category.
-  - >-
-    Tax treatment on EP Workforce rows: confirm zero-rated (TaxAmount == 0 on all 4 EP rows in
-    the Aug 002 exemplar; conditional branch Standard-Rated is live should any future EP row
-    carry VAT > 0).
+    Month-on-month maintenance: update shell_defaults.source_data to the new workbook; ensure
+    col K Batch ID = the month start date; ensure every col D Old Creditor ID exists in the
+    current Supplier extract (reference_paths.supplier_spreadsheet).
 
 mapping:
 - target: B
   function: invoice_line_grouping
-  note: >
-    Spreadsheet Key via modInvoiceGrouping.AssignInvoiceLineGroup -- increments per NEW Invoice
-    Number (K); shared across a group's rows. Single-line invoices trivially get 1..N (CHANGED
-    2026-09-14 from per-row sequence). One uniform mechanism, no single/multi-line distinction.
+  note: Spreadsheet Key via AssignInvoiceLineGroup keyed on Supplier + "|" + Invoice Number (Rule 5).
 - target: I
   default: "Y"
 - target: K
-  function: concat_batchidtoken_derived_from_col_k_date_minus_col_a_docno
-  note: Rule 8 — "{batchIdToken}-{DocNo}" per row. batchIdToken = "CFAD" + MMYY from Finance Master col K (Batch ID date). DocNo = Finance Master col A (per-row unique key). EIB G = Invoice Number.
+  source_column: Description - remittance (F)
+  note: Rule 3 — Invoice Number = TRIM(col F).
 - target: R
   default: "{resolved via ResolveMappedCompany(\"FA\")}"
   source_value: constant_FA
@@ -370,34 +297,41 @@ mapping:
     filter_value: company
     input_column: source
     output_column: target
-  note: Rule 1 — Company = constant "FA" (CFA always = THE FA GROUP - FA). No Finance Master column drives Company.
+  note: Rule 1 — Company = constant "FA" (THE FA GROUP - FA).
 - target: T
   default: GBP
-  note: No currency column in Finance Master; CFA = UK entities.
+  note: No currency column in source; CFA = UK entities.
 - target: U
-  source_column: Workday ID
-  note: Rule 0 — Supplier = Finance Master col U PASSTHROUGH. AP-team-curated Workday Supplier Reference ID (S-XXXXXX). NO Supplier Spreadsheet lookup. Creditor-ID two-part precedence lookup RETIRED 2026-08-24.
+  source_column: Old Creditor ID (D)
+  function: resolve_supplier_with_company_precedence
+  lookup:
+    file: Supplier Spreadsheet
+    tab: Sheet1
+    input_column: Reference ID
+    output_column: Supplier ID
+    key_precedence: ["{CreditorID}-FA", "{CreditorID}"]
+    on_fail: reject
+  note: Rule 0 — Supplier via Supplier extract lookup on col D.
 - target: AF
   source_column: Batch ID (K)
   function: normalize_source_date
-  note: Rule 5 — InvoiceDate per batch from Finance Master col K (same date for all rows).
+  note: Rule 6 — Invoice Date.
 - target: AG
   source_column: Batch ID (K)
   function: normalize_source_date
-  note: Rule 6 — ReceiptDate = InvoiceDate (Finance Master K, no separate receipt date in source).
+  note: Rule 6 — Receipt Date = Invoice Date.
 - target: BG
-  source_column: DocNo / Row Key (A)
-  note: Rule 7 — SuppliersInvoiceNumber = Finance Master col A (per-row unique key).
+  source_column: Description - remittance (F)
+  note: Rule 4 — Suppliers Invoice Number = 1:1 mirror of K.
 - target: EK
   function: invoice_line_grouping
-  note: Row ID = 1..N within the Invoice Number group (mirror of EM). Single-line rows get 1 (CHANGED 2026-09-14 from hardcoded 1).
+  note: Row ID = 1..N within the Supplier + Invoice Number group (mirror of EM).
 - target: EM
   function: invoice_line_grouping
-  note: Line Order = 1..N within the Invoice Number group (mirror of EK). ADDED 2026-09-14.
+  note: Line Order = 1..N within the Supplier + Invoice Number group (mirror of EK).
 - target: EP
-  function: upper_trim
   source_column: Description - remittance (F)
-  note: Rule 4 — UPPER(TRIM(Finance Master F "Description - remittance")).
+  note: Rule 7 — Item Description = TRIM(col F).
 - target: EW
   source_column: Distribution/Cost Code (G)
   function: lookup_worktag_from_final_code
@@ -414,30 +348,29 @@ mapping:
 - target: FE
   function: tax_on_taxamount_conditional
   slot: applicability
-  note: Rule 13 — If TaxAmount (I) > 0 → Standard_Rated; else → Outside_of_Scope.
+  note: Rule 11 — If TaxAmount (I) > 0 → Domestic Purchase; else → Outside_of_Scope.
 - target: FF
   function: tax_on_taxamount_conditional
   slot: code
-  note: Rule 13 — If TaxAmount (I) > 0 → Standard_Rated code; else → Zero_Rated code.
+  note: Rule 11 — If TaxAmount (I) > 0 → GBR_Standard; else → GBR_Zero_Rated.
 - target: FH
   default: INVOICE/ADJUSTMENT_DATE
 - target: FK
   function: tax_on_taxamount_conditional
   slot: recoverability
-  note: Rule 13 — If TaxAmount (I) > 0 → Recoverable_Allocate; else → Nonrecoverable_Allocate.
+  note: Rule 11 — If TaxAmount (I) > 0 → Fully_Recoverable; else → Nonrecoverable_Allocate.
 - target: FL
   default: CALC_TAX_DUE
-  note: >
-    CALC_TAX_DUE = Workday computes the VAT figure on standard-rated rows from the net
-    PurchasesAmount (col H) and the DS/DT/DY tax codes. Zero-rated rows have no VAT to add.
-- target: GE
-  source_column: Total (H)
-  note: Rule 10 — Net line amount = Finance Master col H (Total / PurchasesAmount).
+  note: Workday computes VAT on standard-rated rows from the net Extended Amount and tax code.
+# GE (Unit Cost) intentionally NOT mapped — left blank (Rule 8).
 - target: GF
   source_column: Total (H)
+  function: round_2dp_excel
+  number_format: "0.00"
+  note: Rule 9 — Extended Amount = ROUND(col H, 2), formatted "0.00".
 - target: GQ
   function: concat_cola_docno_space_colg_distributioncostcode
-  note: Rule 14 — Memo (EO) = Finance Master col A (DocNo) + " " + Finance Master col G (Distribution/Cost Code).
+  note: Rule 12 — Memo = col A + " " + col G.
 - target: GR
   source_column: Distribution/Cost Code (G)
   function: reporting_type_from_final_code
