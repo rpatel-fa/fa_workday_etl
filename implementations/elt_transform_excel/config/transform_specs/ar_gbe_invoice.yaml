@@ -18,7 +18,9 @@
 # "22. GBE - August 26.xlsx"):
 #   A WORKDAY ID|Customer ID | B Date | C Club|Customer Name | D Gross | E VAT | F Net |
 #   G Invoice Line Description | H Invoice line part 2|Invoice Line Description 2 |
-#   I Invoice Memo | J (blank) | K Company | L Cost Centre | M Reporting Type | N Revenue Category
+#   I PO | J (blank) | K Company | L Cost Centre | M Reporting Type | N Revenue Category
+#   NOTE: col I "PO" (previously listed as "Invoice Memo") feeds Customer PO Number (CQ) per
+#   row as a direct passthrough (2026-10-22); optional - not in required_headers.
 #   NOTE: the "Womens GBE" header row OMITS the "VAT" label in col E (the data is still
 #   present). VAT is therefore not read: the VAT amount driving Line Tax Applicability (FA)
 #   and Line Tax Code (FB) is derived as Gross - Net, present on both tabs (2026-10-07).
@@ -104,9 +106,19 @@ notes: >
   2026-09-28); Line Tax Applicability (FA) and Line Tax Code (FB) are set per row from the
   Net / (Gross - Net) split, mirroring ar_integration_invoice (see tax_rules). Line Item Description
   (EN) + line Memo (FV) = Player + " - " + Type, where Player is the text before the "-FOOT"
-  split and Type comes from col H.
+  split and Type comes from col H. Customer PO Number (CQ) = source col I "PO" per row
+  (2026-10-22), blank when the cell or column is absent.
 
 fields:
+  customer_po_number:
+    source_column: PO
+    source_column_letter: I
+    source_code: per_row_direct_passthrough
+    on_blank: leave_empty
+    note: >
+      Added 2026-10-22 per requester instruction: Customer PO Number (CQ) maps to source
+      col I "PO". Optional column (not in required_headers) - a missing column or blank cell
+      leaves CQ empty; Customer PO Number is not mandatory for Submit Customer Invoice.
   invoice_number:
     source_column: Invoice Line Description
     source_column_letter: G
@@ -292,6 +304,15 @@ mapping:
     ar_integration_invoice / ar_discipline_invoice. Previously source NET (col F).
 - target: co
   default: Standard
+- target: cq
+  source_column: PO
+  source_column_letter: I
+  source_code: per_row_direct_passthrough
+  on_blank: leave_empty
+  optional: true
+  note: >
+    Customer PO Number -- source col I "PO" verbatim (trimmed), written as text so numeric
+    POs keep leading zeros (2026-10-22). Blank cell or missing column -> CQ left empty.
 - target: db
   source_column: Invoice Line Description
   source_column_letter: G
