@@ -159,6 +159,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Dim salesItemColumn As Long, qtyColumn As Long, costCodeColumn As Long
     Dim customerIdColumn As Long, companyColumn As Long
     Dim costCentreColumn As Long, reportingTypeColumn As Long, revenueCategoryColumn As Long
+    Dim poNumberColumn As Long
     Dim clubName As String
     Dim workdayCustomerId As String
     Dim playerValue As String
@@ -298,6 +299,9 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     salesItemColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "SALES ITEM CODE")
     qtyColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "QUANTITY")
     costCodeColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "COST CODE")
+    '  Customer PO Number (CQ) = per-row direct passthrough of source col I "PO" (2026-10-22).
+    '  Optional (not in required_headers): a missing column or blank cell leaves CQ empty.
+    poNumberColumn = FindOptionalColumnIndexInRow(sourceTable, headerRowIndex, "PO")
 
     gbeCompanyValue = ResolveBatchConstantColumnValue(sourceTable, dataStartRowIndex, companyColumn)
     If LenB(gbeCompanyValue) = 0 Then gbeCompanyValue = COMPANY_DEFAULT_FALLBACK
@@ -350,7 +354,7 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
                 rowsProcessed = rowsProcessed + 1
                 WriteOutputRow runnerWorkbook, targetSheet, targetRow, rowsProcessed, sourceTable, rowIndex, _
                     dateColumn, playerValue, referenceValue, typeColumn, salesItemColumn, qtyColumn, _
-                    netColumn, grossColumn, costCodeColumn, _
+                    netColumn, grossColumn, costCodeColumn, poNumberColumn, _
                     workdayCustomerId, gbeCompanyValue, gbeCostCentreValue, _
                     gbeReportingTypeValue, gbeRevenueCategoryValue, _
                     eventLookup, campLookup, faLearningLookup, commercialPartnerLookup, _
@@ -419,7 +423,7 @@ Private Sub WriteOutputRow( _
     ByVal sequenceNumber As Long, ByVal sourceTable As Variant, ByVal sourceRow As Long, _
     ByVal dateColumn As Long, ByVal playerValue As String, ByVal referenceValue As String, ByVal typeColumn As Long, _
     ByVal salesItemColumn As Long, ByVal qtyColumn As Long, ByVal netColumn As Long, _
-    ByVal grossColumn As Long, ByVal costCodeColumn As Long, _
+    ByVal grossColumn As Long, ByVal costCodeColumn As Long, ByVal poNumberColumn As Long, _
     ByVal outputCustomerId As String, ByVal companyValue As String, ByVal costCentreValue As String, _
     ByVal reportingTypeValue As String, ByVal revenueCategoryValue As String, _
     ByVal eventLookup As Collection, ByVal campLookup As Collection, ByVal faLearningLookup As Collection, _
@@ -455,6 +459,7 @@ Private Sub WriteOutputRow( _
     Dim spreadsheetKeyValue As Long
     Dim lineOrderValue As Long
     Dim referenceId As String
+    Dim poNumberValue As String
 
     companyId = companyValue
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, dateColumn))
@@ -544,6 +549,13 @@ Private Sub WriteOutputRow( _
     '  ar_discipline_invoice. Was source col F (NET). See mapping.cm.
     targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
+    '  Customer PO Number (CQ) = source col I "PO" verbatim, written as text so a numeric PO
+    '  keeps any leading zeros; blank when the cell or column is absent. See mapping.cq.
+    If poNumberColumn > 0 Then poNumberValue = Trim$(CStr(sourceTable(sourceRow, poNumberColumn))) Else poNumberValue = vbNullString
+    If LenB(poNumberValue) > 0 Then
+        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).NumberFormat = "@"
+        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = poNumberValue
+    End If
     targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = referenceValue
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_REFERENCE)).Value = vbNullString
