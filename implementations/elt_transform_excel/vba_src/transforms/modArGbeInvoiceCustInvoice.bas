@@ -127,6 +127,11 @@ Private Const TGT_PROJECT_LINE_WORKTAG As String = "GF"
 Private mGrpKey As Collection
 Private mGrpLine As Collection
 Private mGrpNextKey As Long
+'  Header values (CQ / DB) captured from the FIRST row of each invoice group, keyed by
+'  Customer ID (AJ) + "|" + Invoice Date (BR), so every line of a grouped invoice carries one
+'  consistent header.
+Private mGrpHdrPo As Collection
+Private mGrpHdrMemo As Collection
 
 Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVal controlSheet As Worksheet)
     Dim sourceDataPath As String
@@ -316,6 +321,8 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Set mGrpKey = New Collection
     Set mGrpLine = New Collection
     mGrpNextKey = 0
+    Set mGrpHdrPo = New Collection
+    Set mGrpHdrMemo = New Collection
 
     For rowIndex = dataStartRowIndex To UBound(sourceTable, 1)
         If (rowIndex Mod 200) = 0 Then UpdateRunProgress runnerWorkbook, selectionKey, rowIndex, UBound(sourceTable, 1), runStartTime
@@ -333,9 +340,9 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
             '  (col A). No lookup, no name matching - a blank ID rejects the row.
             workdayCustomerId = Trim$(CStr(sourceTable(rowIndex, customerIdColumn)))
             If LenB(referenceValue) = 0 Then
-                '  Reference drives G/DB and the invoice-line grouping key, so a row whose
-                '  Invoice Line Description does not contain the "-FOOT" anchor is rejected
-                '  rather than silently grouped under a blank key.
+                '  Reference drives the header Memo (DB) and the Player/Type line description,
+                '  so a row whose Invoice Line Description does not contain the "-FOOT" anchor
+                '  is rejected rather than written with a guessed split.
                 rowsSkipped = rowsSkipped + 1
                 missingReferenceRows = missingReferenceRows + 1
                 AppendRejectRow runnerWorkbook, selectionKey, rowIndex, _
@@ -460,6 +467,10 @@ Private Sub WriteOutputRow( _
     Dim lineOrderValue As Long
     Dim referenceId As String
     Dim poNumberValue As String
+    Dim invoiceGroupKey As String
+    Dim headerInvoiceDate As String
+    Dim headerPoNumber As String
+    Dim headerMemo As String
 
     companyId = companyValue
     invoiceDate = NormalizeSourceDate(sourceTable(sourceRow, dateColumn))
@@ -490,7 +501,21 @@ Private Sub WriteOutputRow( _
         taxCode = TAX_CODE_STANDARD
     End If
 
-    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, referenceValue, mGrpNextKey, lineOrderValue)
+    '  Invoice-line grouping keyed by Customer ID (AJ) + Invoice Date (BR): every row for the
+    '  same customer on the same date shares one Spreadsheet Key (B), and Row ID (DS) / Line
+    '  Order (DV) run 1..N within it. BR (and so G) is uniform within a group by construction;
+    '  CQ / DB come from the group's FIRST row so the grouped invoice has one consistent
+    '  header. See transform_specs mapping.b / .ds / .dv.
+    invoiceGroupKey = outputCustomerId & "|" & invoiceDate
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceGroupKey, mGrpNextKey, lineOrderValue)
+    If poNumberColumn > 0 Then poNumberValue = Trim$(CStr(sourceTable(sourceRow, poNumberColumn))) Else poNumberValue = vbNullString
+    If Not CollectionKeyExists(mGrpHdrPo, invoiceGroupKey) Then
+        mGrpHdrPo.Add poNumberValue, invoiceGroupKey
+        mGrpHdrMemo.Add referenceValue, invoiceGroupKey
+    End If
+    headerInvoiceDate = invoiceDate
+    headerPoNumber = CStr(mGrpHdrPo(invoiceGroupKey))
+    headerMemo = CStr(mGrpHdrMemo(invoiceGroupKey))
     lineDescValue = BuildLineDescription(playerValue, CStr(sourceTable(sourceRow, typeColumn)))
     If salesItemColumn > 0 Then salesItemValue = CStr(sourceTable(sourceRow, salesItemColumn)) Else salesItemValue = vbNullString
 
@@ -527,7 +552,7 @@ Private Sub WriteOutputRow( _
     '  (e.g. C-000102 + 2026-03-17 + key 1 -> gbe_mens_C000102_20260317_1).
     '  AJ keeps the original Customer ID. D is intentionally left blank; see mapping.g / mapping.d.
     referenceId = REFERENCE_ID_PREFIX & variantToken & "_" & Replace(outputCustomerId, "-", vbNullString) & _
-        "_" & Replace(invoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
+        "_" & Replace(headerInvoiceDate, "-", vbNullString) & "_" & CStr(spreadsheetKeyValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).NumberFormat = "@"
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_ID)).Value = referenceId
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_REF_ID)).Value = vbNullString
@@ -541,7 +566,7 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER)).Value = outputCustomerId
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).NumberFormat = "@"
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).Value = invoiceDate
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_INVOICE_DATE)).Value = headerInvoiceDate
 
     targetSheet.Cells(targetRow, ColumnIndex(TGT_PAYMENT_STATUS)).Value = OUTPUT_PAYMENT_STATUS
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DOCUMENT_STATUS)).Value = OUTPUT_DOCUMENT_STATUS
@@ -550,13 +575,13 @@ Private Sub WriteOutputRow( _
     targetSheet.Cells(targetRow, ColumnIndex(TGT_AMOUNT_DUE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_INVOICE_TYPE)).Value = OUTPUT_INVOICE_TYPE
     '  Customer PO Number (CQ) = source col I "PO" verbatim, written as text so a numeric PO
-    '  keeps any leading zeros; blank when the cell or column is absent. See mapping.cq.
-    If poNumberColumn > 0 Then poNumberValue = Trim$(CStr(sourceTable(sourceRow, poNumberColumn))) Else poNumberValue = vbNullString
-    If LenB(poNumberValue) > 0 Then
+    '  keeps any leading zeros; blank when the cell or column is absent. Taken from the
+    '  customer group's first row. See mapping.cq.
+    If LenB(headerPoNumber) > 0 Then
         targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).NumberFormat = "@"
-        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = poNumberValue
+        targetSheet.Cells(targetRow, ColumnIndex(TGT_CUSTOMER_PO_NUMBER)).Value = headerPoNumber
     End If
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = referenceValue
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_HEADER_MEMO)).Value = headerMemo
     targetSheet.Cells(targetRow, ColumnIndex(TGT_ROW_ID_LINE)).Value = CStr(lineOrderValue)
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_REFERENCE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_ORDER)).Value = CStr(lineOrderValue)
@@ -665,7 +690,7 @@ End Function
 '  Reference. Verified against every row of the 2026-09-17 AR file (see
 '  PLAYER_REFERENCE_SPLIT_ANCHOR declaration above for the verification note). outReference is
 '  "" when the anchor is absent, which the caller treats as a reject (Reference is load-bearing
-'  for G/DB and the invoice-line grouping key - never guessed).
+'  for DB and the line description - never guessed).
 Private Sub SplitPlayerAndReference( _
     ByVal rawDescription As String, _
     ByRef outPlayer As String, _

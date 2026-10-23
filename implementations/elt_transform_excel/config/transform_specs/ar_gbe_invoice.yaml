@@ -36,8 +36,9 @@
 #   splits correctly since the anchor is the literal substring "-FOOT", not "first/last dash").
 #   Mirrors ap_travel_places' inline SupplierID split (InStr + Left$/Mid$, no shared helper).
 #
-# Data shape = one source row = one single-line Workday Customer Invoice. Each row is one
-# club/player GBE line, keyed by the Reference extracted from col G.
+# Data shape = one source row = one club/player GBE invoice LINE. Lines are grouped into one
+# multi-line Workday Customer Invoice per Workday Customer ID (col A) + Invoice Date (col B)
+# (DECIDED 2026-10-23; Customer ID only 2026-10-22).
 
 meta:
   key: ar_gbe_invoice
@@ -94,11 +95,17 @@ notes: >
   endorsement panels/extensions. The composite customer-invoice identifier is written to G
   as gbe_{mens|womens}_{Customer without hyphen}_{Invoice Date YYYYMMDD}_{Spreadsheet Key},
   while D is intentionally left blank because Workday treats it as an existing-invoice lookup
-  and rejects a new ID there. The extracted Reference from col G ("Invoice Line Description",
-  split on the literal "-FOOT" anchor token - see mapping target `g` below) remains the shared
-  invoice-line grouping key for Spreadsheet Key plus Row ID / Line Order and is still copied
-  into the header Memo (DB). A repeated `Reference` therefore collapses to one Workday header
-  with 1..N lines; a unique `Reference` remains the single-line case. v46.1 layout. Amounts
+  and rejects a new ID there. DECIDED 2026-10-23: the shared invoice-line grouping key for
+  Spreadsheet Key plus Row ID / Line Order is the Workday Customer ID (AJ, source col A) PLUS
+  the normalised Invoice Date (BR, source col B) - key "{Customer ID}|{YYYY-MM-DD}". Every row
+  for the same customer on the same date collapses to one Workday header with 1..N lines; the
+  same customer on a different date is a separate invoice (new Spreadsheet Key). Invoice
+  Date (BR) and therefore the composite G are uniform within a group by construction;
+  Customer PO Number (CQ) and Header Memo (DB) are taken from the group's FIRST row so the
+  grouped invoice has one consistent header. Output stays in source row order (rows are not
+  re-sorted, so a group's lines need not be adjacent). (2026-10-22 interim: Customer ID only.)
+  The extracted Reference from col G ("Invoice Line Description", split on the literal
+  "-FOOT" anchor token) is still copied into DB from the group's first row. v46.1 layout. Amounts
   mirrored ar_bulk_invoice / ar_multi_line_invoice's GROSS-into-amounts convention originally;
   DECIDED 2026-09-17: Amount Due (CM), Unit Cost (FL) and Extended Amount (FO) all came from
   NET (col F) instead of GROSS; as of 2026-10-07 CM and FO are left blank on every row (as
@@ -129,19 +136,24 @@ fields:
       DECIDED 2026-09-17: Reference is no longer its own column - it is the part of col G
       ("Invoice Line Description") from the literal "-FOOT" anchor token onward (e.g.
       "FOOT01/22/S-2024-1669" out of "Romain Jordan Faivre-FOOT01/22/S-2024-1669"). Verified
-      against all 584 rows of the 2026-09-17 AR file. It remains the shared grouping key for
-      the invoice-line helper and is copied to DB; G holds the composite gbe_... identifier and
-      D remains blank. A row whose col G has no "-FOOT" token is rejected (never guessed) - see skip_rule.
+      against all 584 rows of the 2026-09-17 AR file. It is copied to DB (from the customer
+      group's first row); it is no longer the grouping key (Customer ID + Invoice Date is, as
+      of 2026-10-23).
+      G holds the composite gbe_... identifier and D remains blank. A row whose col G has no
+      "-FOOT" token is rejected (never guessed) - see skip_rule.
   spreadsheet_key_group_id:
     function: per_source_invoice_number_group_sequential_id
-    group_key_source_column: Reference
+    group_key_source_columns: [WORKDAY ID|Customer ID, Date]
+    group_key_format: "{Customer ID}|{Date as YYYY-MM-DD}"
     id_start: 1
     id_assignment_order: source_file_row_order
     note: >
-      Spreadsheet Key B is assigned once per distinct extracted `Reference` in first-seen row order.
+      Spreadsheet Key B is assigned once per distinct Workday Customer ID (AJ) + Invoice Date
+      (BR) pair in first-seen row order (DECIDED 2026-10-23; Customer ID only 2026-10-22;
+      originally the extracted `Reference`).
   line_row_id_within_group:
     function: per_source_invoice_number_group_1based_reset_counter
-    group_key_source_column: Reference
+    group_key_source_columns: [WORKDAY ID|Customer ID, Date]
     counter_start: 1
     reset_on_new_group: true
     counter_assignment_order: source_file_row_order_within_group
@@ -149,7 +161,7 @@ fields:
       Target DS is the grouped row id emitted from the shared invoice-line helper.
   line_order_within_group:
     function: per_source_invoice_number_group_1based_reset_counter
-    group_key_source_column: Reference
+    group_key_source_columns: [WORKDAY ID|Customer ID, Date]
     counter_start: 1
     reset_on_new_group: true
     counter_assignment_order: source_file_row_order_within_group
@@ -207,13 +219,15 @@ skip_rule:
     - Workday Customer ID (col A) blank
 
 mapping:
-# EIB-level + line-level columns for one-row-one-invoice. House defaults: submit=Y,
+# EIB-level + line-level columns; one invoice per Customer ID + Invoice Date, one line per source row. House defaults: submit=Y,
 # auto_complete=Y, currency=GBP, payment=Unpaid, document=Approved, invoice_type=Standard.
 - target: b
   function: invoice_group_spreadsheet_key
   note: >
-    Populated by AssignInvoiceLineGroup keyed by `Reference`. Repeated source references
-    therefore share one Spreadsheet Key; a unique reference is the N=1 case.
+    Populated by AssignInvoiceLineGroup keyed by Workday Customer ID (AJ) + Invoice Date (BR)
+    (DECIDED 2026-10-23). Every row for the same customer on the same date shares one
+    Spreadsheet Key; a different date for the same customer gets the next key; a
+    customer/date with one row is the N=1 case.
 - target: h
   default: "Y"
 - target: i
@@ -233,10 +247,9 @@ mapping:
     ar_gbe_invoice_mens: mens
     ar_gbe_invoice_womens: womens
   examples:
-    - "gbe_mens_C000102_20260317_1"     # Mens GBE row 1: C-000102, 2026-03-17, Spreadsheet Key 1
-    - "gbe_mens_C000102_20260501_2"     # Mens GBE row 2: C-000102, 2026-05-01, Spreadsheet Key 2
-    - "gbe_womens_C000300_20260427_1"   # Womens GBE row 1: C-000300, 2026-04-27, Spreadsheet Key 1
-    - "gbe_womens_C000300_20260427_2"   # Womens GBE row 2: C-000300, 2026-04-27, Spreadsheet Key 2
+    - "gbe_mens_C000102_20260317_1"     # Mens GBE rows for C-000102 dated 2026-03-17, Spreadsheet Key 1 - same G on every line
+    - "gbe_mens_C000102_20260501_2"     # Mens GBE rows for C-000102 dated 2026-05-01 - separate invoice, Spreadsheet Key 2
+    - "gbe_womens_C000300_20260427_1"   # Womens GBE rows for C-000300 dated 2026-04-27, Spreadsheet Key 1
   note: >
     Customer Invoice ID -- per requester instruction (2026-09-28): literal "gbe_",
     then the variant token ("mens" for AR Invoice GBE Mens / "womens" for AR Invoice GBE
@@ -244,10 +257,9 @@ mapping:
     `C000102`), then the Invoice Date written to `br` as YYYYMMDD, then the Spreadsheet Key
     written to `b`, joined by "_". The hyphen is removed only in G; `aj` keeps the original
     Customer ID. Spreadsheet Key restarts at 1 on each tab, so the variant token keeps Mens
-    and Womens IDs distinct; within a tab the Spreadsheet Key keeps two invoices for the same
-    customer on the same date distinct. Should be written as text. The extracted Reference
-    from col G (the part from "-FOOT" onward) remains the grouping key and is still written to
-    the header Memo (DB).
+    and Womens IDs distinct. Since 2026-10-23 lines are grouped per Customer ID + Invoice
+    Date, so customer, date and Spreadsheet Key are all uniform within a group and every
+    line of the grouped invoice carries the same G. Should be written as text.
 - target: bo
   default: ""
   optional: true
@@ -292,6 +304,10 @@ mapping:
   source_column: Date
   source_format: Excel date serial or dd/mm/yyyy
   target_format: YYYY-MM-DD
+  note: >
+    Header Invoice Date -- per row, and part of the grouping key with Customer ID
+    (2026-10-23), so it is identical on every line of a grouped invoice. Line Transaction
+    Date (FP) is the same per-row value.
 - target: ck
   default: Unpaid
 - target: cl
@@ -313,23 +329,28 @@ mapping:
   note: >
     Customer PO Number -- source col I "PO" verbatim (trimmed), written as text so numeric
     POs keep leading zeros (2026-10-22). Blank cell or missing column -> CQ left empty.
+    Taken from the Customer ID + Invoice Date group's FIRST row and written on every line
+    of that grouped invoice (2026-10-23).
 - target: db
   source_column: Invoice Line Description
   source_column_letter: G
   function: split_on_anchor_token
   split_anchor_token: "-FOOT"
   split_part: after_anchor
-  note: Header Memo (DB) = extracted GBE Reference for traceability.
+  note: >
+    Header Memo (DB) = extracted GBE Reference for traceability, taken from the Customer ID
+    + Invoice Date group's FIRST row and written on every line of that grouped invoice
+    (2026-10-23).
 - target: ds
   function: invoice_group_line_order
   note: >
-    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
-    source references write a 1..N row id within the grouped invoice.
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so a customer/date
+    group's rows write a 1..N row id, restarting at 1 for each new Spreadsheet Key.
 - target: dv
   function: invoice_group_line_order
   note: >
-    Populated by the same AssignInvoiceLineGroup call as target `b`, so repeated
-    source references write a 1..N line order within the grouped invoice.
+    Populated by the same AssignInvoiceLineGroup call as target `b`, so a customer/date
+    group's rows write a 1..N line order (mirrors `ds`).
 - target: en
   derivation: player_dash_type
   source_columns: [Invoice Line Description, Invoice line part 2|Invoice Line Description 2]
