@@ -127,9 +127,9 @@ Private Const TGT_PROJECT_LINE_WORKTAG As String = "GF"
 Private mGrpKey As Collection
 Private mGrpLine As Collection
 Private mGrpNextKey As Long
-'  Header values (BR / CQ / DB) captured from the FIRST row of each customer group, keyed by
-'  Customer ID (AJ), so every line of a grouped invoice carries one consistent header.
-Private mGrpHdrDate As Collection
+'  Header values (CQ / DB) captured from the FIRST row of each invoice group, keyed by
+'  Customer ID (AJ) + "|" + Invoice Date (BR), so every line of a grouped invoice carries one
+'  consistent header.
 Private mGrpHdrPo As Collection
 Private mGrpHdrMemo As Collection
 
@@ -321,7 +321,6 @@ Public Sub RunArGbeInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook, ByVa
     Set mGrpKey = New Collection
     Set mGrpLine = New Collection
     mGrpNextKey = 0
-    Set mGrpHdrDate = New Collection
     Set mGrpHdrPo = New Collection
     Set mGrpHdrMemo = New Collection
 
@@ -468,6 +467,7 @@ Private Sub WriteOutputRow( _
     Dim lineOrderValue As Long
     Dim referenceId As String
     Dim poNumberValue As String
+    Dim invoiceGroupKey As String
     Dim headerInvoiceDate As String
     Dim headerPoNumber As String
     Dim headerMemo As String
@@ -501,20 +501,21 @@ Private Sub WriteOutputRow( _
         taxCode = TAX_CODE_STANDARD
     End If
 
-    '  Invoice-line grouping keyed by Customer ID (AJ): every row for the same customer shares
-    '  one Spreadsheet Key (B), and Row ID (DS) / Line Order (DV) run 1..N within it. The
-    '  header fields BR / CQ / DB (and so G) come from the customer's FIRST row so the grouped
-    '  invoice has one consistent header. See transform_specs mapping.b / .ds / .dv.
-    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, outputCustomerId, mGrpNextKey, lineOrderValue)
+    '  Invoice-line grouping keyed by Customer ID (AJ) + Invoice Date (BR): every row for the
+    '  same customer on the same date shares one Spreadsheet Key (B), and Row ID (DS) / Line
+    '  Order (DV) run 1..N within it. BR (and so G) is uniform within a group by construction;
+    '  CQ / DB come from the group's FIRST row so the grouped invoice has one consistent
+    '  header. See transform_specs mapping.b / .ds / .dv.
+    invoiceGroupKey = outputCustomerId & "|" & invoiceDate
+    spreadsheetKeyValue = AssignInvoiceLineGroup(mGrpKey, mGrpLine, invoiceGroupKey, mGrpNextKey, lineOrderValue)
     If poNumberColumn > 0 Then poNumberValue = Trim$(CStr(sourceTable(sourceRow, poNumberColumn))) Else poNumberValue = vbNullString
-    If Not CollectionKeyExists(mGrpHdrDate, outputCustomerId) Then
-        mGrpHdrDate.Add invoiceDate, outputCustomerId
-        mGrpHdrPo.Add poNumberValue, outputCustomerId
-        mGrpHdrMemo.Add referenceValue, outputCustomerId
+    If Not CollectionKeyExists(mGrpHdrPo, invoiceGroupKey) Then
+        mGrpHdrPo.Add poNumberValue, invoiceGroupKey
+        mGrpHdrMemo.Add referenceValue, invoiceGroupKey
     End If
-    headerInvoiceDate = CStr(mGrpHdrDate(outputCustomerId))
-    headerPoNumber = CStr(mGrpHdrPo(outputCustomerId))
-    headerMemo = CStr(mGrpHdrMemo(outputCustomerId))
+    headerInvoiceDate = invoiceDate
+    headerPoNumber = CStr(mGrpHdrPo(invoiceGroupKey))
+    headerMemo = CStr(mGrpHdrMemo(invoiceGroupKey))
     lineDescValue = BuildLineDescription(playerValue, CStr(sourceTable(sourceRow, typeColumn)))
     If salesItemColumn > 0 Then salesItemValue = CStr(sourceTable(sourceRow, salesItemColumn)) Else salesItemValue = vbNullString
 
