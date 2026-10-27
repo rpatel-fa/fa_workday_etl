@@ -147,6 +147,7 @@ shared_helpers:
       examples:
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -239,6 +240,7 @@ shared_helpers:
       examples:
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -361,6 +363,7 @@ shared_helpers:
         - ar_bulk_invoice
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -497,6 +500,7 @@ shared_helpers:
         - ap_cfa_claims
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -632,6 +636,7 @@ shared_helpers:
         - ap_cfa_claims
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -673,6 +678,7 @@ shared_helpers:
         - ap_referees_v2
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -706,6 +712,7 @@ shared_helpers:
         - ap_referees_v2
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
 
@@ -833,5 +840,6 @@ shared_helpers:
         - ar_multi_line_invoice
         - ap_stationery_v2
         - ap_taxi_v2
+        - ap_referees_v3
         - ap_cfa_claims_v2
         - ap_gfsp
