@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Conforming Map</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1b;--mut:#666;--card:#fff;--bd:#d9d9d2;--a:#2a6fdb;--ok:#2f8f5b;--warn:#c27a00;--bad:#c0392b;--ref:#7a4fd0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--fg:#eceae4;--mut:#9a9a92;--card:#201f1e;--bd:#3a3936;--a:#6ea3ff;--ok:#5fcf93;--warn:#f0b24a;--bad:#ff7a6b;--ref:#b196ff}}
+:root[data-theme="dark"]{--bg:#161615;--fg:#eceae4;--mut:#9a9a92;--card:#201f1e;--bd:#3a3936;--a:#6ea3ff;--ok:#5fcf93;--warn:#f0b24a;--bad:#ff7a6b;--ref:#b196ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:24px 16px}
+main{max-width:1060px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;margin:36px 0 8px}
+p.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;overflow-x:auto}
+svg{display:block;min-width:900px;width:100%;height:auto}
+svg text{fill:var(--fg);font:12px system-ui,sans-serif}
+svg .m{fill:var(--mut);font-size:10.5px}
+.box{fill:var(--card);stroke:var(--bd);stroke-width:1.2}
+.in{stroke:var(--a)}.rf{stroke:var(--ref)}.ok{stroke:var(--ok)}.wn{stroke:var(--warn)}.bd{stroke:var(--bad)}
+.arrow{stroke:var(--mut);stroke-width:1.3;fill:none}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin:8px 0 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;border:2px solid;margin-right:6px;vertical-align:-2px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd);vertical-align:top}
+th{color:var(--mut);font-weight:600}
+.tag{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid;white-space:nowrap}
+.t-ok{color:var(--ok)}.t-wn{color:var(--warn)}.t-bd{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>Data conforming map</h1>
+<p class="sub">Great Plains finance master data to Workday (<code>elt_ingest_excel</code>). Evidence: code and reference data on disk, 2026-10-28. Detail in <a href="data-conforming-inventory.md">data-conforming-inventory.md</a>.</p>
+
+<h2>1. How data flows and where each reference set is used</h2>
+<div class="card">
+<svg viewBox="0 0 980 470" role="img" aria-label="Pipeline from source through cleaning stages to Workday, with reference datasets feeding each stage">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--mut)"/></marker></defs>
+
+<rect class="box in" x="10" y="190" width="110" height="80" rx="8"/>
+<text x="65" y="222" text-anchor="middle" font-weight="600">Source</text>
+<text class="m" x="65" y="240" text-anchor="middle">Great Plains Excel</text>
+<text class="m" x="65" y="254" text-anchor="middle">raw, read-only</text>
+
+<!-- stage columns -->
+<g>
+<rect class="box ok" x="170" y="20" width="150" height="62" rx="8"/><text x="245" y="44" text-anchor="middle" font-weight="600">Names</text><text class="m" x="245" y="62" text-anchor="middle">SQL rules, dedupe, rank</text>
+<rect class="box ok" x="170" y="96" width="150" height="62" rx="8"/><text x="245" y="120" text-anchor="middle" font-weight="600">Address</text><text class="m" x="245" y="138" text-anchor="middle">SQL junk strip, re-pack</text>
+<rect class="box ok" x="170" y="172" width="150" height="62" rx="8"/><text x="245" y="196" text-anchor="middle" font-weight="600">Postcode</text><text class="m" x="245" y="214" text-anchor="middle">Python UDF + SQL</text>
+<rect class="box ok" x="170" y="248" width="150" height="62" rx="8"/><text x="245" y="272" text-anchor="middle" font-weight="600">Phone</text><text class="m" x="245" y="290" text-anchor="middle">Python UDF (libphonenumber)</text>
+<rect class="box wn" x="170" y="324" width="150" height="62" rx="8"/><text x="245" y="348" text-anchor="middle" font-weight="600">Email</text><text class="m" x="245" y="366" text-anchor="middle">regex only</text>
+<rect class="box bd" x="170" y="400" width="150" height="62" rx="8"/><text x="245" y="424" text-anchor="middle" font-weight="600">Bank / IBAN / SWIFT</text><text class="m" x="245" y="442" text-anchor="middle">format cleanup, 2-digit prefix</text>
+</g>
+
+<!-- reference sets -->
+<g>
+<rect class="box rf" x="400" y="96" width="210" height="62" rx="8"/><text x="505" y="118" text-anchor="middle" font-weight="600">Region chain (5 ref sets)</text><text class="m" x="505" y="136" text-anchor="middle">district, override, Workday list,</text><text class="m" x="505" y="148" text-anchor="middle">obsolete remap, town-county</text>
+<rect class="box rf" x="400" y="20" width="210" height="62" rx="8"/><text x="505" y="42" text-anchor="middle" font-weight="600">Business mappings</text><text class="m" x="505" y="60" text-anchor="middle">category, terms, business unit,</text><text class="m" x="505" y="72" text-anchor="middle">country, groups</text>
+<rect class="box rf" x="400" y="172" width="210" height="62" rx="8"/><text x="505" y="196" text-anchor="middle" font-weight="600">Workday postcode rules</text><text class="m" x="505" y="214" text-anchor="middle">245 free-text formats</text>
+<rect class="box rf" x="400" y="248" width="210" height="62" rx="8"/><text x="505" y="272" text-anchor="middle" font-weight="600">ref_country</text><text class="m" x="505" y="290" text-anchor="middle">dial codes, ISO2, currency</text>
+<rect class="box rf" x="400" y="400" width="210" height="62" rx="8"/><text x="505" y="418" text-anchor="middle" font-weight="600">Bank refs</text><text class="m" x="505" y="434" text-anchor="middle">88 sort prefixes, 19k US ABA,</text><text class="m" x="505" y="446" text-anchor="middle">103 IBAN codes (16 countries)</text>
+</g>
+
+<!-- workday rules -->
+<rect class="box rf" x="680" y="96" width="140" height="214" rx="8"/>
+<text x="750" y="124" text-anchor="middle" font-weight="600">Workday rules</text>
+<text class="m" x="750" y="146" text-anchor="middle">per country (245):</text>
+<text class="m" x="750" y="164" text-anchor="middle">line 1-4, city, region,</text>
+<text class="m" x="750" y="178" text-anchor="middle">county, subdivision,</text>
+<text class="m" x="750" y="192" text-anchor="middle">postcode</text>
+<text class="m" x="750" y="214" text-anchor="middle">Required / Optional /</text>
+<text class="m" x="750" y="228" text-anchor="middle">Not Accepted</text>
+<text class="m" x="750" y="256" text-anchor="middle">+ region instances (4,349)</text>
+<text class="m" x="750" y="270" text-anchor="middle">+ phone, bank formats</text>
+
+<rect class="box in" x="860" y="190" width="110" height="80" rx="8"/>
+<text x="915" y="222" text-anchor="middle" font-weight="600">Workday</text>
+<text class="m" x="915" y="240" text-anchor="middle">EIB workbooks</text>
+<text class="m" x="915" y="254" text-anchor="middle">+ validation log</text>
+
+<!-- arrows -->
+<path class="arrow" marker-end="url(#ar)" d="M120 230H150V51H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 127H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 203H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 279H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 355H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 431H168"/>
+<path class="arrow" marker-end="url(#ar)" d="M150 51V431"/>
+<path class="arrow" marker-end="url(#ar)" d="M400 51H322"/>
+<path class="arrow" marker-end="url(#ar)" d="M400 127H322"/>
+<path class="arrow" marker-end="url(#ar)" d="M400 203H322"/>
+<path class="arrow" marker-end="url(#ar)" d="M400 279H322"/>
+<path class="arrow" marker-end="url(#ar)" d="M400 431H322"/>
+<path class="arrow" marker-end="url(#ar)" d="M610 127H678"/>
+<path class="arrow" marker-end="url(#ar)" d="M610 203H678"/>
+<path class="arrow" marker-end="url(#ar)" d="M820 230H858"/>
+</svg>
+<div class="legend">
+<span><i style="border-color:var(--ok)"></i>adequate</span>
+<span><i style="border-color:var(--warn)"></i>basic</span>
+<span><i style="border-color:var(--bad)"></i>weak, better options exist</span>
+<span><i style="border-color:var(--ref)"></i>reference data / rules</span>
+</div>
+</div>
+
+<h2>2. The Workday region redirection chain</h2>
+<div class="card">
+<svg viewBox="0 0 980 300" role="img" aria-label="Region resolution chain">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--mut)"/></marker></defs>
+<g>
+<rect class="box in" x="10" y="20" width="130" height="64" rx="8"/><text x="75" y="46" text-anchor="middle" font-weight="600">Cleaned</text><text x="75" y="62" text-anchor="middle" font-weight="600">postcode</text>
+<rect class="box rf" x="180" y="20" width="150" height="64" rx="8"/><text x="255" y="44" text-anchor="middle" font-weight="600">1 District table</text><text class="m" x="255" y="60" text-anchor="middle">3,126 outward codes</text><text class="m" x="255" y="73" text-anchor="middle">gives post town + region</text>
+<rect class="box rf" x="370" y="20" width="150" height="64" rx="8"/><text x="445" y="44" text-anchor="middle" font-weight="600">2 Override table</text><text class="m" x="445" y="60" text-anchor="middle">352 rows: gazetteer</text><text class="m" x="445" y="73" text-anchor="middle">region to Workday name</text>
+<rect class="box rf" x="560" y="20" width="170" height="64" rx="8"/><text x="645" y="44" text-anchor="middle" font-weight="600">3 Workday instances</text><text class="m" x="645" y="60" text-anchor="middle">4,349 rows per country</text><text class="m" x="645" y="73" text-anchor="middle">exact match required</text>
+<rect class="box rf" x="770" y="20" width="200" height="64" rx="8"/><text x="870" y="44" text-anchor="middle" font-weight="600">4 Obsolete remap</text><text class="m" x="870" y="60" text-anchor="middle">retry with "(obsolete)",</text><text class="m" x="870" y="73" text-anchor="middle">then 160-row remap</text>
+</g>
+<path class="arrow" marker-end="url(#ar2)" d="M140 52H178"/>
+<path class="arrow" marker-end="url(#ar2)" d="M330 52H368"/>
+<path class="arrow" marker-end="url(#ar2)" d="M520 52H558"/>
+<path class="arrow" marker-end="url(#ar2)" d="M730 52H768"/>
+
+<rect class="box wn" x="180" y="150" width="340" height="86" rx="8"/>
+<text x="350" y="174" text-anchor="middle" font-weight="600">Fallback if no district match</text>
+<text class="m" x="350" y="194" text-anchor="middle">raw county as Workday instance, then raw city as instance,</text>
+<text class="m" x="350" y="208" text-anchor="middle">then town-county table (200 rows, all GB) by county, then city,</text>
+<text class="m" x="350" y="222" text-anchor="middle">then raw county. First non-null goes on to step 3.</text>
+<path class="arrow" marker-end="url(#ar2)" d="M255 84V148"/>
+<path class="arrow" marker-end="url(#ar2)" d="M520 193H600V86"/>
+
+<rect class="box ok" x="620" y="150" width="350" height="86" rx="8"/>
+<text x="795" y="174" text-anchor="middle" font-weight="600">Landing</text>
+<text class="m" x="795" y="194" text-anchor="middle">blank the region where Workday says "Not Accepted" for the country,</text>
+<text class="m" x="795" y="208" text-anchor="middle">then write to the address table and EIB workbook.</text>
+<text class="m" x="795" y="222" text-anchor="middle">Result NULL if nothing matched (no later fallback).</text>
+<path class="arrow" marker-end="url(#ar2)" d="M870 84V148"/>
+
+<text class="m" x="10" y="268">Risk: every join keys on country NAME text, not ISO code. Macedonia already fails silently (Workday rules say "Macedonia, the Former Yugoslav Republic of").</text>
+<text class="m" x="10" y="286">The same district join also decides GB / Jersey / Guernsey / Isle of Man and the post town.</text>
+</svg>
+</div>
+
+<h2>3. Cleaning quality and where better data exists</h2>
+<div class="card">
+<table>
+<thead><tr><th>Domain</th><th>Today</th><th>Rating</th><th>Candidate upgrade (verify licence and cost)</th></tr></thead>
+<tbody>
+<tr><td>Postcode</td><td>Syntax rules from Workday text, 1-char UK repair, outward-code lookup</td><td><span class="tag t-ok">good</span></td><td>ONS Postcode Directory (free), Royal Mail PAF, OS AddressBase</td></tr>
+<tr><td>Address lines</td><td>Junk strip, re-pack; customer overflow dropped</td><td><span class="tag t-wn">basic</span></td><td>Loqate, Experian, Ideal Postcodes, Google Address Validation</td></tr>
+<tr><td>Town / region</td><td>5 hand-built tables, ~5 redirects</td><td><span class="tag t-wn">fragile</span></td><td>ONSPD admin codes, mapped once to Workday ids</td></tr>
+<tr><td>Phone</td><td>libphonenumber with fallback trimming</td><td><span class="tag t-ok">good</span></td><td>Twilio Lookup or Vonage only if line-type or liveness needed</td></tr>
+<tr><td>Email</td><td>Regex, silent drop</td><td><span class="tag t-wn">basic</span></td><td>ZeroBounce, NeverBounce, Kickbox, Mailgun</td></tr>
+<tr><td>Sort code to bank</td><td>First 2 digits, 88 rows</td><td><span class="tag t-bd">weak</span></td><td>Pay.UK sort code directory, Experian Bank Wizard, Loqate</td></tr>
+<tr><td>Account number</td><td>Pad to 8, length check</td><td><span class="tag t-bd">weak</span></td><td>Vocalink modulus check (free), Confirmation of Payee</td></tr>
+<tr><td>IBAN</td><td>Regex + length, no checksum</td><td><span class="tag t-bd">weak</span></td><td>mod-97 via schwifty / python-stdnum (free)</td></tr>
+<tr><td>SWIFT / BIC</td><td>Upper-case only</td><td><span class="tag t-bd">weakest</span></td><td>SWIFTRef, schwifty</td></tr>
+<tr><td>Tax / VAT id</td><td>Shape guess, no check</td><td><span class="tag t-bd">weak</span></td><td>HMRC VAT API, EU VIES (free)</td></tr>
+<tr><td>Entity / dedupe</td><td>Deterministic score and rank</td><td><span class="tag t-ok">transparent</span></td><td>Companies House, GLEIF, D&amp;B, Creditsafe</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>4. Proposed layered framework</h2>
+<div class="card">
+<svg viewBox="0 0 980 190" role="img" aria-label="Four layer framework">
+<defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--mut)"/></marker></defs>
+<rect class="box in" x="10" y="20" width="210" height="120" rx="8"/><text x="115" y="46" text-anchor="middle" font-weight="600">1 Capture</text><text class="m" x="115" y="68" text-anchor="middle">typeahead, field rules per</text><text class="m" x="115" y="82" text-anchor="middle">country, checksums in the UI</text><text class="m" x="115" y="104" text-anchor="middle">libaddressinput, PAF API</text>
+<rect class="box ok" x="260" y="20" width="210" height="120" rx="8"/><text x="365" y="46" text-anchor="middle" font-weight="600">2 Syntax (offline)</text><text class="m" x="365" y="68" text-anchor="middle">format, length, checksum</text><text class="m" x="365" y="82" text-anchor="middle">phone parse, IBAN mod-97,</text><text class="m" x="365" y="96" text-anchor="middle">BIC shape, postcode regex</text>
+<rect class="box rf" x="510" y="20" width="210" height="120" rx="8"/><text x="615" y="46" text-anchor="middle" font-weight="600">3 Existence (ref data)</text><text class="m" x="615" y="68" text-anchor="middle">postcode exists, sort code</text><text class="m" x="615" y="82" text-anchor="middle">to bank, region to ids</text><text class="m" x="615" y="104" text-anchor="middle">ISO-code keyed, dated</text>
+<rect class="box wn" x="760" y="20" width="210" height="120" rx="8"/><text x="865" y="46" text-anchor="middle" font-weight="600">4 Verify (paid, risk-based)</text><text class="m" x="865" y="68" text-anchor="middle">bank account + name match,</text><text class="m" x="865" y="82" text-anchor="middle">VAT live, email deliverable</text><text class="m" x="865" y="104" text-anchor="middle">only where risk warrants</text>
+<path class="arrow" marker-end="url(#ar3)" d="M220 80H258"/><path class="arrow" marker-end="url(#ar3)" d="M470 80H508"/><path class="arrow" marker-end="url(#ar3)" d="M720 80H758"/>
+<text class="m" x="10" y="170">Cross-cutting: keep raw beside conformed; never drop silently (reason + severity); one rules table keyed on ISO code; record provenance and refresh date.</text>
+</svg>
+</div>
+<p class="sub" style="margin-top:16px">Scope note: the source data describes organisations (suppliers, customers). Parent/guardian, date of birth and consent are not covered anywhere in this repo.</p>
+</main>
+</body>
+</html>
