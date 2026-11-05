@@ -91,18 +91,6 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
-    "workbookFileName": "ProClubs.csv",
-    "fileType": "DELIMITED",
-    "sheets": [
-      {
-        "headerRow": "1",
-        "dataRow": "2",
-        "targetTableName": "pff_pro_club"
-      }
-    ]
-  },
-  {
-    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
     "workbookFileName": "Discipline Customers.xlsx",
     "sheets": [
       {
@@ -114,17 +102,30 @@
     ]
   },
   {
-    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/org_services",
-    "workbookFileName": "Pro club details Extract.xlsx",
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
+    "workbookFileName": "Pro club details Extract[76].xlsx",
     "sheets": [
       {
         "sheetName": "Sheet1",
         "headerRow": "1",
         "dataRow": "2",
-        "targetTableName": "os_pro_club"
+        "targetTableName": "pff_pro_club"
       }
     ]
   },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/pff",
+    "workbookFileName": "pff_workday_manually_mapped_customer.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "pff_workday_manual_mapped"
+      }
+    ]
+  },
+
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
     "workbookFileName": "Account Advanced Find View (with Licences).xlsx",
