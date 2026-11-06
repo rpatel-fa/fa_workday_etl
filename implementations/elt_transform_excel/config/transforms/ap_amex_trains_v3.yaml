@@ -1,0 +1,185 @@
+version: 3
+
+transform:
+  key: ap_amex_trains_v3
+  label: AP AMEX Trains V3
+  source_type: AP AMEX Trains V3
+  eib_population_type: Supplier Invoice
+  description: >
+    American Express rail (trains) invoice workbook transformed into the Workday
+    Supplier Invoice EIB. Core source-to-EIB and worktag mappings follow
+    ap_stationery_v2: supplier and company are read from the source, invoice number
+    is mirrored to both EIB invoice-number fields, Net supplies the extended amount,
+    and worktags are read directly from their source columns. Per-row tax
+    classification is driven by TaxCode.
+
+runtime:
+  step_list_macro: RunApAmexTrainsV3SupplierInvoice
+
+source_layout:
+  worksheet_name: Workday_Upload
+  worksheet_resolution: named
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  # Workday_Upload columns A-T: identical header row in all 5 supplier source files (2026-10-16).
+  required_headers:
+    - SupplierID            # A
+    - InvoiceNumber         # B
+    - InvoiceDate           # C
+    - Currency              # D
+    - Company               # E
+    - Net                   # F
+    - Tax                   # G
+    - Gross                 # H
+    - Description           # I
+    - TaxCode               # J
+    - Spend Category        # K  (mandatory worktag)
+    - Reporting Type        # L  (mandatory worktag)
+    - Cost Centre           # M  (mandatory worktag)
+  # Optional worktag columns: the header must be present (the .bas requires the column), but
+  # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
+  # data check (same convention as ap_cfa_claims).
+  optional_headers:
+    - Event                 # N
+    - Camp                  # O
+    - FA Learning Course    # P
+    - Commercial Partner    # Q
+    - Grant                 # R
+    - Programme             # S
+    - Project               # T
+
+transform_constants:
+  # Source column -> EIB field bindings (same key convention as ap_stationery_v2).
+  source_columns:
+    supplier_id: SupplierID                 # A -> U
+    invoice_number: InvoiceNumber           # B -> BG, and mirrored to K
+    invoice_date: InvoiceDate               # C -> AF
+    currency: Currency                      # D -> T
+    company: Company                        # E -> R
+    net_amount: Net                         # F -> GF
+    tax_amount: Tax                         # G
+    gross_amount: Gross                     # H
+    line_description: Description           # I -> EP
+    tax_code: TaxCode                       # J -> per_row_tax driver
+
+  # Supplier: source already carries the Workday Supplier ID. Validate against the
+  # Supplier extract; reject unknown IDs.
+  supplier_resolution:
+    mode: direct_workday_id_with_extract_check   # shared_helper_registry variant
+    source_column: SupplierID
+    target_eib_column: U
+    validated_via: Supplier Spreadsheet
+    validation_column: Supplier ID
+    on_not_found: reject_row
+
+  # Company: source carries the Workday company and is written to R as-is.
+  company_resolution:
+    mode: per_row_direct_source_column           # shared_helper_registry variant
+    source_column: Company
+    target_eib_column: R
+    on_blank: reject_row
+
+  # Invoice number: K mirrors BG; both are the source InvoiceNumber, written as text.
+  invoice_number:
+    source_column: InvoiceNumber
+    suppliers_invoice_number_eib_column: BG
+    invoice_number_eib_column: K
+    k_mirrors_bg: true
+    number_format: "@"                      # text on every row for K and BG
+
+  # Extended Amount (GF) = Net; Unit Cost (GE) is left blank.
+  line_amounts:
+    extended_amount:
+      source_column: Net
+      target_eib_column: GF
+      number_format: "0.00"                 # display 2 decimal places; value not rounded
+    unit_cost:
+      target_eib_column: GE
+      value: blank
+
+  # Memo (GQ) = Supplier (U) + '_' + Suppliers Invoice Number (BG).
+  memo_derivation:
+    strategy: concat_underscore_join
+    separator: "_"
+    source_steps:
+      supplier_id:
+        source_column: SupplierID           # value written to U
+      suppliers_invoice_number:
+        source_column: InvoiceNumber        # value written to BG
+    concat_order:
+      - supplier_id
+      - suppliers_invoice_number
+    target_eib_column: GQ
+
+  per_row_tax:
+    driver_column: TaxCode
+    rate_0:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Nonrecoverable_Allocate
+    rate_20:
+      applicability: GBR_Domestic_Purchase_Of_Goods_And_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+
+  company_fallback: ""                      # no fallback: Company comes from the source row
+  mapping_sheet: MAPPING MASTER             # schema parity only; NOT opened at runtime (see worktag_resolution)
+
+  # Worktags: read verbatim from their own source columns. No accounting string, no
+  # Mapping MASTER lookup, and no Final Code-based Reporting Type derivation.
+  worktag_resolution:
+    resolution: direct_from_source_columns
+    source_columns:
+      spend_category: Spend Category       # K
+      reporting_type: Reporting Type       # L
+      cost_centre: Cost Centre             # M
+      event: Event                         # N
+      camp: Camp                           # O
+      fa_learning: FA Learning Course      # P
+      commercial_partner: Commercial Partner  # Q
+      grant: Grant                         # R
+      program: Programme                   # S
+      project: Project                     # T
+    mandatory:                             # blank -> reject row; the other 7 may be blank
+      - spend_category
+      - reporting_type
+      - cost_centre
+    reject_values:                         # source-workbook "unresolved" marker -> reject row
+      - NOT_FOUND
+    note: >
+      Source values are already Workday reference IDs and Reporting Type display values.
+      Optional worktags may be blank. The worktag pipeline is INACTIVE: no
+      worktag_business_objects / derived_worktags, so no Mapping MASTER lookup or
+      Final Code-based Reporting Type derivation runs here. NOT_FOUND values are
+      rejected.
+
+  # Standard 9-pack worktag column letters for v46.2 Supplier Invoice EIB (+ Reporting Type).
+  worktag_target_columns:
+    spend_category: EW
+    reporting_type: GR
+    cost_centre: GT
+    event: GV
+    camp: GX
+    fa_learning: GZ
+    commercial_partner: HB
+    grant: HD
+    program: HF
+    project: HH
+
+skip_rule:
+  drop_when:
+    - Net < 0
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/trains/source/AMEX TRAINS JUL 26_£144,876.80 V3_ANALYSIS UPDATED.xlsm
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/Submit_Supplier_Invoice_v46.2.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ap/amex/trains/target/Submit_Supplier_Invoice_ap_amex_trains_v3_output.xlsx
+  # source_layout defaults — override here to change which sheet/rows the transform uses at build time
+  source_worksheet_name: Workday_Upload
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2
+  # customer_spreadsheet / supplier_spreadsheet / mapping_spreadsheet / mapping_sheet are
+  # inherited from config/reference_paths.yaml. Override here only if this transform must use
+  # a different reference file.

@@ -29,6 +29,7 @@ active_profiles:
   - ap_amex_hotel
   - ap_amex_trains
   - ap_amex_trains_v2
+  - ap_amex_trains_v3
   - ap_cfa_claims
   - ap_cfa_claims_v2
   - ap_cfa_distributions
