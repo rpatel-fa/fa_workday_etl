@@ -27,6 +27,7 @@ default_profile_key: ap_referees_v2
 active_profiles:
   # AP - Supplier Invoices
   - ap_amex_hotel
+  - ap_amex_hotel_v3
   - ap_amex_trains
   - ap_amex_trains_v2
   - ap_amex_trains_v3
