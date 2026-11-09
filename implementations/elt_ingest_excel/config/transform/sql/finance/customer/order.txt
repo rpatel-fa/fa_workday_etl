@@ -46,5 +46,9 @@ workday_customer_phone.sql
 workday_customer_email.sql
 workday_pff_os_customer_mapped.sql
 workday_pff_os_customer_unmapped.sql
+src_crm_customer_base.sql
+workday_crm_customer_mapped.sql
+workday_crm_customer_unmapped_account.sql
+workday_crm_customer_unmapped_contact.sql
 
 validation.sql
