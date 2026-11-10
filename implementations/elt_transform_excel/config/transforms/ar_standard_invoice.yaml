@@ -1,0 +1,188 @@
+version: 1
+
+transform:
+  key: ar_standard_invoice
+  label: AR Standard Invoice
+  source_type: AR Standard Invoice
+  eib_population_type: Customer Invoice
+  start_row: 6
+  description: >
+    EIB profile for Accounts Receivable standard invoice extracts that are used for most of AR invoice processing.
+    The source file is a standardised to accomodate various AR invoices and validated. 
+    The source file is transformed into the Workday Customer Invoice EIB workbook.
+
+runtime:
+  step_list_macro: RunArStandardInvoiceCustomerInvoice
+
+source_layout:
+  # Named-worksheet resolution: each Runner variant overrides worksheet_name to its tab.
+  # The base worksheet_name below is the INVOICE tab (the manifest default variant); it is
+  # only used if a build ever references the base binding directly.
+  worksheet_resolution: named
+  worksheet_name: INVOICE
+  header_row: 1
+  data_start_row: 2
+  header_detection: scan_required_headers
+  required_headers:
+    - DATE                          #A
+    - COMPANY                       #B 
+    - WORKDAY ID                    #D   
+    - INVOICE LINE DESCRIPTION      #F
+    - QTY                           #J
+    - UNIT COST                     #K
+    - VAT                           #L
+    - Total                         #M
+    - TAX CODE                      #O
+    - Reporting Type                #P
+    - Cost Centre                   #Q
+    - Revenue Category              #R
+    
+  # Optional worktag columns: the header must be present (the .bas requires the column), but
+  # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
+  # data check (same convention as ap_cfa_claims / ap_stationery_v2).
+  optional_headers:
+    - INVOICE TYPE                      #C 
+    - CUSTOMER NAME                     #E
+    - INVOICE MEMO (DB)                 #G
+    - INVOICE LINE MEMO (emails) (FV)   #H
+    - Purchase Order                    #I
+    - Email                             #N
+    - Event-OPTIONAL                    #S  
+    - FA LEARNING COURSES-OPTIONAL      #T
+
+transform_constants:
+  fixed_currency: GBP
+  fixed_invoice_type: Standard
+  # BO (Invoice Number) is left blank on every row. FA (Line Tax Applicability) and FB
+  # (Line Tax Code) are set per row -- see tax_triple_per_row below and mapping.fa/.fb in
+  # the spec.
+  tax_triple_per_row:
+    source_net_column: UNIT COST
+    source_gross_column: Total
+    vat_derivation: Total - UNIT COST
+    standard_rated:
+      applicability: GBR_Domestic_Sale_of_Goods_and_Services
+      code: GBR_Standard
+      recoverability: Fully_Recoverable
+    zero_rated:
+      applicability: GBR_Outside_of_Scope
+      code: GBR_Zero_Rated
+      recoverability: Fully_Recoverable
+  # DECIDED 2026-09-17: AR now delivers a ready-made Workday Customer ID per row (source col D,
+  # header "WORKDAY ID" on the INVOICE tab). Customer resolution
+  # is a DIRECT PASSTHROUGH of that column - no lookup, no name matching. This supersedes the
+  # earlier two-level club-name cascade (customer_name_resolution.two_level_l1_l2_sql_migration
+  # in shared_helper_registry.yaml); that shared helper is untouched and still available to
+  # other transforms, it is simply no longer called by ar_standard_invoice.
+  
+  # Source column -> EIB field bindings.
+  source_columns:
+    DATE:  Invoice Date                                       # A -> BR, and mirrors to FP (Transaction Date)
+    COMPANY:  Company                                         # B -> J
+    WORKDAY ID:  Customer                                     # D -> AJ
+    INVOICE LINE DESCRIPTION:  Line Item Description          # F -> EN
+    INVOICE MEMO (DB): Header Memo                            # G -> DB  
+    INVOICE LINE MEMO (emails) (FV):  Line Memo               # H -> FV
+    Purchase Order:  Customer PO Number                       # I -> CQ         
+    QTY:  Quantity                                            # J -> FH
+    UNIT COST:  Unit Cost                                     # K -> FL
+    Cost Centre:  Cost Centre                                 # Q -> FX
+    Reporting Type:  Reporting Type                           # P -> FY
+    Revenue Category:  Revenue Category                       # R -> EM 
+    Event-OPTIONAL:  Event - Custom Org                       # S -> GA
+    FA LEARNING COURSES-OPTIONAL:  FA Learning - Custom Org   # T -> GC 
+
+  customer_resolution:
+    mode: direct_passthrough
+    source_column: WORKDAY ID
+    source_column_letter: D
+    on_blank: reject
+  # Multi-line grouping (2026-10-23): the invoice-line grouping key is the Workday ID above
+  # plus the normalised Invoice Date ("{Customer ID}|{YYYY-MM-DD}"). B = one Spreadsheet Key
+  # per distinct Customer + Date pair (first-seen order); DS and DV = 1..N within that key,
+  # restarting at 1 for each new key. BR (and so G) is uniform within a group by construction;
+  # header CQ / DB come from the group's first row. Output keeps source row order (no re-sort).
+  invoice_line_grouping:
+    group_key: [WORKDAY ID, DATE]
+    group_key_format: "{WORKDAY ID}|{Date as YYYY-MM-DD}"
+    spreadsheet_key: B
+    row_id_line: DS
+    line_order: DV
+    header_values_from: first_row_of_group
+    header_columns: [CQ, DB]
+  
+  customer_invoice_eib_columns:
+    # --- HEADER identifier columns (D blank; G composite ID; BO blank) ---
+    # G = ar_{AJ without hyphens}_{BR as YYYYMMDD}_{B}, e.g.
+    # ar_C000102_20260317_1, written as text. AJ keeps the original Customer ID. 
+    customer_invoice_ref_id: D        # intentionally left blank on every row
+    customer_invoice_id: G
+    invoice_number: BO                # intentionally left blank on every row
+    # --- HEADER fields (Submit Customer Invoice v46.1) ---
+    spreadsheet_key: B
+    add_only: C
+    header_comment: E
+    submit: H
+    locked_in_workday: I
+    company: J
+    row_id_header_1: K
+    row_id_header_2: L
+    row_id_header_3: M
+    currency: AI
+    customer: AJ
+    sold_to_customer: AK
+    billable_project_header: BN
+    invoice_date: BR
+    payment_status: CK
+    document_status: CL
+    amount_due: CM                    # intentionally left blank on every row (2026-10-07)
+    customer_invoice_type: CO
+    header_tax_code: CP
+    customer_po_number: CQ            # source col I "PO", per row (see customer_po_number above)
+    include_customer_worktags: CY
+    header_worktags_plus: CZ
+    header_memo: DB
+    # --- LINE identifier and Row ID ---
+    row_id_line: DS
+    line_reference: DU
+    line_order: DV
+    # --- LINE fields ---
+    sales_item: EJ
+    revenue_category: EM
+    line_item_description: EN
+    line_tax_applicability: FA        # per row, see tax_triple_per_row
+    line_tax_code: FB                 # per row, see tax_triple_per_row
+    line_quantity: FH
+    line_unit_of_measure: FI
+    line_unit_cost: FL
+    line_extended_amount: FO          # intentionally left blank on every row (2026-10-07)
+    line_transaction_date: FP
+    line_from_date: FQ
+    line_to_date: FR
+    deferred_revenue: FS
+    line_memo: FV
+    billable_project_line: GF
+    # --- Accounting-string / Worktag hierarchy FX..GF (9 slots, shared with AP) ---
+    cost_centre: FX
+    reporting_type: FY
+    camp: FZ
+    event: GA
+    commercial_partner: GB
+    fa_learning_course: GC
+    grant: GD
+    programme: GE
+    project_line_worktag: GF
+    # --- Directly populated Worktags+ columns ---
+    worktags_plus_order:
+      reporting_type: FY
+      event: GA
+      fa_learning: GC
+      cost_centre: FX
+
+shell_defaults:
+  source_data: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/ar_standard_invoice/source/EIB INVOICE TEMPLATE.xlsx
+  target_eib: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/eib_template/FA Submit Customer Invoice.xlsx
+  output_file_path: /Users/Rakesh.Patel/Documents/__data/excel/finance_ref/eib/ar/ar_standard_invoice/target/FA Submit Customer Invoice_ar_standard_invoice_output.xlsx
+  source_worksheet_resolution: named
+  source_header_row: 1
+  source_data_start_row: 2

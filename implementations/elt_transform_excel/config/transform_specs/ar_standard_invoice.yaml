@@ -1,0 +1,228 @@
+# Transform spec - ar_standard_invoice
+#
+# Human decision record + the authoritative target-column mapping. The .bas module mirrors
+# the mapping: section; see docs/ADDING_A_TRANSFORM.md.
+#
+# Operational facts (profile identity, source layout, paths, and EIB columns) live in
+# config/transforms/ar_standard_invoice.yaml and are not restated here.
+
+meta:
+  key: ar_standard_invoice
+  label: AR Standard Invoice
+  requester: Finance (AR)
+  date_confirmed: 2026-11-10
+  exemplar_to_fork: ar_discipline_invoice
+
+shared_helpers:
+  source_date_normalization: excel_serial_and_dmy_text
+  invoice_line_grouping: per_invoice_number
+
+parties:
+  customer:
+    source_column: WORKDAY ID
+    resolved_via: none
+    note: >
+      The source provides the Workday Customer ID directly. A blank value is rejected;
+      no Customer Spreadsheet lookup is performed.
+  company:
+    source_column: COMPANY
+    resolved_via: none
+    note: Written directly from the source column to Customer Invoice Company (J).
+
+notes: >
+  AR Standard Invoice Customer Invoice profile. Source fields are mapped by header:
+  DATE and WORKDAY ID together define an invoice group; rows with the same customer and
+  date share a Spreadsheet Key, with line order incrementing in source order. Customer
+  Invoice ID (G) is ar_{WORKDAY ID without hyphens}_{DATE as yyyyMMdd}_{Spreadsheet Key}.
+  Purchase Order and Header Memo are taken from the first source row in each group.
+  Unit Cost is the net line amount and Total is gross; calculated VAT is Total - Unit Cost.
+  A calculated VAT of zero selects the zero-rated tax set; every other calculated VAT
+  selects the standard-rated set. There is no Mapping MASTER derivation in this profile.
+
+fields:
+  invoice_number:
+    default: ""
+    note: Invoice Number (BO) is intentionally left blank.
+  invoice_date:
+    source_column: DATE
+    note: Source invoice date; normalized by the shared source-date helper.
+  line_amount:
+    source_column: UNIT COST
+    basis: net
+  spreadsheet_key_group_id:
+    function: invoice_group_spreadsheet_key
+    group_key_source_columns: [WORKDAY ID, DATE]
+    group_key_field: WORKDAY ID + normalized DATE
+    id_start: 1
+    id_assignment_order: source_file_row_order
+    note: >
+      One Spreadsheet Key is assigned to each distinct Workday Customer ID + normalized
+      DATE pair, in first-seen source order.
+  line_order_within_group:
+    function: invoice_group_line_order
+    group_key_source_columns: [WORKDAY ID, DATE]
+    group_key_field: WORKDAY ID + normalized DATE
+    counter_start: 1
+    reset_on_new_group: true
+    counter_assignment_order: source_file_row_order_within_group
+
+tax_rules:
+  row_level_determination:
+    input_columns: [UNIT COST, Total]
+    calculated_vat: Total - UNIT COST
+    rule: |-
+      effective_net = ResolveAmount(source, UNIT COST)
+      effective_gross = ResolveAmount(source, Total)
+      effective_vat = effective_gross - effective_net
+      If effective_vat = 0 Then
+          tax_triple = ZERO_RATED_SET
+      Else
+          tax_triple = STANDARD_RATED_SET
+      End If
+  standard_rated:
+    applicability: GBR_Domestic_Sale_of_Goods_and_Services
+    code: GBR_Standard
+    recoverability: Fully_Recoverable
+  zero_rated:
+    applicability: GBR_Outside_of_Scope
+    code: GBR_Zero_Rated
+    recoverability: Fully_Recoverable
+
+mapping:
+- target: b
+  function: invoice_group_spreadsheet_key
+  note: Group by WORKDAY ID + normalized DATE; assign keys in first-seen source order.
+- target: c
+  default: "Y"
+- target: d
+  default: ""
+  optional: true
+  note: Customer Invoice Reference ID is intentionally blank.
+- target: e
+  default: "Y"
+- target: g
+  derivation: composite_reference_id
+  output_format: "ar_{WORKDAY ID with hyphens removed}_{yyyyMMdd of br}_{b}"
+  note: Written as text; WORKDAY ID in AJ remains unchanged.
+- target: h
+  default: "Y"
+- target: i
+  default: ""
+  optional: true
+- target: bo
+  default: ""
+  optional: true
+  note: Invoice Number is intentionally blank.
+- target: j
+  source_column: COMPANY
+- target: ai
+  default: GBP
+- target: aj
+  source_column: WORKDAY ID
+  note: Direct Workday Customer ID passthrough; blank values are rejected.
+- target: br
+  source_column: DATE
+  shared_helper_ref: source_date_normalization.excel_serial_and_dmy_text
+  target_format: YYYY-MM-DD
+- target: ck
+  default: Unpaid
+- target: cl
+  default: Approved
+- target: cm
+  default: ""
+  optional: true
+- target: co
+  default: Standard
+  note: Fixed Customer Invoice Type; the source INVOICE TYPE column is not used.
+- target: cp
+  default: ""
+  optional: true
+- target: cq
+  source_column: Purchase Order
+  note: Use the first source row's value for each WORKDAY ID + DATE group.
+- target: cy
+  default: ""
+  optional: true
+- target: db
+  source_column: INVOICE MEMO (DB)
+  note: Use the first source row's value for each WORKDAY ID + DATE group.
+- target: ds
+  function: invoice_group_line_order
+- target: du
+  default: ""
+  optional: true
+- target: dv
+  function: invoice_group_line_order
+- target: ej
+  default: ""
+  optional: true
+- target: em
+  source_column: Revenue Category
+- target: en
+  source_column: INVOICE LINE DESCRIPTION
+- target: fa
+  derivation: per_row_tax_applicability
+  rule: tax_rules.row_level_determination -> standard_rated.applicability or zero_rated.applicability
+- target: fb
+  derivation: per_row_tax_code
+  rule: tax_rules.row_level_determination -> standard_rated.code or zero_rated.code
+- target: fh
+  source_column: QTY
+- target: fi
+  default: ""
+  optional: true
+- target: fl
+  source_column: UNIT COST
+  target_format: "0.00"
+  note: Unit Cost is the net line amount; Workday calculates tax from the line tax code.
+- target: fo
+  default: ""
+  optional: true
+- target: fp
+  mirrors: br
+  note: Transaction Date mirrors the normalized Invoice Date.
+- target: fq
+  default: ""
+  optional: true
+- target: fr
+  default: ""
+  optional: true
+- target: fs
+  default: ""
+  optional: true
+- target: fv
+  source_column: INVOICE LINE MEMO (emails) (FV)
+- target: fx
+  source_column: Cost Centre
+- target: fy
+  source_column: Reporting Type
+- target: fz
+  default: ""
+  optional: true
+- target: ga
+  source_column: Event-OPTIONAL
+  optional: true
+- target: gb
+  default: ""
+  optional: true
+- target: gc
+  source_column: FA LEARNING COURSES-OPTIONAL
+  optional: true
+- target: gd
+  default: ""
+  optional: true
+- target: ge
+  default: ""
+  optional: true
+- target: gf
+  default: ""
+  optional: true
+
+skip_rule:
+  drop_when:
+    - WORKDAY ID is blank
+    - DATE is blank
+    - UNIT COST is blank
+  note: Customer resolution explicitly rejects blank WORKDAY ID; DATE is required for grouping and G; UNIT COST is the net line amount.
+
+open_questions: []
