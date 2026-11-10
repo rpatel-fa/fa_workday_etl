@@ -36,7 +36,7 @@ select c.*
        cte_os_wd                    ow
          ON ow.os_club_id           = c.club_id
      )
-select 'OS-' || o.club_id           new_workday_id
+select o.club_id                    new_workday_id
      , o.* 
   from cte_os     o 
  where o.workday_id                   IS NULL

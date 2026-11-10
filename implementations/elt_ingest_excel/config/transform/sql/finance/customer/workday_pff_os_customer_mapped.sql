@@ -32,7 +32,7 @@ SELECT * FROM cte_mm
   as (
 select 
        wo.workday_id                mapped_workday_id
-     , 'OS-' || c.club_id           new_workday_id
+     , c.club_id                    new_workday_id
      , c.club_id                    os_club_id
      , c.onsidecludorgid            os_onside_org_id
      , c.club_name                  os_club_name

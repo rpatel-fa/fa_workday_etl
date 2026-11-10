@@ -1,0 +1,12 @@
+[
+  {
+    "tgtWorkbookPathName": "~/Documents/__data/excel/workday/pff",
+    "tgtWorkbookFileName": "pff_os_customer_load",
+    "sheets": [
+      {
+        "sheetName": "customer_load",
+        "srcTableName": "workday_pff_os_customer_load"
+      }
+    ]
+  }
+]
