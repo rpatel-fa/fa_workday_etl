@@ -34,6 +34,23 @@ SELECT CAST(NULL AS VARCHAR)           wd_customer_id
      , 'UNMAPPED'                      load_status
   FROM workday_pff_os_customer_unmapped u
      )
+     -- PFF holds the literal word NULL (and blanks) for missing values: treat both as NULL.
+   , cte_clean
+  AS (
+SELECT r.wd_customer_id
+     , CASE WHEN UPPER(TRIM(r.pff_id)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.pff_id) END pff_id
+     , CASE WHEN UPPER(TRIM(r.club_name)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.club_name) END club_name
+     , CASE WHEN UPPER(TRIM(r.addr_line1)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.addr_line1) END addr_line1
+     , CASE WHEN UPPER(TRIM(r.addr_line2)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.addr_line2) END addr_line2
+     , CASE WHEN UPPER(TRIM(r.addr_line3)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.addr_line3) END addr_line3
+     , CASE WHEN UPPER(TRIM(r.city)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.city) END city
+     , CASE WHEN UPPER(TRIM(r.postcode2)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.postcode2) END postcode2
+     , CASE WHEN UPPER(TRIM(r.sec_first)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.sec_first) END sec_first
+     , CASE WHEN UPPER(TRIM(r.sec_last)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.sec_last) END sec_last
+     , CASE WHEN UPPER(TRIM(r.sec_email)) IN ('', 'NULL') THEN NULL ELSE TRIM(r.sec_email) END sec_email
+     , r.load_status
+  FROM cte_all r
+     )
 SELECT a.*
      , CASE WHEN NULLIF(TRIM(a.addr_line1), '') IS NULL
               OR NULLIF(TRIM(a.city), '')       IS NULL
@@ -48,6 +65,6 @@ SELECT a.*
               OR NULLIF(TRIM(a.club_name), '') IS NULL
               OR NULLIF(TRIM(a.pff_id), '')    IS NULL
             THEN 'MISSING MANDATORY' END                       flag_mandatory
-  FROM cte_all a
+  FROM cte_clean a
  ORDER BY a.load_status, a.pff_id
 ;
