@@ -26,10 +26,7 @@ default_profile_key: ap_referees_v2
 
 active_profiles:
   # AP - Supplier Invoices
-  - ap_amex_hotel
   - ap_amex_hotel_v3
-  - ap_amex_trains
-  - ap_amex_trains_v2
   - ap_amex_trains_v3
   - ap_cfa_claims
   - ap_cfa_claims_v2
@@ -37,12 +34,9 @@ active_profiles:
   - ap_cfa_distributions_amendments
   - ap_commercial_invoice
   - ap_prize_funds
-  - ap_stationery
-  - ap_stationery_addisonlee_wnsl
   - ap_stationery_v2
   - ap_referees_v2
   - ap_referees_v3
-  - ap_taxi
   - ap_taxi_v2
   - ap_gfsp
   - ap_travel_places
@@ -50,11 +44,6 @@ active_profiles:
   - ap_wnl_grants_invoice
 
   # AR - Customer Invoices
-  - ar_bulk_invoice
-  - ar_discipline_invoice
-  - ar_gbe_invoice
-  - ar_integration_invoice
-  - ar_multi_line_invoice
   - ar_manual_invoice
   - ar_standard_invoice
 
@@ -74,6 +63,15 @@ defunct_profiles:
   - ar_invoice
   - ar_invoice_run
 
+  # The source file layout for all AR invoice types is now standardised into a single `Rolling` sheet, 
+  # so the following invoice-type-specific transforms are now defunct.
+  # The new standardised source file is consumed by ar_standard_invoice. (10/11/2026)
+  - ar_bulk_invoice
+  - ar_discipline_invoice
+  - ar_gbe_invoice
+  - ar_integration_invoice
+  - ar_multi_line_invoice
+
   # AP Referees V1 (OG) — declared defunct 2026-08-24.
   # Originally consumed the Finance-built Integration tab; superseded by V2
   # after business confirmed the "analysis" tab as the canonical single source.
@@ -81,3 +79,12 @@ defunct_profiles:
   # making the two profiles byte-identical in runtime behaviour and output shape.
   # Files retained on disk for git traceability (transforms/, .bas, transform_specs/).
   - ap_referees
+
+  # New mapping logic was implemented to cover the new Workday code.
+  # Therefore the following transforms are now defunct. (10/11/2026)
+  - ap_amex_hotel
+  - ap_amex_trains
+  - ap_amex_trains_v2
+  - ap_stationery
+  - ap_stationery_addisonlee_wnsl
+  - ap_taxi
