@@ -10,7 +10,7 @@ meta:
   note: >
     Supplier, company, invoice fields, amount, tax driver, and worktags follow the
     prepared Workday_Upload source. The invoice memo is derived from SupplierID and
-    InvoiceNumber; the separate Hotel Stay Memo source field is written to EIB IL.
+    InvoiceNumber.
 
 shared_helpers:
   supplier_resolution: direct_workday_id_with_extract_check
@@ -81,10 +81,6 @@ fields:
     source_columns: [SupplierID, InvoiceNumber]
     target_eib_column: GQ
     separator: "_"
-  hotel_stay_memo:
-    source_column: Hotel Stay Memo
-    target_eib_column: IL
-    passthrough: true
   tax:
     mode: per_row
     driver_source_column: TaxCode
@@ -181,9 +177,6 @@ mapping:
     number_format: "0.00"
   - target: GQ
     function: concat_underscore_supplier_id_invoice_number
-  - target: IL
-    source_column: Hotel Stay Memo
-    passthrough: true
   - target: GR
     source_column: Reporting Type
     passthrough: true
