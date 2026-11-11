@@ -44,6 +44,7 @@ SELECT DISTINCT
        m.crm_customer_type
      , m.crm_customer_id
      , m.crm_licenceref_no
+     , m.crm_fan
      , g.wd_customer_id
      , m.wd_reference_id                                           wd_reference_id_original
      , a.wd_reference_id_combined                                  wd_reference_id

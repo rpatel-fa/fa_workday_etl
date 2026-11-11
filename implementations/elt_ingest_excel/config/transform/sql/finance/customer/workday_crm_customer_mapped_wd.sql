@@ -33,6 +33,7 @@ SELECT p.wd_customer_id
      , p.crm_customer_type
      , p.crm_customer_id
      , p.crm_licenceref_no
+     , p.crm_fan
      , p.crm_licence_overlap
      , p.crm_customer_count
      , (SELECT STRING_AGG(s.crm_customer_type || ':' || s.crm_customer_id, '|'

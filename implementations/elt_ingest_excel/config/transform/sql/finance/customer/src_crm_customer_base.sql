@@ -6,7 +6,8 @@ WITH cte_ca
   AS (
 SELECT 'ACCOUNT'                       crm_customer_type
      , ca.account_number_id            crm_customer_id
-     , ca.licenceref_no                crm_licenceref_no 
+     , ca.licenceref_no                crm_licenceref_no
+     , ca.fan_primary_contact_contact  crm_fan
   FROM crm_account                     ca 
  WHERE NULLIF(NULLIF(TRIM(ca.licenceref_no), ''), 'NULL') IS NOT NULL
      )
@@ -15,6 +16,7 @@ SELECT 'ACCOUNT'                       crm_customer_type
 SELECT 'INDIVIDUAL'                    crm_customer_type
      , cc.fan                          crm_customer_id
      , cc.licenceref_no                crm_licenceref_no
+     , cc.fan                          crm_fan
   FROM crm_contact                     cc 
  WHERE NULLIF(NULLIF(TRIM(cc.licenceref_no), ''), 'NULL') IS NOT NULL
      )
