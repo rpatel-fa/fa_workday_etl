@@ -61,6 +61,7 @@ export ALLOW_HCM_CONTINGENT_WORKER_RUN=1
 cd implementations/elt_ingest_excel
 uv sync
 
+uv run python examples/hcm_learn.py                             --run-to-phase TRANSFORM
 uv run python examples/fin_customer_invoice.py                  --run-to-phase PUBLISH
 uv run python examples/fin_customer_invoice_adjustment.py       --run-to-phase PUBLISH
 uv run python examples/fin_customer_workday_eib_result.py       --run-to-phase INGEST
