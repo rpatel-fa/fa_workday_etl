@@ -32,8 +32,7 @@ SELECT * FROM cte_mm
   as (
 select 
        wo.workday_id                mapped_workday_id
-     , c.club_id                    new_workday_id
-     , c.club_id                    os_club_id
+     , 'OS-' || c.club_id           os_club_id
      , c.onsidecludorgid            os_onside_org_id
      , c.club_name                  os_club_name
      , c.club_type                  os_club_type
@@ -51,7 +50,7 @@ select
      , c.lastname                   os_lastname
      , c.email                      os_email
      , w.customer                   wd_customer
-     , w.reference_id 				wd_reference_id
+     , w.reference_id 				      wd_reference_id
      , w.customer_id                wd_customer_id
      , w.customer_category          wd_customer_category
      , w.default_address            wd_default_address

@@ -7,7 +7,7 @@ CREATE TABLE workday_pff_os_customer_load
 WITH cte_all
   AS (
 SELECT m.wd_customer_id                wd_customer_id
-     , m.os_onside_org_id              pff_id
+     , m.os_club_id                    pff_id
      , m.os_club_name                  club_name
      , m.os_addressline1               addr_line1
      , m.os_addressline2               addr_line2
@@ -21,7 +21,7 @@ SELECT m.wd_customer_id                wd_customer_id
   FROM workday_pff_os_customer_mapped   m
  UNION ALL
 SELECT CAST(NULL AS VARCHAR)           wd_customer_id
-     , u.onsidecludorgid               pff_id
+     , u.os_club_id                    pff_id
      , u.club_name                     club_name
      , u.addressline1                  addr_line1
      , u.addressline2                  addr_line2
