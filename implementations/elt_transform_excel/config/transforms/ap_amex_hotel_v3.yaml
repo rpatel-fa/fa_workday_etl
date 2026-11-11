@@ -12,7 +12,7 @@ transform:
     from the source. TaxCode selects the tax treatment. Worktags are read directly
     from source columns; Spend Category, Reporting Type, and Cost Centre are
     mandatory, while related worktags may be blank. GQ is derived from
-    SupplierID and InvoiceNumber; IL receives the source Hotel Stay Memo.
+    SupplierID and InvoiceNumber.
 
 runtime:
   step_list_macro: RunApAmexHotelV3SupplierInvoice
@@ -38,7 +38,6 @@ source_layout:
     - Spend Category        # K  (mandatory worktag)
     - Reporting Type        # L  (mandatory worktag)
     - Cost Centre           # M  (mandatory worktag)
-    - Hotel Stay Memo       # separate hotel/traveller memo -> EIB IL
   # Optional worktag columns: the header must be present (the .bas requires the column), but
   # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
   # data check (same convention as ap_cfa_claims).
@@ -64,7 +63,6 @@ transform_constants:
     gross_amount: Gross                     # H
     line_description: Description           # I -> EP
     tax_code: TaxCode                       # J -> per_row_tax driver
-    hotel_stay_memo: Hotel Stay Memo        # -> IL
 
  # Supplier: source already carries the Workday Supplier ID. Validate against the
   # Supplier extract; reject unknown IDs.

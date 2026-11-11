@@ -4,7 +4,7 @@ Option Explicit
 ' Source of truth: config/transform_specs/ap_amex_hotel_v3.yaml
 Private Const TARGET_SHEET_NAME As String = "Submit Supplier Invoice"
 Private Const TARGET_DATA_START_ROW As Long = 6
-Private Const REQUIRED_HEADER_COUNT As Long = 14
+Private Const REQUIRED_HEADER_COUNT As Long = 13
 
 Private Const OUTPUT_SUBMIT As String = "Y"
 Private Const OUTPUT_DEFAULT_CURRENCY As String = "GBP"
@@ -48,7 +48,6 @@ Private mColNet As Long
 Private mColGross As Long
 Private mColDescription As Long
 Private mColTaxCode As Long
-Private mColHotelStayMemo As Long
 Private mWorktagHeaders(1 To 10) As String
 Private mWorktagMandatory(1 To 10) As Boolean
 Private mWorktagCols(1 To 10) As Long
@@ -326,7 +325,6 @@ Private Sub ResolveSourceColumns(ByVal sourceTable As Variant, ByVal headerRowIn
     mColGross = RequiredColumn(sourceTable, headerRowIndex, "Gross")
     mColDescription = RequiredColumn(sourceTable, headerRowIndex, "Description")
     mColTaxCode = RequiredColumn(sourceTable, headerRowIndex, "TaxCode")
-    mColHotelStayMemo = RequiredColumn(sourceTable, headerRowIndex, "Hotel Stay Memo")
 
     SetWorktag 1, "Spend Category", True
     SetWorktag 2, "Reporting Type", True
@@ -516,7 +514,6 @@ Private Sub WriteOutputRow(ByVal targetSheet As Worksheet, ByVal targetRow As Lo
     targetSheet.Cells(targetRow, ColumnIndex("GF")).NumberFormat = AMOUNT_NUMBER_FORMAT
     targetSheet.Cells(targetRow, ColumnIndex("GF")).Value = ResolveAmount(sourceTable(sourceRow, mColNet))
     targetSheet.Cells(targetRow, ColumnIndex("GQ")).Value = supplierId & MEMO_SEPARATOR & invoiceNumberValue
-    targetSheet.Cells(targetRow, ColumnIndex("IL")).Value = CellText(sourceTable(sourceRow, mColHotelStayMemo))
     targetSheet.Cells(targetRow, ColumnIndex("EW")).Value = CellText(sourceTable(sourceRow, mWorktagCols(1)))
     targetSheet.Cells(targetRow, ColumnIndex("GR")).Value = CellText(sourceTable(sourceRow, mWorktagCols(2)))
     targetSheet.Cells(targetRow, ColumnIndex("GT")).Value = CellText(sourceTable(sourceRow, mWorktagCols(3)))
