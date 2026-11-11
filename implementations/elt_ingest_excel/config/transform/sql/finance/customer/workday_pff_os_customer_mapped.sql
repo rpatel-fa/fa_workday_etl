@@ -4,7 +4,11 @@ CREATE TABLE workday_pff_os_customer_mapped
     AS
   WITH cte_gp 
   AS (
-SELECT distinct customer_number, moasorg_id, workday_id from pff_gp_discipline_customer
+SELECT distinct 
+       customer_number
+     , moasorg_id
+     , workday_id 
+  from pff_gp_discipline_customer
  WHERE NULLIF(TRIM(workday_id), '')    IS NOT NULL 
      )
    , cte_os
@@ -21,6 +25,7 @@ SELECT c.club_id                       os_club_id
 select replace(new_workday_id, 'OS-', '') os_club_id
      , workday_id
   from pff_workday_manual_mapped
+ where workday_id NOT IN (SELECT workday_id FROM cte_os)
      )
    , cte_wd_os
   AS (
