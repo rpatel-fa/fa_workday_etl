@@ -21,6 +21,11 @@ The scripts under `elt_ingest_excel/examples/` are the intended entry points. Th
   - Ingest: `config/ingest/hcm/contingent_worker.json`
   - Transform: `config/transform/sql/hcm/contingent_worker/`
   - Publish: `config/publish/hcm/publish_contingent_worker.json`
+- HCM learn (scaffold — source workbook, Workday target mappings, and publish template are placeholders): [hcm_learn.py](examples/hcm_learn.py)
+  - Ingest: `config/ingest/hcm/learn.json`
+  - Transform: `config/transform/sql/hcm/learn/`
+  - Publish: `config/publish/hcm/publish_learn.json`
+  - Validate: `config/validate/hcm/learn/` (results in `validation_learn_issues`)
 
 ## Reference export (outlier)
 

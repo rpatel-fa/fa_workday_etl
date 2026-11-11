@@ -1,0 +1,4 @@
+src_hcm_learn_base.sql
+src_hcm_learn_nrm.sql
+src_hcm_learn.sql
+workday_learn.sql

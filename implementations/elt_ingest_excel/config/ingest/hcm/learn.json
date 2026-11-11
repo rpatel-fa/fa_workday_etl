@@ -1,0 +1,14 @@
+[
+  {
+    "workbookPathName": "~/Documents/__data/excel/hcm/learn",
+    "workbookFileName": "PLACEHOLDER_hcm_learn_export.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sheet1",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "hcm_learn"
+      }
+    ]
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/threeplus/hcm",
+    "srcWorkbookFileName": "PLACEHOLDER HCM Learning Workbook (Blank).xlsm",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_hcm_learn",
+    "sheets": [
+      {
+        "srcTableName": "workday_learn",
+        "sheetName": "PLACEHOLDER",
+        "headerRow": "3",
+        "dataRow": "4"
+      }
+    ]
+  }
+]

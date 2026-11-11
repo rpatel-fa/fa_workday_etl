@@ -32,6 +32,9 @@ uv run python examples/fin_customer_debtor.py [--run-to-phase INGEST|TRANSFORM|P
 # HCM – Contingent Worker
 uv run python examples/hcm_contingent_worker.py [--run-to-phase INGEST|TRANSFORM|PUBLISH]
 
+# HCM – Learn (scaffold: ingest workbook, transform mappings and publish template are placeholders)
+uv run python examples/hcm_learn.py [--run-to-phase INGEST|TRANSFORM|PUBLISH]
+
 # Finance – Workday CCS Customer Extract
 uv run python examples/fin_workday_extract_ccs_customer.py [--run-to-phase INGEST|TRANSFORM|PUBLISH]
 

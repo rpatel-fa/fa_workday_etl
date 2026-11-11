@@ -23,6 +23,14 @@ For live supplier reconciliation continuity, continue in:
 - Status: closed
 - Archive doc: `elt_ingest_excel/docs/todo/archive/todo_ccs_customer.md`
 
+### HCM learn
+
+- Status: scaffold only — pipeline wired (ingest/transform/publish/validate + `examples/hcm_learn.py`), awaiting specifics
+- Outstanding (all currently PLACEHOLDER values):
+  - Source workbook filename + sheet layout in `config/ingest/hcm/learn.json`
+  - Workday Learning target templates + column mappings in `config/transform/sql/hcm/learn/`
+  - 3+ Learning template workbook + sheet names in `config/publish/hcm/publish_learn.json`
+
 ## Archive
 
 - Closed supplier transform workstream: `elt_ingest_excel/docs/todo/archive/todo_finance_supplier_transform_locked_2026-07-24.md`
