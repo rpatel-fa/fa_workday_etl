@@ -148,5 +148,17 @@
         "targetTableName": "crm_contact"
       }
     ]
+  },
+  {
+    "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
+    "workbookFileName": "Manual EBW Invoices.xlsx",
+    "sheets": [
+      {
+        "sheetName": "Sales CRM Post 270726",
+        "headerRow": "1",
+        "dataRow": "2",
+        "targetTableName": "crm_workday_customer_manual"
+      }
+    ]
   }
 ]
