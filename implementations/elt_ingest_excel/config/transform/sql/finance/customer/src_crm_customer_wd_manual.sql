@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS src_crm_customer_wd_manual
 ;
-CREATE TABLE src_crm_customer_manual
+CREATE TABLE src_crm_customer_wd_manual
     AS
 WITH cte_wd_mm 
   AS (
@@ -19,3 +19,4 @@ SELECT m.licence_ref_no               wd_licence_ref_no
 SELECT *
   FROM cte_wd_mm
 ;
+
