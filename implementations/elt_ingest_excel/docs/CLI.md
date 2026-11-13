@@ -65,7 +65,7 @@ uv run python examples/hcm_learn.py                             --run-to-phase T
 uv run python examples/fin_customer_invoice.py                  --run-to-phase PUBLISH
 uv run python examples/fin_customer_invoice_adjustment.py       --run-to-phase PUBLISH
 uv run python examples/fin_customer_workday_eib_result.py       --run-to-phase INGEST
-uv run python examples/fin_general_ledger.py                    --run-to-phase PUBLISH
+uv run python examples/fin_general_ledger.py                    --run-to-phase TRANSFORM
 uv run python examples/fin_workday_extract.py                   --run-to-phase TRANSFORM
 uv run python examples/fin_workday_extract_ccs_customer.py      --run-to-phase TRANSFORM
 uv run python examples/fin_customer_ccs_reconcile_sql.py        --run-to-phase TRANSFORM
