@@ -1,6 +1,307 @@
 [
   {
     "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "Put_Beginning_Balance_Journal_v46.1.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_opening_balance_journal_pnl_no_bs",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_opening_balance_pnl",
+        "sheetName": "Beginning Balance Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_00",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_00",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_00",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_01",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_01",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_01",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_02",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_02",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_02",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_03",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_03",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_03",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_04",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_04",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_04",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_05",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_05",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_05",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_06",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_06",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_06",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_07",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_07",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_07",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_08",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_08",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_08",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_09",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_09",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_09",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_10",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_10",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_10",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_11",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_11",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_11",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_balances_pnl_no_bs_12",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_header_pnl_12",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_line_pnl_12",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
     "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
     "tgtWorkbookPathName": "~/Documents",
     "tgtWorkbookFileName": "workday_fin_gl_closing_balance_pnl_no_bs",

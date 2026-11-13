@@ -67,6 +67,6 @@ The `src_fin_*_raw.sql` files use deterministic REGEXP_REPLACE normalisation onl
 
 Source amount columns are ingested as `VARCHAR` and may carry more decimal places than standard 2dp currency (for example General Ledger source data carries 5dp). Two rules apply when casting these to numeric:
 
-- Cast to `DECIMAL(p,s)`, never `DOUBLE`. `DOUBLE` is binary floating point and cannot represent most decimal fractions exactly; rounding a `DOUBLE` per-row and then summing across many rows (e.g. debit/credit totals) produces a non-zero residual even when the source balances exactly. See [workday_fin_gl_line_base.sql](config/transform/sql/finance/general_ledger/workday_fin_gl_line_base.sql) for the corrected pattern.
+- Cast to `DECIMAL(p,s)`, never `DOUBLE`. `DOUBLE` is binary floating point and cannot represent most decimal fractions exactly; rounding a `DOUBLE` per-row and then summing across many rows (e.g. debit/credit totals) produces a non-zero residual even when the source balances exactly. See [workday_fin_gl_line_base.sql](config/transform/sql/finance/general_ledger/pnl_bs_by_month/workday_fin_gl_line_base.sql) for the corrected pattern.
 - Do not round to 2dp at the row level before a debit/credit (or any sign-based) split. Carry the source's native precision through (`DECIMAL(20,5)` for GL) and only round at final presentation, if at all — early rounding repeated across many rows is what breaks balance checks, not the final display value.
 
