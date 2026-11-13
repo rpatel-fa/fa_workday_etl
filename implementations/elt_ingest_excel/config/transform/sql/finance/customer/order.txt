@@ -46,6 +46,7 @@ workday_customer_phone.sql
 workday_customer_email.sql
 workday_pff_os_customer_mapped.sql
 workday_pff_os_customer_unmapped.sql
+workday_pff_os_customer_load_base.sql
 workday_pff_os_customer_load.sql
 src_crm_customer_base.sql
 src_crm_customer_wd_manual_missing.sql

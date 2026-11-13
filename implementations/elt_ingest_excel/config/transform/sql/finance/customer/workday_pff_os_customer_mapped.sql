@@ -61,6 +61,7 @@ select
      , w.default_address            wd_default_address
      , w.default_phone_number       wd_default_phone_number
      , w.customer_contacts          wd_customer_contacts
+     , w.customer_status            wd_customer_status
   from pff_pro_club                 c
        INNER JOIN
        cte_wd_os                    wo

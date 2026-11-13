@@ -26,6 +26,7 @@ select 'OS-' || c.club_id               os_club_id
      , c.*
      , g.workday_id
      , ow.manually_mapped_workday_id
+     , w.customer_status                wd_customer_status
   from pff_pro_club                     c
        LEFT OUTER JOIN 
        cte_gp                           g
