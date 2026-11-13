@@ -321,5 +321,27 @@
         "use_column_name_index": "Y"
       }
     ]
+  },
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/finance_ref/general_ledger/eib",
+    "srcWorkbookFileName": "workday_fin_gl_closing_balance_pnl.xlsx",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_gl_closing_balance_pnl",
+    "sheets": [
+      {
+        "srcTableName": "workday_fin_gl_closing_balance_pnl_header",
+        "sheetName": "Import Accounting Journal",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      },
+      {
+        "srcTableName": "workday_fin_gl_closing_balance_pnl_line",
+        "sheetName": "Journal Entry Line Replacement",
+        "headerRow": "5",
+        "dataRow": "6",
+        "use_column_name_index": "Y"
+      }
+    ]
   }
 ]

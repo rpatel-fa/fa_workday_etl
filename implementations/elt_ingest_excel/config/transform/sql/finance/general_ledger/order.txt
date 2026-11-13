@@ -33,3 +33,5 @@ workday_fin_gl_line_11.sql
 workday_fin_gl_line_12.sql
 workday_fin_gl_closing_balance_header.sql
 workday_fin_gl_closing_balance_line.sql
+workday_fin_gl_closing_balance_pnl_header.sql
+workday_fin_gl_closing_balance_pnl_line.sql
