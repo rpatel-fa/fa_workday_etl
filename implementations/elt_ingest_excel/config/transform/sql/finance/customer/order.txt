@@ -48,6 +48,7 @@ workday_pff_os_customer_mapped.sql
 workday_pff_os_customer_unmapped.sql
 workday_pff_os_customer_load.sql
 src_crm_customer_base.sql
+src_crm_customer_wd_manual.sql
 workday_crm_customer_mapped.sql
 workday_crm_customer_mapped_clean.sql
 workday_crm_customer_mapped_wd.sql
