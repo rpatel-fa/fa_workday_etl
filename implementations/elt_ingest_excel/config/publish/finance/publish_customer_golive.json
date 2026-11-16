@@ -1,0 +1,88 @@
+[
+  {
+    "srcWorkbookPathName": "~/Documents/__data/excel/threeplus/CCS",
+    "srcWorkbookFileName": "FA E2E Customers V1.xlsm",
+    "tgtWorkbookPathName": "~/Documents",
+    "tgtWorkbookFileName": "workday_fin_debtor_customer_active_v1",
+    "sheets": [
+      {
+        "srcTableName": "workday_customer_name",
+        "sheetName": "Customer Name",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_groups",
+        "sheetName": "Customer Groups",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_credit",
+        "sheetName": "Customer Credit",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_payment",
+        "sheetName": "Customer Payment",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_currencies",
+        "sheetName": "Customer Currencies",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_company_restrictions",
+        "sheetName": "Customer Company Restrictions",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_document_delivery",
+        "sheetName": "Customer Document Delivery",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_settlement_account",
+        "sheetName": "Customer Settlement Account",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_intermediary_account",
+        "sheetName": "Customer Intermediary Account",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_tax",
+        "sheetName": "Customer Tax",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_address",
+        "sheetName": "Customer Address",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_phone",
+        "sheetName": "Customer Phone",
+        "headerRow": "3",
+        "dataRow": "4"
+      },
+      {
+        "srcTableName": "workday_customer_email",
+        "sheetName": "Customer Email",
+        "headerRow": "3",
+        "dataRow": "4"
+      }
+    ]
+  }
+]

@@ -8,16 +8,18 @@
 """Update Workday customer IDs to CRM customer IDs, then build the CRM FAN Number EIB for those customers.
 
 Inputs (never modified):
-  (a) mapping  ~/Downloads/workday_crm_customer_mapped.xlsx
+  (a) mapping  ~/Downloads/workday_crm/workday_crm_customer_mapped.xlsx
       columns found by header name: crm_customer_type, crm_customer_id, crm_fan, wd_customer_id
-  (b) master   ~/Downloads/Master Customer EBW CRM ID Update.xlsx
-  (c) FAN      ~/Downloads/FAN_Number CRM Update.xlsx
+  (b) master   ~/Downloads/workday_crm/Master Customer EBW CRM ID Update.xlsx
+  (c) FAN      ~/Downloads/workday_crm/FAN_Number CRM Update.xlsx
 
 Outputs (overwritten every run, so the process is idempotent):
-  ~/Downloads/workday_crm_id_update.xlsx                clone of (b), column H (rows 6+) wd id -> crm id
-  ~/Downloads/workday_customer_crm_org_fan_update.xlsx  clone of (c), sheet "FAN Number for Customer"
+  ~/Downloads/workday_crm/workday_crm_id_update.xlsx    clone of (b), column H (rows 6+) wd id -> crm id
+  ~/Downloads/workday_crm/workday_customer_crm_org_fan_update.xlsx
+                                                        clone of (c), sheet "FAN Number for Customer"
                                                         rows 6+: A blank | B seq | C "Create" | D crm id | E crm_fan
-  ~/Downloads/workday_crm_id_update_stats.xlsx          summary + gap sheets
+  ~/Downloads/workday_crm/workday_crm_id_update_stats.xlsx
+                                                        summary + gap sheets
 
 Part 1 - CRM ID update (all mapping rows, any crm_customer_type):
   1. replaced        - in (a), found in (b) column H
@@ -46,7 +48,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import Cell
 from openpyxl.utils import get_column_letter
 
-DOWNLOADS = Path.home() / "Downloads"
+DOWNLOADS = Path.home() / "Downloads" / "workday_crm"
 DEFAULT_MAPPING = DOWNLOADS / "workday_crm_customer_mapped.xlsx"
 DEFAULT_SOURCE = DOWNLOADS / "Master Customer EBW CRM ID Update.xlsx"
 DEFAULT_OUTPUT = DOWNLOADS / "workday_crm_id_update.xlsx"
