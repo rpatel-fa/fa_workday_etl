@@ -1,5 +1,7 @@
 [
   {
+    "srcWorkbookPathName": "~/Downloads/workday_crm",
+    "srcWorkbookFileName": "workday_crm_customer_mapped_template.xlsx",
     "tgtWorkbookPathName": "~/Downloads/workday_crm",
     "tgtWorkbookFileName": "workday_crm_customer_mapped",
     "sheets": [
