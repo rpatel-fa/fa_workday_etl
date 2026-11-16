@@ -127,7 +127,7 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
-    "workbookFileName": "Account Advanced Find View (with Licences).xlsx",
+    "workbookFileName": "Account Data Extract - With Licences - As of 16112026.xlsx",
     "sheets": [
       {
         "sheetName": "Account Advanced Find View",
@@ -139,10 +139,10 @@
   },
   {
     "workbookPathName": "~/Documents/__data/excel/finance_ref/customer/crm",
-    "workbookFileName": "Contact Advanced Find View (with Licences).xlsx",
+    "workbookFileName": "Contact Data Extract - With Licences - As of 16112026.xlsx",
     "sheets": [
       {
-        "sheetName": "contacts with Licences and AccN",
+        "sheetName": "Contact Data Extract - With Lic",
         "headerRow": "1",
         "dataRow": "2",
         "targetTableName": "crm_contact"
