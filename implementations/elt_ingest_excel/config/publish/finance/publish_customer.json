@@ -8,6 +8,10 @@
       {
         "sheetName": "Sheet1",
         "srcTableName": "workday_crm_customer_mapped_wd"
+      },
+      {
+        "sheetName": "ignored",
+        "srcTableName": "workday_crm_customer_mapped_wd_ignored"
       }
     ]
   }

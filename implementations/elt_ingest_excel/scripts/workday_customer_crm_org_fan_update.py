@@ -9,7 +9,10 @@
 
 Inputs (never modified):
   (a) mapping  ~/Downloads/workday_crm/workday_crm_customer_mapped.xlsx
-      columns found by header name: crm_customer_type, crm_customer_id, crm_fan, wd_customer_id
+      first sheet (workday_crm_customer_mapped_wd), columns found by header name:
+        crm_customer_type, crm_customer_id, crm_fan, wd_customer_id
+      sheet "ignored" (workday_crm_customer_mapped_wd_ignored): every Workday customer with no CRM id
+        and the reason, columns: wd_customer_id, reason (+ matched/kept CRM detail)
   (b) master   ~/Downloads/workday_crm/Master Customer EBW CRM ID Update.xlsx
   (c) FAN      ~/Downloads/workday_crm/FAN_Number CRM Update.xlsx
 
@@ -24,7 +27,8 @@ Outputs (overwritten every run, so the process is idempotent):
 Part 1 - CRM ID update (all mapping rows, any crm_customer_type):
   1. replaced        - in (a), found in (b) column H
   2. mapping failed  - in (a), not in (b)
-  3. not replaced    - in (b), no mapping in (a)
+  3. not replaced    - in (b), no mapping in (a), split by the reason in the "ignored" sheet
+                       (3a..3f); any not in that sheet are 3z unexplained, which should be 0
 
 Part 2 - FAN sheet: only customers REPLACED in part 1 whose crm_customer_type = ACCOUNT
 (a CRM ID that was not loaded to Workday would not exist there). Replaced ACCOUNT customers
@@ -64,6 +68,23 @@ ACCOUNT = "ACCOUNT"
 # Mapping headers (matched case-insensitively, spaces treated as underscores).
 COL_TYPE, COL_CRM, COL_FAN, COL_WD = "crm_customer_type", "crm_customer_id", "crm_fan", "wd_customer_id"
 
+# "ignored" sheet of (a): why a Workday customer has no CRM id (workday_crm_customer_mapped_wd_ignored.sql).
+DEFAULT_IGNORED_SHEET = "ignored"
+COL_REASON = "reason"
+IGNORED_DETAIL = ("matched_crm_customers", "kept_wd_customer_id", "kept_crm_customer_type", "kept_crm_customer_id")
+UNEXPLAINED = "UNEXPLAINED"
+# reason -> (stat label, stats sheet name <= 31 chars), in report order.
+REASONS: dict[str, tuple[str, str]] = {
+    "DUPLICATE": ("3a. Not replaced: duplicate, CRM ID on another WD customer", "3a Duplicate"),
+    "CRM_LOST_TO_HIGHER_RANK": ("3b. Not replaced: CRM ID lost to higher-ranked match", "3b CRM lost to higher rank"),
+    "WD_REF_IS_CRM_ID": ("3c. Not replaced: WD ref holds CRM ID, fix Workday", "3c WD ref is CRM ID"),
+    "WD_REF_IS_CRM_ID_NO_CRM_LICENCE": ("3d. Not replaced: WD ref holds CRM ID, CRM has no licence",
+                                        "3d WD ref CRM ID no licence"),
+    "WD_REF_BLANK": ("3e. Not replaced: WD reference blank", "3e WD ref blank"),
+    "NOT_IN_CRM": ("3f. Not replaced: not in CRM", "3f Not in CRM"),
+}
+UNEXPLAINED_STAT = ("3z. Not replaced: unexplained (not in ignored sheet)", "3z Unexplained")
+
 
 @dataclass(frozen=True)
 class MapRow:
@@ -77,6 +98,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--mapping", type=Path, default=DEFAULT_MAPPING, help="Mapping workbook (a).")
     p.add_argument("--mapping-sheet", default=0, help="Mapping sheet name or index (default: first sheet).")
+    p.add_argument("--ignored-sheet", default=DEFAULT_IGNORED_SHEET,
+                   help=f"Sheet of (a) giving the reason per unmapped wd_customer_id (default: {DEFAULT_IGNORED_SHEET!r}).")
     p.add_argument("--source", type=Path, default=DEFAULT_SOURCE, help="Master customer workbook (b), left untouched.")
     p.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Clone of (b) with the CRM IDs.")
     p.add_argument(
@@ -152,6 +175,36 @@ def load_mapping(path: Path, sheet: str | int) -> tuple[dict[str, MapRow], pd.Da
         for wd, kept, dropped in conflicts[:20]:
             print(f"  {wd}: kept {kept}, ignored {dropped}")
     return mapping, df
+
+
+def load_ignored(path: Path, sheet: str) -> dict[str, dict]:
+    """Return wd id -> {reason, matched/kept CRM detail} from the "ignored" sheet of the mapping."""
+    try:
+        df = pd.read_excel(path, sheet_name=sheet, dtype=object)
+    except ValueError as exc:  # sheet not found
+        raise SystemExit(f"ERROR: mapping {path.name} has no sheet {sheet!r} ({exc}). "
+                         f"Re-run the customer transform + publish to add it.") from exc
+    by_key = {header_key(c): c for c in df.columns}
+    missing = [h for h in (COL_WD, COL_REASON) if h not in by_key]
+    if missing:
+        raise SystemExit(f"ERROR: sheet {sheet!r} of {path.name} is missing header(s) {missing}. "
+                         f"Headers found: {[str(c) for c in df.columns]}")
+    ignored: dict[str, dict] = {}
+    for rec in df.to_dict("records"):
+        wd = norm(rec[by_key[COL_WD]])
+        if wd is None:
+            continue
+        ignored[wd] = {COL_REASON: norm(rec[by_key[COL_REASON]]) or UNEXPLAINED,
+                       **{h: norm(rec[by_key[h]]) if h in by_key else None for h in IGNORED_DETAIL}}
+    print(f"(a) sheet {sheet!r}: {len(ignored)} wd_customer_id(s) with a reason")
+    return ignored
+
+
+def reason_stat(reason: str) -> tuple[str, str]:
+    """(stat label, sheet name) for a reason; an unknown reason still gets its own line."""
+    if reason == UNEXPLAINED:
+        return UNEXPLAINED_STAT
+    return REASONS.get(reason, (f"3?. Not replaced: {reason}", f"3? {reason}"[:31]))
 
 
 def index_column(sheets: list, start_row: int) -> dict[str, list[Cell]]:
@@ -234,6 +287,7 @@ def main() -> int:
             return 1
 
     mapping, mapping_df = load_mapping(args.mapping, args.mapping_sheet)
+    ignored = load_ignored(args.mapping, args.ignored_sheet)
 
     # ---------- Part 1: CRM ID update in a clone of the master ----------
     shutil.copy2(args.source, args.output)
@@ -257,6 +311,23 @@ def main() -> int:
         sorted((c for cells in no_mapping.values() for c in cells), key=lambda c: (c.parent.title, c.row)),
         args.start_row - 1,
     )
+    # Why each one has no mapping, from the "ignored" sheet; absent there = unexplained (should be none).
+    no_mapping_reason = {wd: ignored.get(wd, {}).get(COL_REASON, UNEXPLAINED) for wd in no_mapping}
+    if not missing_in_mapping.empty:
+        detail = pd.DataFrame(
+            [{COL_REASON: no_mapping_reason[wd], **{h: ignored.get(wd, {}).get(h) for h in IGNORED_DETAIL}}
+             for wd in missing_in_mapping["wd_customer_id"]],
+            index=missing_in_mapping.index,
+        )
+        pos = missing_in_mapping.columns.get_loc("wd_customer_id") + 1
+        missing_in_mapping = pd.concat(
+            [missing_in_mapping.iloc[:, :pos], detail, missing_in_mapping.iloc[:, pos:]], axis=1
+        )
+    # Known reasons in report order (zeros included), then any new reason, then unexplained.
+    reasons = list(REASONS) + sorted(set(no_mapping_reason.values()) - set(REASONS) - {UNEXPLAINED}) + [UNEXPLAINED]
+    by_reason = {
+        r: [wd for wd in no_mapping if no_mapping_reason[wd] == r] for r in reasons
+    }
 
     replaced: list[tuple[str, Cell]] = []  # (wd id, first cell) in master order
     replaced_cells = 0
@@ -314,6 +385,7 @@ def main() -> int:
         ("1. Replaced (in mapping, found in master)", len(replaced), replaced_cells),
         ("2. Mapping failed (in mapping, not in master)", len(not_found), None),
         ("3. Not replaced (in master, no mapping)", len(no_mapping), no_mapping_cells),
+        *((reason_stat(r)[0], len(ids), sum(len(no_mapping[wd]) for wd in ids)) for r, ids in by_reason.items()),
         (f"4. FAN rows written (replaced + {ACCOUNT})", len(fan_rows), None),
         (f"5. FAN skipped: replaced but not {ACCOUNT}", non_account, None),
         (f"6. FAN skipped: replaced {ACCOUNT}, blank crm_fan", len(fan_blank), None),
@@ -329,6 +401,11 @@ def main() -> int:
            {"stat": f"fan: {args.fan_source.name}"}],
         {
             "Master - no CRM mapping": missing_in_mapping,
+            **{
+                reason_stat(r)[1]: (missing_in_mapping[missing_in_mapping[COL_REASON] == r].reset_index(drop=True)
+                                    if not missing_in_mapping.empty else pd.DataFrame())
+                for r, ids in by_reason.items() if ids or r != UNEXPLAINED
+            },
             "Mapping - not in master": missing_in_master,
             "FAN - blank crm_fan": pd.DataFrame(fan_blank),
             "FAN - duplicate crm id": pd.DataFrame(fan_dupes),
@@ -340,8 +417,9 @@ def main() -> int:
     print(f"=== Stats (master column {TARGET_COLUMN}, rows {args.start_row}+, "
           f"of: {', '.join(ws.title for ws in sheets)}) ===")
     for s, n, c in summary:
-        print(f"{s:<52} {n}" + (f" ({c} cell(s))" if c is not None else ""))
+        print(f"{s:<60} {n}" + (f" ({c} cell(s))" if c is not None else ""))
     print(f"Check: 1 + 3 = {len(replaced) + len(no_mapping)} (master ids {len(col_h)}); "
+          f"3a..3z = {sum(len(ids) for ids in by_reason.values())} (3 = {len(no_mapping)}); "
           f"1 + 2 = {len(replaced) + len(not_found)} (mapping ids {len(mapping)}); "
           f"4 + 5 + 6 + 7 = {len(fan_rows) + non_account + len(fan_blank) + len(fan_dupes)} (replaced {len(replaced)})")
 
@@ -350,15 +428,19 @@ def main() -> int:
         print("--- 2. In mapping, not found in master ---")
         for wd in sorted(not_found):
             print(f"  {wd} -> {mapping[wd].crm_customer_id}")
-        print("--- 3. In master, no mapping ---")
-        for wd, cells in sorted(no_mapping.items()):
+        print("--- 3. In master, no mapping (by reason) ---")
+        for wd, cells in sorted(no_mapping.items(), key=lambda t: (reasons.index(no_mapping_reason[t[0]]), t[0])):
             refs = [f"'{c.parent.title}'!{c.coordinate}" for c in cells]
-            print(f"  {wd}: " + ", ".join(refs[:5]) + (f", ... (+{len(refs) - 5})" if len(refs) > 5 else ""))
+            print(f"  {no_mapping_reason[wd]:<32} {wd}: " + ", ".join(refs[:5])
+                  + (f", ... (+{len(refs) - 5})" if len(refs) > 5 else ""))
         print(f"--- 6. Replaced {ACCOUNT}, blank crm_fan ---")
         for r in fan_blank:
             print(f"  {r['wd_customer_id']} -> {r['crm_customer_id']}")
     else:
         print("(rerun with --list to see the IDs behind the gap stats; all are in the stats file)")
+    if by_reason[UNEXPLAINED]:
+        print(f"WARNING: {len(by_reason[UNEXPLAINED])} master wd_customer_id(s) with no mapping are not in sheet "
+              f"{args.ignored_sheet!r} (3z) - re-run the customer transform + publish, or investigate.")
     return 0
 
 

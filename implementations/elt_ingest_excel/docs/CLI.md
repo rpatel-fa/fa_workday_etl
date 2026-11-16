@@ -80,6 +80,10 @@ uv run python examples/fin_supplier_creditor.py                 --run-to-phase I
 uv run python examples/fin_customer_debtor.py                   --run-to-phase TRANSFORM
 uv run python examples/hcm_contingent_worker.py                 --run-to-phase PUBLISH
 
+# Workday CRM Mapping EIBs
+uv run scripts/workday_customer_crm_org_fan_update.py
+uv run scripts/workday_customer_crm_org_fan_update.py --list
+
 
 # Validation only (no ingest/transform/publish) — re-run against an already-populated database
 uv run python examples/fin_customer_debtor_validate_sql.py

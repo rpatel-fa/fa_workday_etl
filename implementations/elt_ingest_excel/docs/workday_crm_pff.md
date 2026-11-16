@@ -77,7 +77,7 @@ The CRM update also uses two Workday load templates: `Master Customer EBW CRM ID
 | PFF club load sheet | One row per club: **MAPPED** (update the existing Workday customer) or **UNMAPPED** (create it). Flags missing address, email or mandatory fields. |
 | `workday_crm_id_update.xlsx` | Workday load file that changes each matched customer's ID to its CRM ID. |
 | `workday_customer_crm_org_fan_update.xlsx` | Workday load file that records the primary contact FAN on organisations whose ID was updated. Loaded **after** the ID update. |
-| `workday_crm_id_update_stats.xlsx` | Counts and named lists of every customer *not* updated, and why. |
+| `workday_crm_id_update_stats.xlsx` | Counts and named lists of every customer *not* updated, and why. Every Workday customer that isn't updated gets exactly one reason: a duplicate of a customer that was updated; its CRM ID went to a higher-ranked match; its Workday reference holds a CRM ID instead of a licence number (with or without a licence number in CRM); its reference is blank; or it isn't in CRM. Any customer without a reason is listed as unexplained, and that count should be zero. |
 | Unmapped CRM lists | CRM organisations and individuals with a licence number but no matching Workday customer. |
 
 ## Why the results can be trusted
@@ -138,6 +138,9 @@ it exactly. Behaviour that differs from this is an interface issue, not a data i
 | 3 | GP migration duplicates (CRM) | Handled | The GP migration also created duplicate customers for CRM. The CRM mapping collapses them to one Workday customer per CRM ID. |
 | 4 | Changes after the extract dates | Manage at cutover | Anything created or changed after the extracts isn't covered. Refresh the extracts and re-run before go-live. |
 | 5 | CRM records without a licence number | Out of scope | They can't be matched to Workday. If one already exists in Workday, the interface will create a duplicate. |
+| 6 | Workday reference holds a CRM ID, not a licence number | Data fix | Some Workday customers have a FAN or Account ID in their reference instead of the CRM licence number, so they don't match. If the CRM record has a licence number, Workday needs correcting. If it doesn't, CRM needs one too. Both groups are named in the stats file. |
+| 7 | CRM ID lost to a higher-ranked match | Finance review | A few Workday duplicates matched a CRM individual whose chosen Workday customer then took a CRM organisation instead. Neither the duplicate nor the individual's CRM ID is updated. They are named in the stats file. |
+| 8 | Workday customers not in CRM | Risk | They're not updated, because there's no CRM ID to give them (stats 3e blank reference, 3f not in CRM). If one is later created in CRM, the interface won't find it under its new Account ID / FAN and will create a duplicate Workday customer. Fix: create them in CRM first, then add them to the ID update (as for gap 2), or have CRM users check Workday before creating. |
 
 ---
 
@@ -149,7 +152,8 @@ it exactly. Behaviour that differs from this is an interface issue, not a data i
 |---|---|
 | Ingest of the source files | [config/ingest/finance/active_customer_debtor.json](../config/ingest/finance/active_customer_debtor.json) |
 | PFF transforms | `config/transform/sql/finance/customer/workday_pff_os_customer_{mapped,unmapped,load}.sql` |
-| CRM transforms | `config/transform/sql/finance/customer/src_crm_customer_base.sql`, `workday_crm_customer_{mapped,mapped_clean,mapped_wd,unmapped_account,unmapped_contact}.sql` |
+| CRM transforms | `config/transform/sql/finance/customer/src_crm_customer_base.sql`, `workday_crm_customer_{mapped,mapped_clean,mapped_wd,mapped_wd_ignored,unmapped_account,unmapped_contact}.sql` |
+| CRM mapping workbook for the script | [config/publish/finance/publish_customer.json](../config/publish/finance/publish_customer.json) publishes `workday_crm_customer_mapped.xlsx`: `Sheet1` comes from `mapped_wd` and `ignored` from `mapped_wd_ignored` (every Workday customer without a CRM ID, plus the reason). The template `~/Downloads/workday_crm/workday_crm_customer_mapped_template.xlsx` must have both sheets, with a header row in row 1. |
 | CRM load files + stats | [scripts/workday_customer_crm_org_fan_update.py](../scripts/workday_customer_crm_org_fan_update.py) |
 
 The detailed rules (tie-breaks, exclusions, flags, stats balances) are in those files.
