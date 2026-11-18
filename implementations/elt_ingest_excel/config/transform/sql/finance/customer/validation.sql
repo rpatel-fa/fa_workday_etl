@@ -157,6 +157,14 @@ SELECT 'data_quality', 'invalid_email_addresses', COUNT(*)
  WHERE email_to_address IS NOT NULL
    AND email_to_address !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
 ;
+-- PFF club mapped to a non-Active Workday customer (expected 0; fix via a
+-- pff_workday_manual_mapped remap row with current_workday_id = the inactive id)
+INSERT INTO validation_customer_result
+SELECT 'data_quality', 'pff_os_mapped_wd_customer_not_active', COUNT(*)
+  FROM workday_pff_os_customer_load_base
+ WHERE load_status = 'MAPPED'
+   AND COALESCE(wd_customer_status, '') != 'Active'
+;
 
 -- ============================================================================
 -- INGESTION RECONCILIATION SUMMARY

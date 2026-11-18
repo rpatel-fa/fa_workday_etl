@@ -20,18 +20,30 @@ SELECT c.club_id                       os_club_id
        cte_gp                          gp
           ON gp.moasorg_id             = c.onsidecludorgid
      )
+     -- pff_workday_manual_mapped serves two purposes:
+     --   1. maps a PFF club to a Workday customer where GP has no mapping
+     --      (current_workday_id blank)
+     --   2. remaps a club whose GP mapping points at an inactive Workday customer
+     --      (current_workday_id = that inactive id) to the workday_id to use instead
+     -- Either way the manual row is authoritative for the club, so it replaces any
+     -- GP-derived mapping for that club.
    , cte_mm
   AS (
 select replace(new_workday_id, 'OS-', '') os_club_id
      , workday_id
   from pff_workday_manual_mapped
- where workday_id NOT IN (SELECT workday_id FROM cte_os)
+ where NULLIF(TRIM(workday_id), '')    IS NOT NULL
      )
    , cte_wd_os
   AS (
-SELECT * FROM cte_os
+SELECT o.*
+  FROM cte_os                          o
+ WHERE o.os_club_id NOT IN (SELECT os_club_id FROM cte_mm)
 UNION
-SELECT * FROM cte_mm
+SELECT m.*
+  FROM cte_mm                          m
+       -- guard: never hand a club a Workday id that GP already gives to another club
+ WHERE m.workday_id NOT IN (SELECT workday_id FROM cte_os WHERE os_club_id != m.os_club_id)
      )
    , cte_oswd
   as (

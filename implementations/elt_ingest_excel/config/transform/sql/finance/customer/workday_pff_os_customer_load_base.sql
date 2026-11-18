@@ -68,6 +68,11 @@ SELECT a.*
               OR NULLIF(TRIM(a.club_name), '') IS NULL
               OR NULLIF(TRIM(a.pff_id), '')    IS NULL
             THEN 'MISSING MANDATORY' END                       flag_mandatory
+       -- A mapped club must point at an Active Workday customer; an inactive one needs
+       -- a remap row in pff_workday_manual_mapped (current_workday_id = the inactive id).
+     , CASE WHEN a.load_status = 'MAPPED'
+             AND COALESCE(a.wd_customer_status, '') != 'Active'
+            THEN 'WORKDAY CUSTOMER NOT ACTIVE' END             flag_wd_status
   FROM cte_clean a
  ORDER BY a.load_status, a.pff_id
 ;
