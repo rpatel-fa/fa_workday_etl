@@ -71,7 +71,8 @@ COL_TYPE, COL_CRM, COL_FAN, COL_WD = "crm_customer_type", "crm_customer_id", "cr
 # "ignored" sheet of (a): why a Workday customer has no CRM id (workday_crm_customer_mapped_wd_ignored.sql).
 DEFAULT_IGNORED_SHEET = "ignored"
 COL_REASON = "reason"
-IGNORED_DETAIL = ("matched_crm_customer_type", "matched_crm_customer_id","kept_wd_customer_id", "kept_crm_customer_type", "kept_crm_customer_id")
+IGNORED_DETAIL = ("matched_crm_customer_type", "matched_crm_customer_id", "matched_crm_licenceref_no",
+                  "kept_wd_customer_id", "kept_crm_customer_type", "kept_crm_customer_id")
 UNEXPLAINED = "UNEXPLAINED"
 # reason -> (stat label, stats sheet name <= 31 chars), in report order.
 REASONS: dict[str, tuple[str, str]] = {

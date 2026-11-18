@@ -18,7 +18,9 @@ CREATE TABLE workday_crm_customer_mapped_wd_ignored
 --   NOT_IN_CRM                      - reference_id matches no CRM licence number, FAN or Account ID
 -- matched_crm_customer_type / _id are the CRM records matched by licence number, or for the
 -- WD_REF_IS_CRM_ID* reasons, the CRM records the reference_id points at (FAN / Account ID).
--- Several matches are '|'-separated, in the same order in both columns.
+-- matched_crm_licenceref_no (WD_REF_IS_CRM_ID* only) is each matched CRM record's licence number,
+-- i.e. the value Workday's reference_id should hold; blank where the record has none (the 3d fix).
+-- Several matches are '|'-separated, in the same order in every matched_ column.
 WITH cte_ignored
   AS (
 SELECT w.customer_id                                               wd_customer_id
@@ -72,12 +74,12 @@ SELECT k.wd_customer_id
   AS (
 SELECT 'ACCOUNT'                                                   crm_customer_type
      , UPPER(TRIM(CAST(ca.account_number_id AS VARCHAR)))          crm_customer_id
-     , NULLIF(NULLIF(TRIM(ca.licencerefno), ''), 'NULL') IS NOT NULL crm_has_licence
+     , NULLIF(NULLIF(TRIM(ca.licencerefno), ''), 'NULL')           crm_licenceref_no
   FROM crm_account                          ca
 UNION ALL
 SELECT 'INDIVIDUAL'
      , UPPER(TRIM(CAST(cc.fan AS VARCHAR)))
-     , NULLIF(NULLIF(TRIM(cc.licencesref), ''), 'NULL') IS NOT NULL
+     , NULLIF(NULLIF(TRIM(cc.licencesref), ''), 'NULL')
   FROM crm_contact                          cc
      )
      , cte_ref
@@ -93,7 +95,7 @@ SELECT DISTINCT
        r.wd_customer_id
      , x.crm_customer_type
      , x.crm_customer_id
-     , x.crm_has_licence
+     , x.crm_licenceref_no
   FROM cte_ref                              r
        INNER JOIN
        cte_crm_id                           x
@@ -105,7 +107,9 @@ SELECT DISTINCT
 SELECT x.wd_customer_id
      , STRING_AGG(x.crm_customer_type, '|' ORDER BY x.crm_customer_type, x.crm_customer_id) matched_crm_customer_type
      , STRING_AGG(x.crm_customer_id,   '|' ORDER BY x.crm_customer_type, x.crm_customer_id) matched_crm_customer_id
-     , CASE WHEN BOOL_OR(x.crm_has_licence) THEN 'WD_REF_IS_CRM_ID'
+     , STRING_AGG(COALESCE(x.crm_licenceref_no, ''), '|'
+                  ORDER BY x.crm_customer_type, x.crm_customer_id) matched_crm_licenceref_no
+     , CASE WHEN BOOL_OR(x.crm_licenceref_no IS NOT NULL) THEN 'WD_REF_IS_CRM_ID'
             ELSE 'WD_REF_IS_CRM_ID_NO_CRM_LICENCE'
        END                                                         reason
   FROM cte_ref_match                        x
@@ -115,6 +119,7 @@ SELECT i.wd_customer_id
      , i.wd_reference_id
      , COALESCE(l.matched_crm_customer_type, r.matched_crm_customer_type) matched_crm_customer_type
      , COALESCE(l.matched_crm_customer_id,   r.matched_crm_customer_id)   matched_crm_customer_id
+     , r.matched_crm_licenceref_no
      , l.kept_wd_customer_id
      , l.kept_crm_customer_type
      , l.kept_crm_customer_id

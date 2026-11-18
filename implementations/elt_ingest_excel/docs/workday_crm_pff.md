@@ -138,7 +138,7 @@ it exactly. Behaviour that differs from this is an interface issue, not a data i
 | 3 | GP migration duplicates (CRM) | Handled | The GP migration also created duplicate customers for CRM. The CRM mapping collapses them to one Workday customer per CRM ID. |
 | 4 | Changes after the extract dates | Manage at cutover | Anything created or changed after the extracts isn't covered. Refresh the extracts and re-run before go-live. |
 | 5 | CRM records without a licence number | Out of scope | They can't be matched to Workday. If one already exists in Workday, the interface will create a duplicate. |
-| 6 | Workday reference holds a CRM ID, not a licence number | Data fix | Some Workday customers have a FAN or Account ID in their reference instead of the CRM licence number, so they don't match. If the CRM record has a licence number, Workday needs correcting. If it doesn't, CRM needs one too. Both groups are named in the stats file. |
+| 6 | Workday reference holds a CRM ID, not a licence number | Data fix | Some Workday customers have a FAN or Account ID in their reference instead of the CRM licence number, so they don't match. If the CRM record has a licence number, Workday needs correcting — the stats file shows the licence number to set, so no CRM lookup is needed. If it doesn't, CRM needs one too. Both groups are named in the stats file. |
 | 7 | CRM ID lost to a higher-ranked match | Finance review | A few Workday duplicates matched a CRM individual whose chosen Workday customer then took a CRM organisation instead. Neither the duplicate nor the individual's CRM ID is updated. They are named in the stats file. |
 | 8 | Workday customers not in CRM | Risk | They're not updated, because there's no CRM ID to give them (stats 3e blank reference, 3f not in CRM). If one is later created in CRM, the interface won't find it under its new Account ID / FAN and will create a duplicate Workday customer. Fix: create them in CRM first, then add them to the ID update (as for gap 2), or have CRM users check Workday before creating. |
 
@@ -153,7 +153,7 @@ it exactly. Behaviour that differs from this is an interface issue, not a data i
 | Ingest of the source files | [config/ingest/finance/active_customer_debtor.json](../config/ingest/finance/active_customer_debtor.json) |
 | PFF transforms | `config/transform/sql/finance/customer/workday_pff_os_customer_{mapped,unmapped,load}.sql` |
 | CRM transforms | `config/transform/sql/finance/customer/src_crm_customer_base.sql`, `workday_crm_customer_{mapped,mapped_clean,mapped_wd,mapped_wd_ignored,unmapped_account,unmapped_contact}.sql` |
-| CRM mapping workbook for the script | [config/publish/finance/publish_customer.json](../config/publish/finance/publish_customer.json) publishes `workday_crm_customer_mapped.xlsx`: `Sheet1` comes from `mapped_wd` and `ignored` from `mapped_wd_ignored` (every Workday customer without a CRM ID, plus the reason). The template `~/Downloads/workday_crm/workday_crm_customer_mapped_template.xlsx` must have both sheets, with a header row in row 1. |
+| CRM mapping workbook for the script | [config/publish/finance/publish_customer.json](../config/publish/finance/publish_customer.json) publishes `workday_crm_customer_mapped.xlsx`: `Sheet1` comes from `mapped_wd` and `ignored` from `mapped_wd_ignored` (every Workday customer without a CRM ID, plus the reason). The template `~/Downloads/workday_crm/workday_crm_customer_mapped_template.xlsx` must have both sheets, with a header row in row 1 listing the table's columns **in table order** — the publisher writes data positionally under the template's headers, so adding or reordering a column in the SQL means updating the template header too, or every column to its right shifts. |
 | CRM load files + stats | [scripts/workday_customer_crm_org_fan_update.py](../scripts/workday_customer_crm_org_fan_update.py) |
 
 The detailed rules (tie-breaks, exclusions, flags, stats balances) are in those files.
@@ -180,4 +180,5 @@ Slide outline (keep the order; change only the slides whose source changed):
 11. Interface behaviour: the *How the interfaces behave* table
 12. If something goes wrong: the trace table
 13. Known gaps and risks
-14. Next steps
+14. Actions · Workday and CRM teams: one row per stats-file sheet needing action — team, sheet name, row count, what to change (from *Known gaps* and the stats file)
+15. Next steps
