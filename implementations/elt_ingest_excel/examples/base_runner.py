@@ -12,13 +12,20 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import duckdb
+
 from elt_ingest_excel import FileIngestor, SaveMode, PipelinePhase
+
+
+def parse_bool(value: str | bool) -> bool:
+    return str(value).strip().lower() in {"true", "t", "1", "yes", "y"}
 
 
 def create_parser(
     description: str,
     *,
     default_run_to_phase: str = "PUBLISH",
+    with_clear_down: bool = False,
 ) -> argparse.ArgumentParser:
     """Create an argument parser with common pipeline options."""
     parser = argparse.ArgumentParser(description=description)
@@ -41,7 +48,35 @@ def create_parser(
         default=None,
         help="DuckDB database path override (highest precedence)",
     )
+    if with_clear_down:
+        parser.add_argument(
+            "--no-clear-down",
+            nargs="?",
+            const="TRUE",
+            default="FALSE",
+            help="TRUE keeps the existing DuckDB tables; by default every table and view is dropped before the run",
+        )
     return parser
+
+
+def clear_down_database(database_path: str) -> None:
+    """Drop every table and view in the DuckDB file so the run starts clean."""
+    path = Path(database_path).expanduser()
+    if not path.exists():
+        return
+
+    with duckdb.connect(str(path)) as conn:
+        rows = conn.execute(
+            "SELECT table_schema, table_name, table_type FROM information_schema.tables "
+            "WHERE table_catalog = current_database() "
+            "AND table_type IN ('BASE TABLE', 'VIEW')"
+        ).fetchall()
+        # Views first so no view is left pointing at a dropped table.
+        for schema, name, table_type in sorted(rows, key=lambda r: r[2] != "VIEW"):
+            kind = "VIEW" if table_type == "VIEW" else "TABLE"
+            target = '"{}"."{}"'.format(schema.replace('"', '""'), name.replace('"', '""'))
+            conn.execute(f"DROP {kind} IF EXISTS {target}")
+    print(f"Clear down: dropped {len(rows)} tables/views from {path}")
 
 
 def _load_runtime_database_path(runtime_config_file: Path) -> str | None:
@@ -83,6 +118,7 @@ def run_pipeline(
     config_base_path: Optional[Path] = None,
     cfg_runtime_path: str = "runtime",
     cfg_runtime_name: str = "default.json",
+    clear_down: bool = False,
 ):
     """
     Run the ELTP pipeline with the given configuration.
@@ -110,6 +146,7 @@ def run_pipeline(
             - PipelinePhase.TRANSFORM: Ingest + SQL transformations
             - PipelinePhase.PUBLISH: Full pipeline
         config_base_path: Base path for config files (defaults to ../config relative to caller)
+        clear_down: Drop every table and view in the DuckDB file before the run starts
 
     Returns:
         Tuple of (load_results, transform_results, publish_results)
@@ -127,6 +164,9 @@ def run_pipeline(
             "No DuckDB database path provided. "
             f"Pass --database-path or configure it in {runtime_config_file}"
         )
+
+    if clear_down:
+        clear_down_database(resolved_database_path)
 
     ingestor = FileIngestor(
         config_base_path=config_base_path,

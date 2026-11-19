@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 
-from base_runner import run_pipeline, create_parser
+from base_runner import run_pipeline, create_parser, parse_bool
 from elt_ingest_excel import PipelinePhase
 from elt_ingest_excel.transform.sql_validation_dir import run_validation_sql_dir
 
@@ -15,7 +15,14 @@ if __name__ == "__main__":
             "Set ALLOW_FIN_CUSTOMER_DEBTOR_RUN=1 to explicitly allow execution."
         )
 
-    parser = create_parser("Run Finance Customer/Debtor pipeline")
+    parser = create_parser("Run Finance Customer/Debtor pipeline", with_clear_down=True)
+    parser.add_argument(
+        "--validate",
+        nargs="?",
+        const="TRUE",
+        default="FALSE",
+        help="TRUE runs the customer validation SQL after the pipeline (default: off)",
+    )
     args = parser.parse_args()
 
     run_to_phase = PipelinePhase[args.run_to_phase]
@@ -29,9 +36,10 @@ if __name__ == "__main__":
         cfg_runtime_name=args.runtime_config,
         database_path=args.database_path,
         run_to_phase=run_to_phase,
+        clear_down=not parse_bool(args.no_clear_down),
     )
 
-    if run_to_phase != PipelinePhase.INGEST:
+    if parse_bool(args.validate) and run_to_phase != PipelinePhase.INGEST:
         validation_sql_dir = (
             Path(__file__).parent.parent / "config" / "validate" / "finance" / "customer"
         ).resolve()

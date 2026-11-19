@@ -3,8 +3,9 @@ DROP TABLE IF EXISTS workday_crm_customer_mapped_wd
 CREATE TABLE workday_crm_customer_mapped_wd
     AS
 -- One row per Workday customer. Where several CRM records map to the same Workday customer,
--- the primary is chosen by: 1) ACCOUNT before INDIVIDUAL, 2) most licence numbers shared with the
--- Workday reference id, 3) lowest crm_customer_id (shorter id first so numeric ids order numerically).
+-- the primary is chosen by: 1) Active CRM record before Inactive, 2) ACCOUNT before INDIVIDUAL,
+-- 3) latest CRM created_on, 4) latest CRM modified_on. crm_customer_id is only a fallback so a full
+-- tie still gives the same result every run.
 -- The other CRM records stay listed in crm_secondary_customers.
 WITH cte_rnk
   AS (
@@ -20,9 +21,10 @@ SELECT c.*
 SELECT r.*
      , ROW_NUMBER() OVER (
          PARTITION BY r.wd_customer_id
-             ORDER BY (r.crm_customer_type = 'ACCOUNT') DESC
-                    , r.crm_licence_overlap DESC
-                    , LENGTH(r.crm_customer_id)
+             ORDER BY r.crm_is_active DESC
+                    , (r.crm_customer_type = 'ACCOUNT') DESC
+                    , r.crm_created_on DESC NULLS LAST
+                    , r.crm_modified_on DESC NULLS LAST
                     , r.crm_customer_id
        )                                                           crm_rank
      , COUNT(*) OVER (PARTITION BY r.wd_customer_id)               crm_customer_count

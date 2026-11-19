@@ -63,8 +63,8 @@ the data.
 | PFF (GP) | `Discipline Customers.xlsx` | Links each GP customer to its OnSide org ID and Workday customer ID |
 | PFF | `Pro club details Extract[76].xlsx` | Every PFF club: Club ID, OnSide org ID, name, address, secretary |
 | Finance | `pff_workday_manually_mapped_customer.xlsx` | Finance's own PFF Club → Workday customer links, where GP gives none |
-| CRM | `Account Advanced Find View (with Licences).xlsx` | CRM organisations: Account ID, licence numbers, primary contact FAN |
-| CRM | `Contact Advanced Find View (with Licences).xlsx` | CRM individuals: FAN, licence numbers |
+| CRM | `Account Data Extract - Licences, Dates - As of 18112026.xlsx` | CRM organisations: Account ID, licence numbers, primary contact FAN, status, created and modified dates |
+| CRM | `Contact Data Extract - Licences, Dates - As of 18112026.xlsx` | CRM individuals: FAN, licence numbers, status, created and modified dates |
 | Finance | `Manual EBW Invoices.xlsx` | CRM customers that finance created by hand in Workday |
 
 The CRM update also uses two Workday load templates: `Master Customer EBW CRM ID Update.xlsx` and
@@ -97,7 +97,12 @@ back to the source row it came from.
    ID set to its Account ID or FAN. CRM customers not in Workday are not in scope; the CRM
    interface creates them.
 3. **No double-ups:** each Workday customer receives one CRM ID, and each CRM ID goes to one Workday
-   customer. Where the GP migration left duplicates, a fixed rule picks the one to keep.
+   customer. Where the GP migration left duplicates, a fixed rule picks the one to keep: a CRM record
+   matching several Workday customers goes to the earliest one (lowest Workday customer ID, a
+   sequence); where several CRM records match one Workday customer, an organisation beats an
+   individual, then the latest CRM created date, then the latest modified date.
+   Active CRM records are preferred over Inactive ones, but Inactive records are still matched so no
+   customer is dropped.
 4. **Nothing silently dropped:** any customer that can't be matched or updated is named in an
    output, with the reason.
 5. **Repeatable:** running it again on the same files gives the same result.
@@ -139,8 +144,10 @@ it exactly. Behaviour that differs from this is an interface issue, not a data i
 | 4 | Changes after the extract dates | Manage at cutover | Anything created or changed after the extracts isn't covered. Refresh the extracts and re-run before go-live. |
 | 5 | CRM records without a licence number | Out of scope | They can't be matched to Workday. If one already exists in Workday, the interface will create a duplicate. |
 | 6 | Workday reference holds a CRM ID, not a licence number | Data fix | Some Workday customers have a FAN or Account ID in their reference instead of the CRM licence number, so they don't match. If the CRM record has a licence number, Workday needs correcting — the stats file shows the licence number to set, so no CRM lookup is needed. If it doesn't, CRM needs one too. Both groups are named in the stats file. |
-| 7 | CRM ID lost to a higher-ranked match | Finance review | A few Workday duplicates matched a CRM individual whose chosen Workday customer then took a CRM organisation instead. Neither the duplicate nor the individual's CRM ID is updated. They are named in the stats file. |
+| 7 | CRM ID lost to a higher-ranked match | Informational | A few Workday duplicates matched a CRM individual whose chosen Workday customer then took a CRM organisation instead. Neither the duplicate nor the individual's CRM ID is updated. They are named in the stats file. |
 | 8 | Workday customers not in CRM | Risk | They're not updated, because there's no CRM ID to give them (stats 3e blank reference, 3f not in CRM). If one is later created in CRM, the interface won't find it under its new Account ID / FAN and will create a duplicate Workday customer. Fix: create them in CRM first, then add them to the ID update (as for gap 2), or have CRM users check Workday before creating. |
+| 9 | Mapped customers missing from the ID-update master | Finance review | A Workday customer can be matched to CRM yet absent from the `Master Customer EBW CRM ID Update.xlsx` load template (stats 2, sheet `Mapping - not in master`; 5 in the 18 Nov 2026 run, all organisations). It gets no ID update and no FAN row, so CRM would create a duplicate. Check whether the template is missing them or holds them under another ID. |
+| 10 | Inactive Workday customers receive a CRM ID | By design | Matching is on licence number whatever the customer's Workday status, so an Inactive Workday customer that matches CRM gets a CRM ID too. Finance created these customers in Workday, and the work doesn't second-guess that. |
 
 ---
 

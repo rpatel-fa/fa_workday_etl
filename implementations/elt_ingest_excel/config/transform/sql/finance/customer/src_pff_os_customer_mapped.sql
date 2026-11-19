@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS workday_pff_os_customer_mapped
+DROP TABLE IF EXISTS src_pff_os_customer_mapped
 ;
-CREATE TABLE workday_pff_os_customer_mapped
+CREATE TABLE src_pff_os_customer_mapped
     AS
   WITH cte_gp 
   AS (

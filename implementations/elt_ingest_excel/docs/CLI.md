@@ -21,6 +21,8 @@ Optional flags accepted by all pipeline runners:
 
 - `--database-path /path/to/db.duckdb` — override the DuckDB path from `config/runtime/default.json`
 - `--runtime-config filename.json` — use an alternate runtime config under `config/runtime/`
+- `--no-clear-down TRUE` — `fin_customer_debtor.py` only: by default it drops every table and view in the DuckDB file before the run; this keeps them
+- `--validate TRUE` — `fin_customer_debtor.py` only: run the customer validation SQL after the pipeline (off by default)
 
 ```bash
 # Finance – Supplier/Creditor

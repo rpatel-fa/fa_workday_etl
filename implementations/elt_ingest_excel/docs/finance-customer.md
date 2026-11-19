@@ -275,10 +275,10 @@ Output filename prefix: `workday_fin_debtor_customer_active_v1`
 
 ### Running validation
 
-Validation runs automatically as part of the main pipeline for any phase beyond INGEST:
+Validation does not run with the main pipeline by default. Add `--validate TRUE` to run it after any phase beyond INGEST:
 
 ```bash
-uv run python examples/fin_customer_debtor.py
+uv run python examples/fin_customer_debtor.py --validate TRUE
 ```
 
 To run validation standalone against an existing database without re-running the pipeline:

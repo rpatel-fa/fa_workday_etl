@@ -19,7 +19,7 @@ SELECT m.wd_customer_id                wd_customer_id
      , m.os_email                      sec_email
      , 'MAPPED'                        load_status
      , m.wd_customer_status            wd_customer_status
-  FROM workday_pff_os_customer_mapped   m
+  FROM src_pff_os_customer_mapped   m
  UNION ALL
 SELECT CAST(NULL AS VARCHAR)           wd_customer_id
      , u.os_club_id                    pff_id
@@ -34,7 +34,7 @@ SELECT CAST(NULL AS VARCHAR)           wd_customer_id
      , u.email                         sec_email
      , 'UNMAPPED'                      load_status
      , u.wd_customer_status            wd_customer_status
-  FROM workday_pff_os_customer_unmapped u
+  FROM src_pff_os_customer_unmapped u
      )
      -- PFF holds the literal word NULL (and blanks) for missing values: treat both as NULL.
    , cte_clean
