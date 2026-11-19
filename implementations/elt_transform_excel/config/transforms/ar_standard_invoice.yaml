@@ -28,14 +28,13 @@ source_layout:
     - COMPANY                       #B 
     - WORKDAY ID                    #D   
     - INVOICE LINE DESCRIPTION      #F
-    - QTY                           #J
-    - UNIT COST                     #K
-    - VAT                           #L
-    - Total                         #M
-    - TAX CODE                      #O
-    - Reporting Type                #P
-    - Cost Centre                   #Q
-    - Revenue Category              #R
+    - QTY                           #I
+    - UNIT COST                     #J
+    - VAT                           #K
+    - Total                         #L
+    - Reporting Type                #M
+    - Cost Centre                   #N
+    - Revenue Category              #O
     
   # Optional worktag columns: the header must be present (the .bas requires the column), but
   # cells are legitimately blank on many/most rows, so they are NOT subject to the non-blank
@@ -44,11 +43,9 @@ source_layout:
     - INVOICE TYPE                      #C 
     - CUSTOMER NAME                     #E
     - INVOICE MEMO (DB)                 #G
-    - INVOICE LINE MEMO (emails) (FV)   #H
-    - Purchase Order                    #I
-    - Email                             #N
-    - Event-OPTIONAL                    #S  
-    - FA LEARNING COURSES-OPTIONAL      #T
+    - Purchase Order                    #H
+    - Event-OPTIONAL                    #P
+    - FA LEARNING COURSES-OPTIONAL      #Q
 
 transform_constants:
   fixed_currency: GBP
@@ -82,15 +79,14 @@ transform_constants:
     WORKDAY ID:  Customer                                     # D -> AJ
     INVOICE LINE DESCRIPTION:  Line Item Description          # F -> EN
     INVOICE MEMO (DB): Header Memo                            # G -> DB  
-    INVOICE LINE MEMO (emails) (FV):  Line Memo               # H -> FV
-    Purchase Order:  Customer PO Number                       # I -> CQ         
-    QTY:  Quantity                                            # J -> FH
-    UNIT COST:  Unit Cost                                     # K -> FL
-    Cost Centre:  Cost Centre                                 # Q -> FX
-    Reporting Type:  Reporting Type                           # P -> FY
-    Revenue Category:  Revenue Category                       # R -> EM 
-    Event-OPTIONAL:  Event - Custom Org                       # S -> GA
-    FA LEARNING COURSES-OPTIONAL:  FA Learning - Custom Org   # T -> GC 
+    Purchase Order:  Customer PO Number                       # H -> CQ
+    QTY:  Quantity                                            # I -> FH
+    UNIT COST:  Unit Cost                                     # J -> FL
+    Cost Centre:  Cost Centre                                 # N -> FX
+    Reporting Type:  Reporting Type                           # M -> FY
+    Revenue Category:  Revenue Category                       # O -> EM
+    Event-OPTIONAL:  Event - Custom Org                       # P -> GA
+    FA LEARNING COURSES-OPTIONAL:  FA Learning - Custom Org   # Q -> GC
 
   customer_resolution:
     mode: direct_passthrough

@@ -84,7 +84,6 @@ Private Enum SourceColumnSlot
     SRC_REVENUE_CATEGORY
     SRC_CUSTOMER_PO
     SRC_HEADER_MEMO
-    SRC_LINE_MEMO
     SRC_EVENT
     SRC_FA_LEARNING
 End Enum
@@ -129,7 +128,6 @@ Public Sub RunArStandardInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook,
     Dim revenueCategoryColumn As Long
     Dim customerPoColumn As Long
     Dim headerMemoColumn As Long
-    Dim lineMemoColumn As Long
     Dim eventColumn As Long
     Dim faLearningColumn As Long
 
@@ -172,13 +170,12 @@ Public Sub RunArStandardInvoiceCustomerInvoice(ByVal runnerWorkbook As Workbook,
     revenueCategoryColumn = FindColumnIndexInRow(sourceTable, sourceHeaderRow, "Revenue Category")
     customerPoColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "Purchase Order")
     headerMemoColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "INVOICE MEMO (DB)")
-    lineMemoColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "INVOICE LINE MEMO (emails) (FV)")
     eventColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "Event-OPTIONAL")
     faLearningColumn = FindOptionalColumnIndexInRow(sourceTable, sourceHeaderRow, "FA LEARNING COURSES-OPTIONAL")
     sourceColumns = Array( _
         workdayIdColumn, dateColumn, companyColumn, descriptionColumn, qtyColumn, _
         netColumn, grossColumn, reportingTypeColumn, costCentreColumn, revenueCategoryColumn, _
-        customerPoColumn, headerMemoColumn, lineMemoColumn, eventColumn, faLearningColumn _
+        customerPoColumn, headerMemoColumn, eventColumn, faLearningColumn _
     )
 
     Set outputWorkbook = CloneTemplateWorkbook(targetEibPath, outputFilePath)
@@ -349,8 +346,7 @@ Private Sub WriteOutputRow(ByVal targetSheet As Worksheet, ByVal targetRow As Lo
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_FROM_DATE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_TO_DATE)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_DEFERRED_REVENUE)).Value = vbNullString
-    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_MEMO)).Value = _
-        ReadSourceText(sourceTable, sourceRow, sourceColumns(SRC_LINE_MEMO))
+    targetSheet.Cells(targetRow, ColumnIndex(TGT_LINE_MEMO)).Value = vbNullString
     targetSheet.Cells(targetRow, ColumnIndex(TGT_COST_CENTRE)).Value = _
         ReadSourceText(sourceTable, sourceRow, sourceColumns(SRC_COST_CENTRE))
     targetSheet.Cells(targetRow, ColumnIndex(TGT_REPORTING_TYPE)).Value = _
