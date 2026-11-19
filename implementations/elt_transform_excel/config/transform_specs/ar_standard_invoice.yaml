@@ -191,7 +191,9 @@ mapping:
   default: ""
   optional: true
 - target: fv
-  source_column: INVOICE LINE MEMO (emails) (FV)
+  default: ""
+  optional: true
+  note: Line Memo is intentionally left blank; the source INVOICE LINE MEMO (emails) (FV) column is not used.
 - target: fx
   source_column: Cost Centre
 - target: fy
